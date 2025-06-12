@@ -413,3 +413,12 @@ go build ./cmd/server
 
 Use `POST /set` and `POST /get` endpoints to store and retrieve answers.
 
+### Simple Go Example
+
+For a minimal in-memory example run:
+
+```bash
+go run ./go/examples/simple
+```
+This prints `cached: world` after storing and retrieving a value using the new concurrent cache.
+
