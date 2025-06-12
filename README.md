@@ -400,3 +400,16 @@ Coming soon! [Stay tuned!](https://twitter.com/zilliz_universe)
 We are extremely open to contributions, be it through new features, enhanced infrastructure, or improved documentation.
 
 For comprehensive instructions on how to contribute, please refer to our [contribution guide](docs/contributing.md).
+
+## Go Server
+
+A minimal Go server is available under `go/cmd/server`. Build and run with:
+
+```bash
+cd go
+go build ./cmd/server
+./server -address :8080
+```
+
+Use `POST /set` and `POST /get` endpoints to store and retrieve answers.
+
