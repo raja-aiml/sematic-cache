@@ -1,3 +1,5 @@
+// Package server exposes HTTP handlers for cache operations.
+
 package server
 
 import (

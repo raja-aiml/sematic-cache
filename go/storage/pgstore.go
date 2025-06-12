@@ -1,3 +1,5 @@
+// Package storage provides a PostgreSQL-backed cache implementation.
+
 package storage
 
 import (

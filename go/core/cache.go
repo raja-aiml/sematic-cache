@@ -1,7 +1,10 @@
+// Package core implements an in-memory cache for prompts and embeddings.
+
 package core
 
 import (
 	"container/list"
+	"math"
 	"sync"
 )
 
@@ -104,14 +107,5 @@ func cosine(a, b []float32) float64 {
 	if aa == 0 || bb == 0 {
 		return 0
 	}
-	return dot / (sqrt(aa) * sqrt(bb))
-}
-
-func sqrt(v float64) float64 {
-	// simple Newton method
-	x := v
-	for i := 0; i < 10; i++ {
-		x = 0.5 * (x + v/x)
-	}
-	return x
+	return dot / (math.Sqrt(aa) * math.Sqrt(bb))
 }

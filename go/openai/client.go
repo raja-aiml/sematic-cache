@@ -1,3 +1,5 @@
+// Package openai provides a minimal client wrapper for the OpenAI API.
+
 package openai
 
 import (
