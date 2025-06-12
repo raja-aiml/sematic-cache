@@ -1,3 +1,4 @@
+// Example demonstrating basic cache usage.
 package main
 
 import (

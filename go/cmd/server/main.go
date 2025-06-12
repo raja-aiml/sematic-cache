@@ -1,3 +1,4 @@
+// Binary server runs the cache server.
 package main
 
 import (
