@@ -41,26 +41,18 @@ func (f *fakeDB) Exec(query string, args ...interface{}) (sql.Result, error) {
 }
 
 func (f *fakeDB) QueryRow(query string, args ...interface{}) scanner {
-	if len(args) > 0 && args[0] == f.expectedPrompt {
-		return fakeScanner{answer: f.answer}
-	}
-	return fakeScanner{err: sql.ErrNoRows}
+	return fakeScanner{answer: f.answer}
 }
+
+type fakeStmt struct{ db *fakeDB }
+
+func (s *fakeStmt) Exec(args ...interface{}) (sql.Result, error) { return s.db.Exec("", args...) }
+func (s *fakeStmt) QueryRow(args ...interface{}) scanner         { return s.db.QueryRow("", args...) }
+func (s *fakeStmt) Close() error                                 { return nil }
 
 func TestPGStoreSetGet(t *testing.T) {
 	db := &fakeDB{expectedPrompt: "p", answer: "a"}
-	// override funcs
-	oldExec := execFunc
-	oldQuery := queryRowFunc
-	execFunc = func(_ *sql.DB, q string, args ...interface{}) (sql.Result, error) {
-		return db.Exec(q, args...)
-	}
-	queryRowFunc = func(_ *sql.DB, q string, args ...interface{}) scanner {
-		return db.QueryRow(q, args...)
-	}
-	defer func() { execFunc = oldExec; queryRowFunc = oldQuery }()
-
-	store := &PGStore{}
+	store := &PGStore{setStmt: &fakeStmt{db}, getStmt: &fakeStmt{db}, similarStmt: &fakeStmt{db}}
 	if err := store.Set("p", nil, "a"); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
@@ -68,21 +60,14 @@ func TestPGStoreSetGet(t *testing.T) {
 	if err != nil || !ok || val != "a" {
 		t.Fatalf("Get failed: %v %v %v", val, ok, err)
 	}
+	val, ok, err = store.GetByEmbedding(nil)
+	if err != nil || !ok || val != "a" {
+		t.Fatalf("GetByEmbedding failed: %v %v %v", val, ok, err)
+	}
 }
 
 func TestPGStoreClose(t *testing.T) {
-	db := &fakeDB{}
-	oldExec := execFunc
-	oldQuery := queryRowFunc
-	execFunc = func(_ *sql.DB, q string, args ...interface{}) (sql.Result, error) {
-		return db.Exec(q, args...)
-	}
-	queryRowFunc = func(_ *sql.DB, q string, args ...interface{}) scanner {
-		return db.QueryRow(q, args...)
-	}
-	defer func() { execFunc = oldExec; queryRowFunc = oldQuery }()
-
-	store := &PGStore{}
+	store := &PGStore{setStmt: &fakeStmt{}, getStmt: &fakeStmt{}, similarStmt: &fakeStmt{}}
 	if err := store.Close(); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

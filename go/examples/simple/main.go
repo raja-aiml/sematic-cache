@@ -7,8 +7,8 @@ import (
 )
 
 func main() {
-	cache := core.NewCache()
-	cache.Set("hello", "world")
+	cache := core.NewCache(10)
+	cache.Set("hello", nil, "world")
 	if val, ok := cache.Get("hello"); ok {
 		fmt.Println("cached:", val)
 	} else {

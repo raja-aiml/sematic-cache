@@ -10,7 +10,7 @@ func main() {
 	addr := flag.String("address", ":8080", "server address")
 	flag.Parse()
 
-	cache := core.NewCache()
+	cache := core.NewCache(100)
 	srv := server.New(cache)
 	srv.Run(*addr)
 }
