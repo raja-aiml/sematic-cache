@@ -69,3 +69,21 @@ func TestPGStoreSetGet(t *testing.T) {
 		t.Fatalf("Get failed: %v %v %v", val, ok, err)
 	}
 }
+
+func TestPGStoreClose(t *testing.T) {
+	db := &fakeDB{}
+	oldExec := execFunc
+	oldQuery := queryRowFunc
+	execFunc = func(_ *sql.DB, q string, args ...interface{}) (sql.Result, error) {
+		return db.Exec(q, args...)
+	}
+	queryRowFunc = func(_ *sql.DB, q string, args ...interface{}) scanner {
+		return db.QueryRow(q, args...)
+	}
+	defer func() { execFunc = oldExec; queryRowFunc = oldQuery }()
+
+	store := &PGStore{}
+	if err := store.Close(); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
