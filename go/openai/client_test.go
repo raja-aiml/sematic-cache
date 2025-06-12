@@ -37,3 +37,32 @@ func TestComplete(t *testing.T) {
 		t.Fatalf("expected world, got %s", got)
 	}
 }
+
+func TestEmbedding(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req EmbeddingRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("bad request: %v", err)
+		}
+		if req.Input != "hello" {
+			t.Fatalf("expected input hello, got %s", req.Input)
+		}
+		resp := EmbeddingResponse{Data: []struct {
+			Embedding []float32 `json:"embedding"`
+		}{{Embedding: []float32{1, 2}}}}
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	c := NewClient("test")
+	c.BaseURL = server.URL
+	got, err := c.Embedding("hello")
+	if err != nil {
+		t.Fatalf("Embedding returned error: %v", err)
+	}
+	if len(got) != 2 || got[0] != 1 || got[1] != 2 {
+		t.Fatalf("unexpected embedding %v", got)
+	}
+}

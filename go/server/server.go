@@ -50,7 +50,7 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.Cache.Set(req.Prompt, req.Answer)
+	s.Cache.Set(req.Prompt, nil, req.Answer)
 	w.WriteHeader(http.StatusCreated)
 }
 

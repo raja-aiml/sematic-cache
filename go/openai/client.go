@@ -36,6 +36,19 @@ type CompletionResponse struct {
 	} `json:"choices"`
 }
 
+// EmbeddingRequest holds the request body for embeddings.
+type EmbeddingRequest struct {
+	Model string `json:"model"`
+	Input string `json:"input"`
+}
+
+// EmbeddingResponse holds the response body for embeddings.
+type EmbeddingResponse struct {
+	Data []struct {
+		Embedding []float32 `json:"embedding"`
+	} `json:"data"`
+}
+
 // Complete calls OpenAI's completion API.
 func (c *Client) Complete(prompt string) (string, error) {
 	reqBody, err := json.Marshal(CompletionRequest{Model: "text-davinci-003", Prompt: prompt})
@@ -67,4 +80,37 @@ func (c *Client) Complete(prompt string) (string, error) {
 		return "", fmt.Errorf("openai: no choices returned")
 	}
 	return res.Choices[0].Text, nil
+}
+
+// Embedding calls OpenAI's embedding API.
+func (c *Client) Embedding(text string) ([]float32, error) {
+	reqBody, err := json.Marshal(EmbeddingRequest{Model: "text-embedding-ada-002", Input: text})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", c.BaseURL+"/embeddings", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("openai: unexpected status %s", resp.Status)
+	}
+
+	var res EmbeddingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, err
+	}
+	if len(res.Data) == 0 {
+		return nil, fmt.Errorf("openai: no embedding returned")
+	}
+	return res.Data[0].Embedding, nil
 }

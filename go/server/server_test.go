@@ -11,7 +11,7 @@ import (
 )
 
 func TestServerSetGet(t *testing.T) {
-	cache := core.NewCache()
+	cache := core.NewCache(10)
 	srv := New(cache)
 
 	ts := httptest.NewServer(srv)
