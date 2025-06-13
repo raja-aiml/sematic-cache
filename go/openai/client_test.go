@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func TestComplete(t *testing.T) {
 
 	c := NewClient("test")
 	c.BaseURL = server.URL
-	got, err := c.Complete("hello")
+	got, err := c.Complete(context.Background(), "hello")
 	if err != nil {
 		t.Fatalf("Complete returned error: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestEmbedding(t *testing.T) {
 
 	c := NewClient("test")
 	c.BaseURL = server.URL
-	got, err := c.Embedding("hello")
+	got, err := c.Embedding(context.Background(), "hello")
 	if err != nil {
 		t.Fatalf("Embedding returned error: %v", err)
 	}
