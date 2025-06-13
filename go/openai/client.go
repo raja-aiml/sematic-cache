@@ -4,6 +4,7 @@ package openai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -52,12 +53,12 @@ type EmbeddingResponse struct {
 }
 
 // Complete calls OpenAI's completion API.
-func (c *Client) Complete(prompt string) (string, error) {
+func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
 	reqBody, err := json.Marshal(CompletionRequest{Model: "text-davinci-003", Prompt: prompt})
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequest("POST", c.BaseURL+"/completions", bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/completions", bytes.NewBuffer(reqBody))
 	if err != nil {
 		return "", err
 	}
@@ -85,12 +86,12 @@ func (c *Client) Complete(prompt string) (string, error) {
 }
 
 // Embedding calls OpenAI's embedding API.
-func (c *Client) Embedding(text string) ([]float32, error) {
+func (c *Client) Embedding(ctx context.Context, text string) ([]float32, error) {
 	reqBody, err := json.Marshal(EmbeddingRequest{Model: "text-embedding-ada-002", Input: text})
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", c.BaseURL+"/embeddings", bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/embeddings", bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, err
 	}
