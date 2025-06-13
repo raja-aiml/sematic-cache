@@ -1,6 +1,9 @@
 package core
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestCacheSetGet(t *testing.T) {
 	c := NewCache(2)
@@ -43,5 +46,21 @@ func TestCacheFlushAndImport(t *testing.T) {
 	c.ImportData(prompts, embeddings, answers)
 	if val, ok := c.Get("p2"); !ok || val != "a2" {
 		t.Fatalf("import failed")
+	}
+}
+
+func TestCacheSetPrompt(t *testing.T) {
+	embFn := func(p string) ([]float32, error) {
+		if p == "p" {
+			return []float32{1, 0}, nil
+		}
+		return nil, fmt.Errorf("unknown prompt")
+	}
+	c := NewCache(2, WithEmbeddingFunc(embFn))
+	if err := c.SetPrompt("p", "a"); err != nil {
+		t.Fatalf("SetPrompt error: %v", err)
+	}
+	if ans, ok := c.Get("p"); !ok || ans != "a" {
+		t.Fatalf("expected cached answer, got %v %v", ans, ok)
 	}
 }

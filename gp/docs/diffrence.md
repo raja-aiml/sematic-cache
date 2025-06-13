@@ -5,7 +5,7 @@ This document lists features from the original Python code that are not yet pres
 ## Core Cache Logic
 - **Initialization parameters**: Python `Cache.init` allows custom functions for enabling cache, embedding, pre/post processing and chaining multiple caches.
 - **API key helpers**: `set_openai_key` and `set_azure_openai_key` configure OpenAI credentials.
-- **Go status**: the Go `Cache` now supports `ImportData` and `Flush` but still lacks customizable init hooks.
+- **Go status**: the Go `Cache` now supports `ImportData`, `Flush` and basic customization through `WithEmbeddingFunc`, `WithCacheEnable` and `WithSimilarityFunc` options. Advanced pre/post hooks are not yet available.
 
 ## Storage Layer
 - **Python DataManager**: pluggable layers handle in-memory, file based or vector store backends with eviction policies.
