@@ -8,6 +8,7 @@ import (
    "math"
    "sort"
    "sync"
+   "sync/atomic"
    "time"
 )
 
@@ -21,14 +22,51 @@ type entry struct {
    ModelID            string  // e.g. deployment or version identifier
    // metadata
    accessCount        int       // number of times this entry was retrieved
-   lastAccessed       int64     // Unix timestamp of last access
-   timestamp          int64     // Unix timestamp when stored
+   lastAccessed       int64     // UnixNano timestamp of last access
+   timestamp          int64     // UnixNano timestamp when stored
    // future: contextChain, expertID, etc.
+}
+// Stats returns the number of cache hits, misses, and the hit rate.
+func (c *Cache) Stats() (hits, misses uint64, hitRate float64) {
+   hits = atomic.LoadUint64(&c.hitCount)
+   misses = atomic.LoadUint64(&c.missCount)
+   total := hits + misses
+   if total > 0 {
+       hitRate = float64(hits) / float64(total)
+   }
+   return
+}
+
+// SetBatch inserts multiple entries into the cache (no model metadata).
+func (c *Cache) SetBatch(prompts []string, embeddings [][]float32, answers []string) {
+   for i, prompt := range prompts {
+       var emb []float32
+       if i < len(embeddings) {
+           emb = embeddings[i]
+       }
+       var ans string
+       if i < len(answers) {
+           ans = answers[i]
+       }
+       c.Set(prompt, emb, ans)
+   }
+}
+
+// GetBatch retrieves multiple prompts from the cache, returning a map of found answers.
+func (c *Cache) GetBatch(prompts []string) map[string]string {
+   results := make(map[string]string, len(prompts))
+   for _, prompt := range prompts {
+       if ans, ok := c.Get(prompt); ok {
+           results[prompt] = ans
+       }
+   }
+   return results
 }
 
 // nowUnix returns the current Unix timestamp (seconds).
+// nowUnix returns the current Unix timestamp in nanoseconds.
 func nowUnix() int64 {
-   return time.Now().Unix()
+   return time.Now().UnixNano()
 }
 
 // QueryResult holds a single match from a similarity search, including model metadata.
@@ -51,7 +89,12 @@ type Cache struct {
    cacheEnable    func(string) bool
    embedFunc      EmbeddingFunc
    simFunc        func(a, b []float32) float64
-   minSimilarity  float64  // minimum similarity threshold for search (default: -1)
+   minSimilarity  float64       // minimum similarity threshold for search (default: -1)
+  	// TTL for entries; if >0, entries older than now-TTL are expired
+   ttl            time.Duration
+  	// metrics
+   hitCount       uint64        // number of cache hits
+   missCount      uint64        // number of cache misses
 }
 
 // EmbeddingFunc converts a prompt into an embedding vector.
@@ -78,6 +121,11 @@ func WithSimilarityFunc(fn func(a, b []float32) float64) Option {
 // Matches with similarity below this value are ignored.
 func WithMinSimilarity(th float64) Option {
    return func(c *Cache) { c.minSimilarity = th }
+}
+// WithTTL sets a time-to-live for cache entries. Entries older than now-TTL
+// will be considered expired and evicted on access.
+func WithTTL(d time.Duration) Option {
+   return func(c *Cache) { c.ttl = d }
 }
 
 // NewCache creates a cache with the given capacity.
@@ -163,31 +211,47 @@ func (c *Cache) Get(prompt string) (string, bool) {
 	defer c.mu.Unlock()
    if el, ok := c.entries[prompt]; ok {
        ent := el.Value.(*entry)
-       // update metadata
+       // expire entry if needed
+       if c.isExpired(ent) {
+           // evict expired entry
+           c.lru.Remove(el)
+           delete(c.entries, prompt)
+           atomic.AddUint64(&c.missCount, 1)
+           return "", false
+       }
+       // cache hit
        ent.accessCount++
        ent.lastAccessed = nowUnix()
        c.lru.MoveToFront(el)
+       atomic.AddUint64(&c.hitCount, 1)
        return ent.answer, true
    }
-	return "", false
+   atomic.AddUint64(&c.missCount, 1)
+   return "", false
 }
 
 // GetByEmbedding returns the answer whose embedding is most similar to the query.
 func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	var (
-		best     *list.Element
-		bestSim  float64
-		initBest bool
-	)
+   // First, scan under read-lock to find the best candidate and collect expired entries.
+   c.mu.RLock()
+   var (
+       best      *list.Element
+       bestSim   float64
+       initBest  bool
+       expired   []*list.Element
+   )
    for e := c.lru.Front(); e != nil; e = e.Next() {
        ent := e.Value.(*entry)
+       // skip entries of wrong dimension or empty query
        if len(ent.embedding) != len(embed) || len(embed) == 0 {
            continue
        }
+       // collect expired entries
+       if c.isExpired(ent) {
+           expired = append(expired, e)
+           continue
+       }
        sim := c.simFunc(ent.embedding, embed)
-       // apply threshold filter
        if sim < c.minSimilarity {
            continue
        }
@@ -197,15 +261,40 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
            initBest = true
        }
    }
-   if best != nil {
-       ent := best.Value.(*entry)
-       // update metadata
-       ent.accessCount++
-       ent.lastAccessed = nowUnix()
-       c.lru.MoveToFront(best)
-       return ent.answer, true
+   c.mu.RUnlock()
+   // Evict expired entries under write lock
+   if len(expired) > 0 {
+       c.mu.Lock()
+       for _, e := range expired {
+           key := e.Value.(*entry).prompt
+           c.lru.Remove(e)
+           delete(c.entries, key)
+       }
+       c.mu.Unlock()
    }
-	return "", false
+   // If no match, record miss
+   if best == nil {
+       atomic.AddUint64(&c.missCount, 1)
+       return "", false
+   }
+   // Update metadata on the chosen entry under write lock
+   c.mu.Lock()
+   ent := best.Value.(*entry)
+   // re-check expiry
+   if c.isExpired(ent) {
+       // evict and miss
+       c.lru.Remove(best)
+       delete(c.entries, ent.prompt)
+       atomic.AddUint64(&c.missCount, 1)
+       c.mu.Unlock()
+       return "", false
+   }
+   ent.accessCount++
+   ent.lastAccessed = nowUnix()
+   c.lru.MoveToFront(best)
+   c.mu.Unlock()
+   atomic.AddUint64(&c.hitCount, 1)
+   return ent.answer, true
 }
 // GetTopKByEmbedding returns up to k answers whose embeddings are most similar to the query.
 // Matches with similarity below the configured threshold are ignored.
@@ -216,6 +305,10 @@ func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
    // iterate through entries
    for prompt, el := range c.entries {
        ent := el.Value.(*entry)
+       // skip expired entries
+       if c.isExpired(ent) {
+           continue
+       }
        if len(ent.embedding) != len(embed) || len(embed) == 0 {
            continue
        }
@@ -260,6 +353,14 @@ func (c *Cache) insertEntry(ent *entry) {
 			delete(c.entries, tail.Value.(*entry).prompt)
 		}
 	}
+}
+
+// isExpired returns true if the entry is older than the cache TTL.
+func (c *Cache) isExpired(ent *entry) bool {
+   if c.ttl <= 0 {
+       return false
+   }
+   return time.Duration(nowUnix()-ent.timestamp) > c.ttl
 }
 
 // GetModelInfo returns the modelName and modelID for a given prompt, and whether the prompt exists in the cache.

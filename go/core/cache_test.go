@@ -1,8 +1,9 @@
 package core
 
 import (
-	"fmt"
-	"testing"
+   "fmt"
+   "testing"
+   "time"
 )
 
 func TestCacheSetGet(t *testing.T) {
@@ -19,6 +20,55 @@ func TestCacheSetGet(t *testing.T) {
 	if _, ok := c.Get("p2"); ok {
 		t.Fatalf("expected p2 evicted")
 	}
+}
+
+// Test entry expiration via TTL.
+func TestTTLExpiration(t *testing.T) {
+   // TTL of 50ms
+   c := NewCache(2, WithTTL(50*time.Millisecond))
+   c.Set("p1", []float32{1}, "a1")
+   // immediately retrievable
+   if v, ok := c.Get("p1"); !ok || v != "a1" {
+       t.Fatalf("expected initial hit, got %v %v", v, ok)
+   }
+   // wait for expiration
+   time.Sleep(60 * time.Millisecond)
+   if _, ok := c.Get("p1"); ok {
+       t.Fatalf("expected entry expired after TTL")
+   }
+}
+
+// Test cache metrics: hits, misses, hit rate.
+func TestStats(t *testing.T) {
+   c := NewCache(2)
+   // misses
+   c.Get("x")
+   // hits
+   c.Set("p", []float32{1}, "a")
+   c.Get("p")
+   hits, misses, rate := c.Stats()
+   if hits != 1 || misses != 1 {
+       t.Errorf("expected hits=1 misses=1, got %d %d", hits, misses)
+   }
+   if rate != 0.5 {
+       t.Errorf("expected hit rate 0.5, got %v", rate)
+   }
+}
+
+// Test batch set and get operations.
+func TestBatchSetGet(t *testing.T) {
+   c := NewCache(5)
+   prompts := []string{"a", "b", "c"}
+   embeddings := [][]float32{{1}, {2}, {3}}
+   answers := []string{"A", "B", "C"}
+   c.SetBatch(prompts, embeddings, answers)
+   res := c.GetBatch([]string{"a", "c", "d"})
+   if len(res) != 2 {
+       t.Fatalf("expected 2 entries, got %d", len(res))
+   }
+   if res["a"] != "A" || res["c"] != "C" {
+       t.Errorf("unexpected batch get results: %v", res)
+   }
 }
 
 func TestCacheGetByEmbedding(t *testing.T) {
