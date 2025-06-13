@@ -43,13 +43,19 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	   http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	val, ok := s.Cache.Get(req.Prompt)
-	if !ok {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
+   // retrieve answer and model metadata
+   val, ok := s.Cache.Get(req.Prompt)
+   if !ok {
+       http.Error(w, "not found", http.StatusNotFound)
+       return
+   }
+   modelName, modelID, _ := s.Cache.GetModelInfo(req.Prompt)
    w.Header().Set("Content-Type", "application/json")
-   json.NewEncoder(w).Encode(map[string]string{"answer": val})
+   json.NewEncoder(w).Encode(map[string]string{
+       "answer":    val,
+       "modelName": modelName,
+       "modelID":   modelID,
+   })
 }
 
 func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
@@ -57,12 +63,19 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var req struct{ Prompt, Answer string }
+   // accept optional model metadata
+   var req struct {
+       Prompt    string `json:"prompt"`
+       Answer    string `json:"answer"`
+       ModelName string `json:"modelName,omitempty"`
+       ModelID   string `json:"modelID,omitempty"`
+   }
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.Cache.Set(req.Prompt, nil, req.Answer)
+   // store entry with model metadata
+   s.Cache.SetWithModel(req.Prompt, nil, req.Answer, req.ModelName, req.ModelID)
 	w.WriteHeader(http.StatusCreated)
 }
 
