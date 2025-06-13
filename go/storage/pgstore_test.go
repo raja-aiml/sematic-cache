@@ -66,6 +66,19 @@ func TestPGStoreSetGet(t *testing.T) {
 	}
 }
 
+func TestPGStoreImportFlush(t *testing.T) {
+	db := &fakeDB{}
+	store := &PGStore{setStmt: &fakeStmt{db}, getStmt: &fakeStmt{db}, similarStmt: &fakeStmt{db}}
+	prompts := []string{"p1", "p2"}
+	answers := []string{"a1", "a2"}
+	if err := store.ImportData(prompts, nil, answers); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if err := store.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+}
+
 func TestPGStoreClose(t *testing.T) {
 	store := &PGStore{setStmt: &fakeStmt{}, getStmt: &fakeStmt{}, similarStmt: &fakeStmt{}}
 	if err := store.Close(); err != nil {

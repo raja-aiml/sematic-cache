@@ -38,3 +38,20 @@ func TestServerSetGet(t *testing.T) {
 		t.Fatalf("expected a, got %s", data["answer"])
 	}
 }
+
+func TestServerFlush(t *testing.T) {
+	cache := core.NewCache(10)
+	srv := New(cache)
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	body, _ := json.Marshal(map[string]string{"prompt": "p", "answer": "a"})
+	http.Post(ts.URL+"/set", "application/json", bytes.NewBuffer(body))
+	http.Post(ts.URL+"/flush", "application/json", nil)
+
+	body, _ = json.Marshal(map[string]string{"prompt": "p"})
+	resp, _ := http.Post(ts.URL+"/get", "application/json", bytes.NewBuffer(body))
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected not found after flush, got %v", resp.StatusCode)
+	}
+}

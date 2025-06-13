@@ -9,8 +9,8 @@ import (
 )
 
 func TestComplete(t *testing.T) {
-   handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-       w.Header().Set("Content-Type", "application/json")
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("bad request: %v", err)
@@ -39,8 +39,8 @@ func TestComplete(t *testing.T) {
 }
 
 func TestEmbedding(t *testing.T) {
-   handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-       w.Header().Set("Content-Type", "application/json")
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("bad request: %v", err)
@@ -66,5 +66,20 @@ func TestEmbedding(t *testing.T) {
 	}
 	if len(got) != 2 || got[0] != 1 || got[1] != 2 {
 		t.Fatalf("unexpected embedding %v", got)
+	}
+}
+
+func TestClientConfig(t *testing.T) {
+	c := NewClient("k1")
+	if c.apiKey != "k1" {
+		t.Fatalf("expected k1")
+	}
+	c.SetAPIKey("k2")
+	if c.apiKey != "k2" {
+		t.Fatalf("expected k2")
+	}
+	c.ConfigureAzure("k3", "http://x", "2023-09-01")
+	if c.BaseURL != "http://x" || c.APIVersion != "2023-09-01" || c.apiKey != "k3" {
+		t.Fatalf("azure config not applied")
 	}
 }

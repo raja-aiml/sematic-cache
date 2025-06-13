@@ -97,6 +97,47 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
 	return "", false
 }
 
+// Flush clears all cached entries.
+func (c *Cache) Flush() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = make(map[string]*list.Element)
+	c.lru.Init()
+}
+
+// ImportData loads multiple prompt/embedding/answer triples into the cache.
+func (c *Cache) ImportData(prompts []string, embeddings [][]float32, answers []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i, p := range prompts {
+		var e []float32
+		if i < len(embeddings) {
+			e = embeddings[i]
+		}
+		var a string
+		if i < len(answers) {
+			a = answers[i]
+		}
+		if el, ok := c.entries[p]; ok {
+			ent := el.Value.(*entry)
+			ent.embedding = e
+			ent.answer = a
+			c.lru.MoveToFront(el)
+			continue
+		}
+		ent := &entry{prompt: p, embedding: e, answer: a}
+		el := c.lru.PushFront(ent)
+		c.entries[p] = el
+		if c.lru.Len() > c.capacity {
+			tail := c.lru.Back()
+			if tail != nil {
+				c.lru.Remove(tail)
+				delete(c.entries, tail.Value.(*entry).prompt)
+			}
+		}
+	}
+}
+
 func cosine(a, b []float32) float64 {
 	var dot, aa, bb float64
 	for i := range a {
