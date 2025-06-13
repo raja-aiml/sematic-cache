@@ -10,6 +10,26 @@ import (
 	"github.com/raja-aiml/sematic-cache/go/core"
 )
 
+// setRequest represents the JSON payload for /set.
+type setRequest struct {
+   Prompt    string `json:"prompt"`
+   Answer    string `json:"answer"`
+   ModelName string `json:"modelName,omitempty"`
+   ModelID   string `json:"modelID,omitempty"`
+}
+
+// getRequest represents the JSON payload for /get.
+type getRequest struct {
+   Prompt string `json:"prompt"`
+}
+
+// getResponse is the JSON response for /get.
+type getResponse struct {
+   Answer    string `json:"answer"`
+   ModelName string `json:"modelName,omitempty"`
+   ModelID   string `json:"modelID,omitempty"`
+}
+
 // Server provides HTTP access to the cache.
 type Server struct {
 	Cache *core.Cache
@@ -38,24 +58,26 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
        return
    }
-   var req struct{ Prompt string }
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+   var req getRequest
+   if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 	   http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
    // retrieve answer and model metadata
-   val, ok := s.Cache.Get(req.Prompt)
+   answer, ok := s.Cache.Get(req.Prompt)
    if !ok {
        http.Error(w, "not found", http.StatusNotFound)
        return
    }
    modelName, modelID, _ := s.Cache.GetModelInfo(req.Prompt)
+   // respond with structured JSON
+   resp := getResponse{
+       Answer:    answer,
+       ModelName: modelName,
+       ModelID:   modelID,
+   }
    w.Header().Set("Content-Type", "application/json")
-   json.NewEncoder(w).Encode(map[string]string{
-       "answer":    val,
-       "modelName": modelName,
-       "modelID":   modelID,
-   })
+   json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
@@ -63,18 +85,13 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-   // accept optional model metadata
-   var req struct {
-       Prompt    string `json:"prompt"`
-       Answer    string `json:"answer"`
-       ModelName string `json:"modelName,omitempty"`
-       ModelID   string `json:"modelID,omitempty"`
+   // decode request payload
+   var req setRequest
+   if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+       http.Error(w, err.Error(), http.StatusBadRequest)
+       return
    }
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-   // store entry with model metadata
+   // store entry with optional model metadata
    s.Cache.SetWithModel(req.Prompt, nil, req.Answer, req.ModelName, req.ModelID)
 	w.WriteHeader(http.StatusCreated)
 }

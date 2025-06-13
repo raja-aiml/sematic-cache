@@ -31,7 +31,6 @@ func nowUnix() int64 {
    return time.Now().Unix()
 }
 
-// QueryResult holds a single match from a similarity search.
 // QueryResult holds a single match from a similarity search, including model metadata.
 type QueryResult struct {
    Prompt     string
@@ -41,7 +40,6 @@ type QueryResult struct {
    ModelID    string
 }
 
-// Cache provides a concurrent LRU cache storing embeddings and answers.
 // Cache provides a concurrent LRU cache storing embeddings and answers.
 // It supports cosine similarity search with optional threshold and top-K queries.
 type Cache struct {
@@ -102,14 +100,14 @@ func NewCache(capacity int, opts ...Option) *Cache {
 	return c
 }
 
-// Set stores an answer and embedding for the given prompt.
 // Set stores an answer and embedding for the given prompt, without model metadata.
-// Equivalent to SetWithModel(prompt, embedding, answer, "", "").
+// It is equivalent to SetWithModel(prompt, embedding, answer, "", "").
 func (c *Cache) Set(prompt string, embedding []float32, answer string) {
    c.SetWithModel(prompt, embedding, answer, "", "")
 }
 
 // SetWithModel stores an answer and embedding for the given prompt, including model metadata.
+// modelName is the model's name (e.g. "gpt-3.5-turbo"); modelID is the specific deployment or version identifier.
 func (c *Cache) SetWithModel(prompt string, embedding []float32, answer, modelName, modelID string) {
    if c.cacheEnable != nil && !c.cacheEnable(prompt) {
        return
@@ -264,7 +262,8 @@ func (c *Cache) insertEntry(ent *entry) {
 	}
 }
 
-// GetModelInfo returns the model name and model ID stored for a prompt, if present.
+// GetModelInfo returns the modelName and modelID for a given prompt, and whether the prompt exists in the cache.
+// Both strings will be empty if found == false.
 func (c *Cache) GetModelInfo(prompt string) (modelName, modelID string, found bool) {
    c.mu.RLock()
    defer c.mu.RUnlock()
