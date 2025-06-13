@@ -149,6 +149,30 @@ func (s *PGStore) GetByEmbedding(embed []float32) (string, bool, error) {
 	return ans, true, nil
 }
 
+// Flush removes all cached rows.
+func (s *PGStore) Flush() error {
+	_, err := execFunc(s.db, `DELETE FROM cache`)
+	return err
+}
+
+// ImportData bulk loads prompts with their embeddings and answers.
+func (s *PGStore) ImportData(prompts []string, embeddings [][]float32, answers []string) error {
+	for i, p := range prompts {
+		var e []float32
+		if i < len(embeddings) {
+			e = embeddings[i]
+		}
+		var a string
+		if i < len(answers) {
+			a = answers[i]
+		}
+		if err := s.Set(p, e, a); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Close releases any database resources.
 func (s *PGStore) Close() error {
 	if s.setStmt != nil {

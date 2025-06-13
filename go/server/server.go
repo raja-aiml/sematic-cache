@@ -26,6 +26,7 @@ func New(c *core.Cache) *Server {
 func (s *Server) routes() {
 	s.mux.HandleFunc("/get", s.handleGet)
 	s.mux.HandleFunc("/set", s.handleSet)
+	s.mux.HandleFunc("/flush", s.handleFlush)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +55,11 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 	}
 	s.Cache.Set(req.Prompt, nil, req.Answer)
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleFlush(w http.ResponseWriter, r *http.Request) {
+	s.Cache.Flush()
+	w.WriteHeader(http.StatusOK)
 }
 
 // Run starts the HTTP server.
