@@ -4,32 +4,37 @@
 package openai
 
 import (
-	"context"
-	"fmt"
+   "context"
+   "fmt"
 
-	openai "github.com/sashabaranov/go-openai"
+   openai "github.com/openai/openai-go"
+   "github.com/openai/openai-go/option"
+   "github.com/openai/openai-go/packages/param"
 )
 
 // Client wraps the OpenAI SDK client.
+// Client wraps the OpenAI SDK client.
 type Client struct {
-	apiKey  string
-	BaseURL string
-	client  *openai.Client
+   apiKey  string
+   BaseURL string
+   client  openai.Client
 }
 
 // NewClient creates a new OpenAI client.
+// NewClient creates a new OpenAI client.
 func NewClient(apiKey string) *Client {
-	c := &Client{apiKey: apiKey, BaseURL: openai.DefaultConfig(apiKey).BaseURL}
-	c.configure()
-	return c
+   c := &Client{apiKey: apiKey}
+   c.configure()
+   return c
 }
 
+// configure initializes the underlying openai.Client with options.
 func (c *Client) configure() {
-	cfg := openai.DefaultConfig(c.apiKey)
-	if c.BaseURL != "" {
-		cfg.BaseURL = c.BaseURL
-	}
-	c.client = openai.NewClientWithConfig(cfg)
+   opts := []option.RequestOption{option.WithAPIKey(c.apiKey)}
+   if c.BaseURL != "" {
+       opts = append(opts, option.WithBaseURL(c.BaseURL))
+   }
+   c.client = openai.NewClient(opts...)
 }
 
 // SetBaseURL updates the API base URL and reinitializes the SDK client. This is
@@ -41,11 +46,13 @@ func (c *Client) SetBaseURL(url string) {
 
 // Complete calls OpenAI's completion API.
 func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
-	req := openai.CompletionRequest{
-		Model:  "text-davinci-003",
-		Prompt: prompt,
-	}
-	resp, err := c.client.CreateCompletion(ctx, req)
+   params := openai.CompletionNewParams{
+       Model: "text-davinci-003",
+       Prompt: openai.CompletionNewParamsPromptUnion{
+           OfString: param.NewOpt(prompt),
+       },
+   }
+   resp, err := c.client.Completions.New(ctx, params)
 	if err != nil {
 		return "", err
 	}
@@ -57,16 +64,23 @@ func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
 
 // Embedding calls OpenAI's embedding API.
 func (c *Client) Embedding(ctx context.Context, text string) ([]float32, error) {
-	req := openai.EmbeddingRequest{
-		Model: "text-embedding-ada-002",
-		Input: []string{text},
-	}
-	resp, err := c.client.CreateEmbeddings(ctx, req)
+   params := openai.EmbeddingNewParams{
+       Model: openai.EmbeddingModelTextEmbeddingAda002,
+       Input: openai.EmbeddingNewParamsInputUnion{
+           OfArrayOfStrings: []string{text},
+       },
+   }
+   resp, err := c.client.Embeddings.New(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.Data) == 0 {
-		return nil, fmt.Errorf("openai: no embedding returned")
-	}
-	return resp.Data[0].Embedding, nil
+   if len(resp.Data) == 0 {
+       return nil, fmt.Errorf("openai: no embedding returned")
+   }
+   raw := resp.Data[0].Embedding
+   vec := make([]float32, len(raw))
+   for i, v := range raw {
+       vec[i] = float32(v)
+   }
+   return vec, nil
 }

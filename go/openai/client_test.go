@@ -9,7 +9,8 @@ import (
 )
 
 func TestComplete(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+   handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+       w.Header().Set("Content-Type", "application/json")
 		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("bad request: %v", err)
@@ -38,7 +39,8 @@ func TestComplete(t *testing.T) {
 }
 
 func TestEmbedding(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+   handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+       w.Header().Set("Content-Type", "application/json")
 		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("bad request: %v", err)
