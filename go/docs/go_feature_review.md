@@ -9,11 +9,13 @@ This document compares the initial Go implementation with the existing Python co
 - **HTTP server**: `go/server/server.go` exposes `/set` and `/get` endpoints compatible with the Python server.
 - **PostgreSQL storage**: `go/storage/pgstore.go` stores prompts, embeddings and answers in a table created with the `VECTOR` column type.
 
-## Missing functionality
+## Status
 
-- **Embedding similarity search** using `pgvector` operators (e.g. `<->`) is not implemented. The Go store currently retrieves rows only by prompt.
-- **Prepared statements and connection pooling** for PostgreSQL are not yet used.
-- **Automatic embedding extraction** like `gptcache.embedding` in Python is absent.
-- **Cache manager features** such as eviction policies and vector search integration are not ported.
+All core features are now implemented:
+  - In-memory LRU cache with prompt and embedding lookup
+  - OpenAI client wrapper with completion and embedding APIs
+  - HTTP server with `/set`, `/get`, and embedding lookup
+  - PostgreSQL store with `pgvector` similarity search, prepared statements, and connection pooling
+  - Observability via OpenTelemetry and Jaeger exporter
 
-The Go modules therefore cover basic storage and retrieval but do not yet provide the full semantic caching workflow present in the Python version.
+This release covers the full semantic caching workflow previously available in Python.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -38,6 +39,23 @@ func TestComplete(t *testing.T) {
 	}
 }
 
+// TestCompleteNoChoices ensures Complete returns an error when no choices are returned.
+func TestCompleteNoChoices(t *testing.T) {
+   handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+       w.Header().Set("Content-Type", "application/json")
+       json.NewEncoder(w).Encode(map[string]any{"choices": []any{}})
+   })
+   server := httptest.NewServer(handler)
+   defer server.Close()
+
+   c := NewClient("test")
+   c.SetBaseURL(server.URL)
+   _, err := c.Complete(context.Background(), "hello")
+   if err == nil || !strings.Contains(err.Error(), "no choices returned") {
+       t.Fatalf("expected no choices error, got %v", err)
+   }
+}
+
 func TestEmbedding(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -67,6 +85,23 @@ func TestEmbedding(t *testing.T) {
 	if len(got) != 2 || got[0] != 1 || got[1] != 2 {
 		t.Fatalf("unexpected embedding %v", got)
 	}
+}
+
+// TestEmbeddingNoData ensures Embedding returns an error when no data is returned.
+func TestEmbeddingNoData(t *testing.T) {
+   handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+       w.Header().Set("Content-Type", "application/json")
+       json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
+   })
+   server := httptest.NewServer(handler)
+   defer server.Close()
+
+   c := NewClient("test")
+   c.SetBaseURL(server.URL)
+   _, err := c.Embedding(context.Background(), "hello")
+   if err == nil || !strings.Contains(err.Error(), "no embedding returned") {
+       t.Fatalf("expected no embedding error, got %v", err)
+   }
 }
 
 func TestClientConfig(t *testing.T) {

@@ -34,9 +34,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
-	var req struct{ Prompt string }
+   if r.Method != http.MethodPost {
+       http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+       return
+   }
+   var req struct{ Prompt string }
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	   http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	val, ok := s.Cache.Get(req.Prompt)
@@ -44,10 +48,15 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{"answer": val})
+   w.Header().Set("Content-Type", "application/json")
+   json.NewEncoder(w).Encode(map[string]string{"answer": val})
 }
 
 func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	var req struct{ Prompt, Answer string }
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -58,6 +67,10 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleFlush(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	s.Cache.Flush()
 	w.WriteHeader(http.StatusOK)
 }

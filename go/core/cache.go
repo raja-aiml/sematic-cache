@@ -25,11 +25,15 @@ type Cache struct {
 
 // NewCache creates a cache with the given capacity.
 func NewCache(capacity int) *Cache {
-	return &Cache{
-		entries:  make(map[string]*list.Element),
-		lru:      list.New(),
-		capacity: capacity,
-	}
+   // capacity must be positive
+   if capacity <= 0 {
+       panic("core: capacity must be > 0")
+   }
+   return &Cache{
+       entries:  make(map[string]*list.Element),
+       lru:      list.New(),
+       capacity: capacity,
+   }
 }
 
 // Set stores an answer and embedding for the given prompt.
@@ -45,17 +49,8 @@ func (c *Cache) Set(prompt string, embedding []float32, answer string) {
 		return
 	}
 
-	ent := &entry{prompt: prompt, embedding: embedding, answer: answer}
-	el := c.lru.PushFront(ent)
-	c.entries[prompt] = el
-
-	if c.lru.Len() > c.capacity {
-		tail := c.lru.Back()
-		if tail != nil {
-			c.lru.Remove(tail)
-			delete(c.entries, tail.Value.(*entry).prompt)
-		}
-	}
+   ent := &entry{prompt: prompt, embedding: embedding, answer: answer}
+   c.insertEntry(ent)
 }
 
 // Get returns the cached answer for a prompt and whether it was found.
@@ -105,6 +100,19 @@ func (c *Cache) Flush() {
 	c.lru.Init()
 }
 
+// insertEntry adds a new entry (assumes c.mu is held), evicting the oldest if over capacity.
+func (c *Cache) insertEntry(ent *entry) {
+   el := c.lru.PushFront(ent)
+   c.entries[ent.prompt] = el
+   if c.lru.Len() > c.capacity {
+       tail := c.lru.Back()
+       if tail != nil {
+           c.lru.Remove(tail)
+           delete(c.entries, tail.Value.(*entry).prompt)
+       }
+   }
+}
+
 // ImportData loads multiple prompt/embedding/answer triples into the cache.
 func (c *Cache) ImportData(prompts []string, embeddings [][]float32, answers []string) {
 	c.mu.Lock()
@@ -126,18 +134,12 @@ func (c *Cache) ImportData(prompts []string, embeddings [][]float32, answers []s
 			continue
 		}
 		ent := &entry{prompt: p, embedding: e, answer: a}
-		el := c.lru.PushFront(ent)
-		c.entries[p] = el
-		if c.lru.Len() > c.capacity {
-			tail := c.lru.Back()
-			if tail != nil {
-				c.lru.Remove(tail)
-				delete(c.entries, tail.Value.(*entry).prompt)
-			}
-		}
+		c.insertEntry(ent)
 	}
 }
 
+// cosine returns the cosine similarity between two vectors (range [-1,1]).
+// If either vector has zero magnitude, cosine returns 0.
 func cosine(a, b []float32) float64 {
 	var dot, aa, bb float64
 	for i := range a {
