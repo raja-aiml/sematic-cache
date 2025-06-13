@@ -10,18 +10,16 @@ import (
 
 func TestComplete(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req CompletionRequest
+		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("bad request: %v", err)
 		}
-		if req.Prompt != "hello" {
-			t.Fatalf("expected prompt hello, got %s", req.Prompt)
+		if req["prompt"] != "hello" {
+			t.Fatalf("expected prompt hello, got %v", req["prompt"])
 		}
-		resp := CompletionResponse{Choices: []struct {
-			Text string `json:"text"`
-		}{
-			{Text: "world"},
-		}}
+		resp := map[string]any{
+			"choices": []map[string]string{{"text": "world"}},
+		}
 		json.NewEncoder(w).Encode(resp)
 	})
 
@@ -29,7 +27,7 @@ func TestComplete(t *testing.T) {
 	defer server.Close()
 
 	c := NewClient("test")
-	c.BaseURL = server.URL
+	c.SetBaseURL(server.URL)
 	got, err := c.Complete(context.Background(), "hello")
 	if err != nil {
 		t.Fatalf("Complete returned error: %v", err)
@@ -41,16 +39,17 @@ func TestComplete(t *testing.T) {
 
 func TestEmbedding(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req EmbeddingRequest
+		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("bad request: %v", err)
 		}
-		if req.Input != "hello" {
-			t.Fatalf("expected input hello, got %s", req.Input)
+		input, ok := req["input"].([]interface{})
+		if !ok || len(input) == 0 || input[0] != "hello" {
+			t.Fatalf("expected input hello, got %v", req["input"])
 		}
-		resp := EmbeddingResponse{Data: []struct {
-			Embedding []float32 `json:"embedding"`
-		}{{Embedding: []float32{1, 2}}}}
+		resp := map[string]any{
+			"data": []map[string]any{{"embedding": []float32{1, 2}}},
+		}
 		json.NewEncoder(w).Encode(resp)
 	})
 
@@ -58,7 +57,7 @@ func TestEmbedding(t *testing.T) {
 	defer server.Close()
 
 	c := NewClient("test")
-	c.BaseURL = server.URL
+	c.SetBaseURL(server.URL)
 	got, err := c.Embedding(context.Background(), "hello")
 	if err != nil {
 		t.Fatalf("Embedding returned error: %v", err)
