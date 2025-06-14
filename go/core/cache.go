@@ -12,10 +12,6 @@ import (
    "sync/atomic"
    "time"
 )
-// Seed the random number generator for RR eviction
-func init() {
-   rand.Seed(time.Now().UnixNano())
-}
 // Eviction policy constants for in-memory cache
 const (
    PolicyLRU  = "LRU"
@@ -106,7 +102,6 @@ func (c *Cache) GetBatch(prompts []string) map[string]string {
 	return results
 }
 
-// nowUnix returns the current Unix timestamp (seconds).
 // nowUnix returns the current Unix timestamp in nanoseconds.
 func nowUnix() int64 {
 	return time.Now().UnixNano()
@@ -638,14 +633,14 @@ func (c *Cache) Flush() {
 func (c *Cache) insertEntry(ent *entry) {
 	el := c.lru.PushFront(ent)
 	c.entries[ent.prompt] = el
-   // evict when reaching or exceeding capacity to maintain max entries
-   if c.lru.Len() >= c.capacity {
+   // evict when exceeding capacity to maintain max entries
+   if c.lru.Len() > c.capacity {
        // determine eviction key based on policy
        var evictKey string
        switch c.evictionPolicy {
        case PolicyLFU:
            // find entry with lowest accessCount
-           minCount := int(^uint(0) >> 1) // max int
+           minCount := math.MaxInt
            for key, el0 := range c.entries {
                cnt := el0.Value.(*entry).accessCount
                if cnt < minCount {

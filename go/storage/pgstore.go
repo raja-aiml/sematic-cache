@@ -13,6 +13,28 @@ import (
 type scanner interface {
 	Scan(dest ...interface{}) error
 }
+// initStatements prepares SQL statements for the store.
+func (s *PGStore) initStatements() error {
+   var err error
+   s.setStmt, err = prepareFunc(s.db, `INSERT INTO cache(prompt, embedding, answer)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (prompt) DO UPDATE SET embedding = EXCLUDED.embedding, answer = EXCLUDED.answer`)
+   if err != nil {
+       return err
+   }
+   s.getStmt, err = prepareFunc(s.db, `SELECT answer FROM cache WHERE prompt = $1`)
+   if err != nil {
+       s.setStmt.Close()
+       return err
+   }
+   s.similarStmt, err = prepareFunc(s.db, `SELECT answer FROM cache ORDER BY embedding <-> $1 LIMIT 1`)
+   if err != nil {
+       s.setStmt.Close()
+       s.getStmt.Close()
+       return err
+   }
+   return nil
+}
 
 // function variables for testability
 var (
@@ -67,27 +89,13 @@ func NewPGStore(conn string) (*PGStore, error) {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(time.Hour)
 
-	setStmt, err := prepareFunc(db, `INSERT INTO cache(prompt, embedding, answer)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (prompt) DO UPDATE SET embedding = EXCLUDED.embedding, answer = EXCLUDED.answer`)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	getStmt, err := prepareFunc(db, `SELECT answer FROM cache WHERE prompt = $1`)
-	if err != nil {
-		setStmt.Close()
-		db.Close()
-		return nil, err
-	}
-	similarStmt, err := prepareFunc(db, `SELECT answer FROM cache ORDER BY embedding <-> $1 LIMIT 1`)
-	if err != nil {
-		setStmt.Close()
-		getStmt.Close()
-		db.Close()
-		return nil, err
-	}
-	return &PGStore{db: db, setStmt: setStmt, getStmt: getStmt, similarStmt: similarStmt}, nil
+   // initialize prepared statements to avoid race conditions
+   store := &PGStore{db: db}
+   if err := store.initStatements(); err != nil {
+       db.Close()
+       return nil, err
+   }
+   return store, nil
 }
 
 // Init creates the table if it doesn't exist.

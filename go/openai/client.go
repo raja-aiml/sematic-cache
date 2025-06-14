@@ -207,7 +207,9 @@ func (c *Client) Chat(ctx context.Context, messages []ChatMessage, opts ChatOpti
 
 // ChatStream invokes the chat completion API with streaming enabled.
 // It returns a channel streaming content deltas, and an error if initial request fails.
-func (c *Client) ChatStream(ctx context.Context, messages []ChatMessage, opts ChatOptions) (<-chan string, error) {
+// ChatStream invokes the chat completion API with streaming enabled.
+// It returns a channel streaming content deltas, a channel for streaming errors, and an error if the initial request fails.
+func (c *Client) ChatStream(ctx context.Context, messages []ChatMessage, opts ChatOptions) (<-chan string, <-chan error, error) {
    // build request params (same as Chat)
    params := openai.ChatCompletionNewParams{
        Model: openai.ChatModel(opts.Model),
@@ -244,19 +246,29 @@ func (c *Client) ChatStream(ctx context.Context, messages []ChatMessage, opts Ch
    // initiate streaming
    stream := c.client.Chat.Completions.NewStreaming(ctx, params)
    out := make(chan string)
+   errChan := make(chan error, 1)
    go func() {
        defer close(out)
+       defer close(errChan)
        for stream.Next() {
            chunk := stream.Current()
            if len(chunk.Choices) > 0 {
                delta := chunk.Choices[0].Delta.Content
                if delta != "" {
-                   out <- delta
+                   select {
+                   case out <- delta:
+                   case <-ctx.Done():
+                       return
+                   }
                }
            }
        }
+       // report any streaming error
+       if err := stream.Err(); err != nil {
+           errChan <- err
+       }
    }()
-   return out, nil
+   return out, errChan, nil
 }
 // NewClient creates a new OpenAI client.
 // NewClient creates a new OpenAI client.
