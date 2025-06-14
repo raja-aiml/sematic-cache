@@ -370,11 +370,25 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
        atomic.AddUint64(&c.missCount, 1)
        return "", false
    }
-   // Try ANN index for fast lookup when no adaptive threshold is set
+   // Try ANN index for fast lookup when no adaptive threshold is set, apply minSimilarity and embedding length check
    if c.annIndex != nil && c.adaptiveThreshold == nil {
        if keys, err := c.annIndex.Search(embed, 1); err == nil && len(keys) > 0 {
-           // c.Get updates LRU and metrics
-           return c.Get(keys[0])
+           key := keys[0]
+           // validate the candidate against expiry, dimension, and threshold
+           c.mu.RLock()
+           el, ok := c.entries[key]
+           c.mu.RUnlock()
+           if ok {
+               ent := el.Value.(*entry)
+               if !c.isExpired(ent) && len(ent.embedding) == len(embed) {
+                   sim := c.simFunc(ent.embedding, embed)
+                   if sim >= c.minSimilarity {
+                       // c.Get updates LRU and metrics
+                       return c.Get(key)
+                   }
+               }
+           }
+           // otherwise fall back to brute-force search
        }
    }
 
@@ -479,6 +493,10 @@ func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
                if el, ok := c.entries[key]; ok {
                    ent := el.Value.(*entry)
                    if c.isExpired(ent) {
+                       continue
+                   }
+                   // skip entries with mismatched embedding dimensions
+                   if len(ent.embedding) != len(embed) {
                        continue
                    }
                    sim := c.simFunc(ent.embedding, embed)
