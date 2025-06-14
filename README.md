@@ -154,13 +154,691 @@ make migrate
 make run
 ```
 
-## Advanced Configuration
+## Project Structure
 
-The system supports extensive configuration for production deployments:
+```
+semantic-cache/
+├── cmd/                    # Application entry points
+│   ├── server/            # Cache server main
+│   └── cli/               # Command-line tools
+├── internal/              # Private application code
+│   ├── cache/            # Core cache logic
+│   ├── storage/          # Storage layer implementations
+│   │   ├── memory/       # In-memory cache
+│   │   ├── redis/        # Redis distributed cache
+│   │   └── postgres/     # PostgreSQL persistent storage
+│   ├── embedding/        # OpenAI embedding client
+│   ├── similarity/       # Similarity calculation algorithms
+│   └── config/           # Configuration management
+├── pkg/                   # Public library code
+│   ├── client/           # Cache client library
+│   └── types/            # Shared types and interfaces
+├── api/                   # API definitions
+│   ├── rest/             # REST API handlers
+│   └── grpc/             # gRPC service definitions
+├── migrations/            # Database migrations
+├── scripts/               # Build and deployment scripts
+├── docker/                # Docker configurations
+├── docs/                  # Documentation
+├── examples/              # Usage examples
+└── test/                  # Integration tests
+```
 
-- **Vector Index Tuning**: Optimize pgvector HNSW parameters for your data
-- **Cache Policies**: Configure multi-level cache behavior and eviction strategies
-- **Monitoring Integration**: Prometheus metrics, Jaeger tracing, structured logging
-- **Security Features**: Rate limiting, API authentication, data encryption
+## Configuration
 
-This semantic cache solution transforms LLM-powered applications from cost-prohibitive experiments into scalable, production-ready systems that deliver exceptional user experiences while maintaining cost efficiency.
+### Environment Variables
+
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_MODEL=gpt-3.5-turbo
+OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
+
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=semantic_cache
+POSTGRES_USER=cache_user
+POSTGRES_PASSWORD=secure_password
+POSTGRES_SSL_MODE=disable
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# Cache Configuration
+CACHE_SIMILARITY_THRESHOLD=0.85
+CACHE_MAX_MEMORY_SIZE=1GB
+CACHE_TTL_HOURS=24
+CACHE_EVICTION_POLICY=LRU
+
+# Server Configuration
+SERVER_PORT=8080
+SERVER_HOST=0.0.0.0
+SERVER_READ_TIMEOUT=30s
+SERVER_WRITE_TIMEOUT=30s
+```
+
+### Advanced Configuration
+
+```yaml
+# config.yaml
+cache:
+  similarity:
+    threshold: 0.85
+    metric: "cosine"        # cosine, dot_product, euclidean
+    embedding_model: "text-embedding-ada-002"
+  
+  storage:
+    memory:
+      max_size: "1GB"
+      eviction_policy: "LRU"
+    
+    redis:
+      cluster_mode: true
+      sentinel_enabled: false
+      ttl: "24h"
+    
+    postgres:
+      max_connections: 25
+      connection_timeout: "30s"
+      query_timeout: "10s"
+      
+  performance:
+    async_processing: true
+    batch_size: 100
+    worker_pool_size: 10
+
+openai:
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-3.5-turbo"
+  embedding_model: "text-embedding-ada-002"
+  max_tokens: 2048
+  temperature: 0.7
+  timeout: "30s"
+  retry_attempts: 3
+  
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  tracing_enabled: true
+  jaeger_endpoint: "http://localhost:14268/api/traces"
+```
+
+## Usage Examples
+
+### Basic Usage
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/your-org/semantic-cache/pkg/client"
+)
+
+func main() {
+    // Initialize cache client
+    cache, err := client.New(client.Config{
+        ServerURL: "http://localhost:8080",
+        APIKey:    "your-api-key",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer cache.Close()
+    
+    ctx := context.Background()
+    
+    // Check cache for similar query
+    query := "What is machine learning?"
+    response, found, err := cache.Get(ctx, query)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    if found {
+        fmt.Printf("Cache hit: %s\n", response)
+        return
+    }
+    
+    // Generate response using LLM
+    llmResponse := "Machine learning is a subset of artificial intelligence..."
+    
+    // Store in cache for future queries
+    err = cache.Set(ctx, query, llmResponse)
+    if err != nil {
+        log.Printf("Failed to cache response: %v", err)
+    }
+    
+    fmt.Printf("Generated response: %s\n", llmResponse)
+}
+```
+
+### Advanced Usage with Custom Similarity
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/your-org/semantic-cache/pkg/client"
+)
+
+func main() {
+    cache, err := client.New(client.Config{
+        ServerURL: "http://localhost:8080",
+        SimilarityThreshold: 0.9,
+        SimilarityMetric: "cosine",
+    })
+    if err != nil {
+        panic(err)
+    }
+    
+    ctx := context.Background()
+    
+    // Search with custom parameters
+    result, err := cache.SearchSimilar(ctx, client.SearchRequest{
+        Query: "Explain neural networks",
+        Threshold: 0.8,
+        MaxResults: 5,
+    })
+    if err != nil {
+        panic(err)
+    }
+    
+    for _, match := range result.Matches {
+        fmt.Printf("Similarity: %.3f, Response: %s\n", 
+            match.Similarity, match.Response)
+    }
+}
+```
+
+### Batch Operations
+
+```go
+package main
+
+import (
+    "context"
+    
+    "github.com/your-org/semantic-cache/pkg/client"
+)
+
+func main() {
+    cache, _ := client.New(client.Config{
+        ServerURL: "http://localhost:8080",
+    })
+    
+    ctx := context.Background()
+    
+    // Batch cache lookup
+    queries := []string{
+        "What is Go programming language?",
+        "How to write effective tests?",
+        "Best practices for API design?",
+    }
+    
+    results, err := cache.GetBatch(ctx, queries)
+    if err != nil {
+        panic(err)
+    }
+    
+    for i, result := range results {
+        if result.Found {
+            fmt.Printf("Query %d: Cache hit\n", i)
+        } else {
+            fmt.Printf("Query %d: Cache miss\n", i)
+        }
+    }
+}
+```
+
+## API Reference
+
+### REST API
+
+#### Cache Operations
+
+```http
+# Get cached response
+GET /api/v1/cache?query=your+query&threshold=0.85
+
+# Store cache entry
+POST /api/v1/cache
+Content-Type: application/json
+
+{
+  "query": "What is machine learning?",
+  "response": "Machine learning is...",
+  "metadata": {
+    "model": "gpt-3.5-turbo",
+    "tokens": 150
+  }
+}
+
+# Search similar entries
+POST /api/v1/cache/search
+Content-Type: application/json
+
+{
+  "query": "Explain neural networks",
+  "threshold": 0.8,
+  "max_results": 5
+}
+
+# Delete cache entry
+DELETE /api/v1/cache/{id}
+```
+
+#### Health and Monitoring
+
+```http
+# Health check
+GET /health
+
+# Metrics (Prometheus format)
+GET /metrics
+
+# Cache statistics
+GET /api/v1/stats
+```
+
+### gRPC API
+
+```protobuf
+service CacheService {
+  rpc Get(GetRequest) returns (GetResponse);
+  rpc Set(SetRequest) returns (SetResponse);
+  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc GetStats(StatsRequest) returns (StatsResponse);
+}
+
+message GetRequest {
+  string query = 1;
+  double threshold = 2;
+}
+
+message GetResponse {
+  bool found = 1;
+  string response = 2;
+  double similarity = 3;
+  CacheMetadata metadata = 4;
+}
+```
+
+## Monitoring and Observability
+
+### Metrics
+
+The system exports comprehensive metrics in Prometheus format:
+
+```
+# Cache performance metrics
+cache_hits_total{layer="memory"}
+cache_misses_total{layer="memory"}
+cache_hit_ratio{layer="memory"}
+cache_response_time_seconds{layer="memory"}
+
+# Storage metrics
+storage_operations_total{operation="get",storage="postgres"}
+storage_response_time_seconds{operation="get",storage="postgres"}
+storage_errors_total{storage="postgres"}
+
+# OpenAI API metrics
+openai_requests_total{model="gpt-3.5-turbo"}
+openai_response_time_seconds{model="gpt-3.5-turbo"}
+openai_tokens_consumed_total{model="gpt-3.5-turbo"}
+openai_costs_total{model="gpt-3.5-turbo"}
+
+# System metrics
+semantic_cache_memory_usage_bytes
+semantic_cache_goroutines_active
+semantic_cache_gc_duration_seconds
+```
+
+### Tracing
+
+OpenTelemetry tracing provides detailed insights:
+
+- **Request tracing**: End-to-end request flow
+- **Cache layer tracing**: L1/L2/L3 cache access patterns
+- **Database operations**: Query performance and bottlenecks
+- **OpenAI API calls**: Latency and error tracking
+
+### Logging
+
+Structured logging with configurable levels:
+
+```json
+{
+  "timestamp": "2024-06-14T10:30:00Z",
+  "level": "info",
+  "component": "cache",
+  "operation": "get",
+  "query_hash": "abc123",
+  "cache_layer": "memory",
+  "hit": true,
+  "similarity": 0.92,
+  "response_time_ms": 2.5
+}
+```
+
+## Deployment
+
+### Docker Deployment
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  semantic-cache:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_DB: semantic_cache
+      POSTGRES_USER: cache_user
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+### Kubernetes Deployment
+
+```yaml
+# kubernetes/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantic-cache
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: semantic-cache
+  template:
+    metadata:
+      labels:
+        app: semantic-cache
+    spec:
+      containers:
+      - name: semantic-cache
+        image: semantic-cache:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-secret
+              key: api-key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+```
+
+## Testing
+
+### Unit Tests
+
+```bash
+# Run all unit tests
+go test ./...
+
+# Run tests with coverage
+go test -cover ./...
+
+# Run tests with race detection
+go test -race ./...
+```
+
+### Integration Tests
+
+```bash
+# Start test dependencies
+docker-compose -f docker-compose.test.yml up -d
+
+# Run integration tests
+go test -tags=integration ./test/...
+
+# Cleanup
+docker-compose -f docker-compose.test.yml down
+```
+
+### Load Testing
+
+```bash
+# Install k6
+brew install k6
+
+# Run load tests
+k6 run test/load/cache_performance.js
+```
+
+## Performance Tuning
+
+### PostgreSQL Optimization
+
+```sql
+-- Optimize pgvector for your workload
+ALTER SYSTEM SET shared_preload_libraries = 'vector';
+ALTER SYSTEM SET max_connections = 100;
+ALTER SYSTEM SET shared_buffers = '256MB';
+ALTER SYSTEM SET effective_cache_size = '1GB';
+
+-- Create appropriate indexes
+CREATE INDEX CONCURRENTLY idx_embeddings_hnsw 
+ON cache_entries USING hnsw (embedding vector_cosine_ops) 
+WITH (m = 16, ef_construction = 64);
+```
+
+### Redis Configuration
+
+```conf
+# redis.conf optimizations
+maxmemory 2gb
+maxmemory-policy allkeys-lru
+tcp-keepalive 60
+timeout 300
+save 900 1
+save 300 10
+save 60 10000
+```
+
+### Application Tuning
+
+```go
+// Connection pool optimization
+config := &postgres.Config{
+    MaxOpenConns:    25,
+    MaxIdleConns:    5,
+    ConnMaxLifetime: time.Hour,
+    ConnMaxIdleTime: time.Minute * 30,
+}
+
+// Memory cache optimization
+memoryCache := memory.NewCache(memory.Config{
+    MaxSize:        1 * 1024 * 1024 * 1024, // 1GB
+    EvictionPolicy: memory.LRU,
+    ShardCount:     32, // Reduce lock contention
+})
+```
+
+## Contributing
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/semantic-cache.git
+cd semantic-cache
+
+# Install development dependencies
+make dev-setup
+
+# Start development services
+make dev-up
+
+# Run tests
+make test
+
+# Format code
+make fmt
+
+# Lint code
+make lint
+```
+
+### Contribution Guidelines
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes following the [Agent Development Guide](AGENTS.md)
+4. Write tests for your changes
+5. Run the test suite: `make test`
+6. Format your code: `make fmt`
+7. Commit your changes: `git commit -m 'Add amazing feature'`
+8. Push to the branch: `git push origin feature/amazing-feature`
+9. Open a Pull Request
+
+## Roadmap
+
+### Current Version (v1.0)
+- ✅ Core semantic caching functionality
+- ✅ PostgreSQL with pgvector support
+- ✅ Redis distributed caching
+- ✅ OpenAI integration
+- ✅ REST and gRPC APIs
+- ✅ Basic monitoring and metrics
+
+### Upcoming Features (v1.1)
+- 🔄 Support for additional LLM providers (Anthropic, Cohere)
+- 🔄 Advanced similarity algorithms (semantic hashing)
+- 🔄 Automatic cache warming strategies
+- 🔄 Enhanced security features (encryption at rest)
+
+### Future Versions
+- 📋 Multi-modal caching (text + images)
+- 📋 Federated caching across regions
+- 📋 ML-powered cache optimization
+- 📋 Stream processing for real-time updates
+
+## Security
+
+### Data Protection
+- **Encryption**: All data encrypted in transit (TLS) and at rest (AES-256)
+- **Access Control**: Role-based authentication and authorization
+- **Data Anonymization**: Optional PII scrubbing for cached content
+- **Audit Logging**: Comprehensive access and modification logs
+
+### API Security
+- **Authentication**: JWT-based API authentication
+- **Rate Limiting**: Configurable request rate limits
+- **Input Validation**: Strict input sanitization and validation
+- **CORS**: Configurable cross-origin resource sharing
+
+## Troubleshooting
+
+### Common Issues
+
+#### Cache Miss Rate Too High
+```bash
+# Check similarity threshold
+curl -X GET "http://localhost:8080/api/v1/stats"
+
+# Adjust threshold in configuration
+export CACHE_SIMILARITY_THRESHOLD=0.75
+```
+
+#### High Memory Usage
+```bash
+# Monitor memory usage
+curl -X GET "http://localhost:8080/metrics" | grep memory
+
+# Reduce memory cache size
+export CACHE_MAX_MEMORY_SIZE=512MB
+```
+
+#### PostgreSQL Performance Issues
+```sql
+-- Check query performance
+EXPLAIN ANALYZE 
+SELECT * FROM cache_entries 
+ORDER BY embedding <=> $1 
+LIMIT 10;
+
+-- Monitor index usage
+SELECT schemaname, tablename, indexname, idx_scan, idx_tup_read, idx_tup_fetch 
+FROM pg_stat_user_indexes 
+WHERE schemaname = 'public';
+```
+
+### Debug Mode
+
+```bash
+# Enable debug logging
+export LOG_LEVEL=debug
+
+# Enable query logging
+export POSTGRES_LOG_QUERIES=true
+
+# Enable trace logging
+export OTEL_LOG_LEVEL=debug
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Documentation**: [https://docs.semantic-cache.dev](https://docs.semantic-cache.dev)
+- **Issues**: [GitHub Issues](https://github.com/your-org/semantic-cache/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-org/semantic-cache/discussions)
+- **Email**: support@semantic-cache.dev
+
+## Acknowledgments
+
+- [OpenAI](https://openai.com) for the embedding and language models
+- [pgvector](https://github.com/pgvector/pgvector) for PostgreSQL vector extensions
+- [Redis](https://redis.io) for high-performance caching
+- [GORM](https://gorm.io) for the Go ORM framework
+- [OpenTelemetry](https://opentelemetry.io) for observability standards
+
+---
+
+**Transform your LLM applications from cost-prohibitive experiments into scalable, production-ready systems with intelligent semantic caching.**
