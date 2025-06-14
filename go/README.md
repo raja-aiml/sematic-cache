@@ -29,6 +29,48 @@ This repository provides:
 - **Get** value: POST `/get` with JSON `{ "prompt": "key" }`, returns `{ "answer": "value" }`
 - **Flush** cache: POST `/flush`
 
+## Configuration
+
+The in-memory cache in the `core` package can be customized via options passed to `core.NewCache`:
+
+- **Eviction policy** (`WithEvictionPolicy`): LRU (default), FIFO, LFU (least-frequently-used), or RR (random replacement).
+- **Time-to-Live** (`WithTTL`): expire entries older than the given duration.
+- **Similarity metric**:
+  - `WithInnerProduct()` to use raw dot-product similarity
+  - `WithL2Similarity()` to use an L2-based score (1/(1+distance))
+  - `WithSimilarityFunc(fn func(a, b []float32) float64)` for a custom function
+- **Minimum similarity threshold** (`WithMinSimilarity`): ignore candidates below this score.
+- **Adaptive thresholding** (`WithAdaptiveThreshold`): compute a dynamic cutoff from the top-K similarities.
+- **Approximate nearest neighbor** (`WithANNIndex`): plug in an `ANNIndex` (e.g. HNSW/LSH) for sub-linear similarity search.
+- **Cache enable filter** (`WithCacheEnable`): skip caching for prompts that do not satisfy the filter.
+
+Example:
+```go
+import (
+  "time"
+  "github.com/raja-aiml/sematic-cache/go/core"
+)
+
+// hnsw is a user-provided ANN index implementing core.ANNIndex
+cache := core.NewCache(100,
+  core.WithEvictionPolicy(core.PolicyLFU),
+  core.WithTTL(10*time.Minute),
+  core.WithInnerProduct(),
+  core.WithMinSimilarity(0.5),
+  core.WithAdaptiveThreshold(func(sims []float64) float64 {
+    // keep only sims >= mean(sims)
+    var sum float64
+    for _, v := range sims { sum += v }
+    return sum / float64(len(sims))
+  }),
+  core.WithANNIndex(hnsw),
+)
+
+// Get stats at runtime:
+hits, misses, hitRate := cache.Stats()
+fmt.Printf("hits=%d, misses=%d, rate=%.2f\n", hits, misses, hitRate)
+```
+
 ## Testing
 Run all unit tests:
 ```bash

@@ -6,10 +6,22 @@ import (
    "container/list"
    "fmt"
    "math"
+   "math/rand"
    "sort"
    "sync"
    "sync/atomic"
    "time"
+)
+// Seed the random number generator for RR eviction
+func init() {
+   rand.Seed(time.Now().UnixNano())
+}
+// Eviction policy constants for in-memory cache
+const (
+   PolicyLRU  = "LRU"
+   PolicyFIFO = "FIFO"
+   PolicyLFU  = "LFU"
+   PolicyRR   = "RR"
 )
 // ANNIndex defines an interface for approximate nearest-neighbor search.
 // Users can plug in HNSW, LSH, or other ANN implementations.
@@ -115,7 +127,9 @@ type Cache struct {
 	mu       sync.RWMutex
 	entries  map[string]*list.Element
 	lru      *list.List
-	capacity int
+   capacity int
+   // evictionPolicy determines the in-memory eviction strategy: "LRU", "FIFO", "LFU", or "RR"
+   evictionPolicy string
 
 	cacheEnable   func(string) bool
 	embedFunc     EmbeddingFunc
@@ -165,6 +179,18 @@ func WithMinSimilarity(th float64) Option {
 func WithTTL(d time.Duration) Option {
 	return func(c *Cache) { c.ttl = d }
 }
+// WithEvictionPolicy sets the in-memory eviction strategy. Valid values are
+// "LRU", "FIFO", "LFU", and "RR" (random replacement).
+func WithEvictionPolicy(policy string) Option {
+   return func(c *Cache) {
+       switch policy {
+       case PolicyLRU, PolicyFIFO, PolicyLFU, PolicyRR:
+           c.evictionPolicy = policy
+       default:
+           panic(fmt.Sprintf("core: unknown eviction policy %q", policy))
+       }
+   }
+}
 
 // WithInnerProduct sets the similarity metric to raw dot-product.
 func WithInnerProduct() Option {
@@ -194,14 +220,15 @@ func NewCache(capacity int, opts ...Option) *Cache {
 	if capacity <= 0 {
 		panic("core: capacity must be > 0")
 	}
-	c := &Cache{
-		entries:       make(map[string]*list.Element),
-		lru:           list.New(),
-		capacity:      capacity,
-		cacheEnable:   func(string) bool { return true },
-		simFunc:       cosine,
-		minSimilarity: -1.0,
-	}
+   c := &Cache{
+       entries:        make(map[string]*list.Element),
+       lru:            list.New(),
+       capacity:       capacity,
+       evictionPolicy: PolicyLRU,
+       cacheEnable:    func(string) bool { return true },
+       simFunc:        cosine,
+       minSimilarity:  -1.0,
+   }
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -224,18 +251,22 @@ func (c *Cache) SetWithModel(prompt string, embedding []float32, answer, modelNa
 	defer c.mu.Unlock()
 
 	now := nowUnix()
-	if el, ok := c.entries[prompt]; ok {
-		ent := el.Value.(*entry)
-		ent.embedding = embedding
-		ent.answer = answer
-		ent.ModelName = modelName
-		ent.ModelID = modelID
-		ent.timestamp = now
-		ent.accessCount++
-		ent.lastAccessed = now
-		c.lru.MoveToFront(el)
-		return
-	}
+       if el, ok := c.entries[prompt]; ok {
+           ent := el.Value.(*entry)
+           ent.embedding = embedding
+           ent.answer = answer
+           ent.ModelName = modelName
+           ent.ModelID = modelID
+           // reset timestamp for TTL
+           ent.timestamp = now
+           ent.accessCount++
+           ent.lastAccessed = now
+           // update LRU position only for LRU policy
+           if c.evictionPolicy == PolicyLRU {
+               c.lru.MoveToFront(el)
+           }
+           return
+       }
 
    ent := &entry{
 		prompt:       prompt,
@@ -285,8 +316,11 @@ func (c *Cache) Get(prompt string) (string, bool) {
 		}
 		// cache hit
 		ent.accessCount++
-		ent.lastAccessed = nowUnix()
-		c.lru.MoveToFront(el)
+			ent.lastAccessed = nowUnix()
+			// update LRU position only for LRU policy
+			if c.evictionPolicy == PolicyLRU {
+				c.lru.MoveToFront(el)
+			}
 		atomic.AddUint64(&c.hitCount, 1)
 		return ent.answer, true
 	}
@@ -301,8 +335,8 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
        atomic.AddUint64(&c.missCount, 1)
        return "", false
    }
-   // Try ANN index if configured for fast lookup
-   if c.annIndex != nil {
+   // Try ANN index for fast lookup when no adaptive threshold is set
+   if c.annIndex != nil && c.adaptiveThreshold == nil {
        if keys, err := c.annIndex.Search(embed, 1); err == nil && len(keys) > 0 {
            // c.Get updates LRU and metrics
            return c.Get(keys[0])
@@ -312,10 +346,11 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
    // Scan under read-lock to find the best candidate and collect expired keys.
    c.mu.RLock()
    var (
-       bestKey     string
-       bestSim     float64
-       initBest    bool
-       expiredKeys []string
+       bestKey          string
+       bestSim          float64
+       initBest         bool
+       expiredKeys      []string
+       sims             []float64
    )
    for e := c.lru.Front(); e != nil; e = e.Next() {
        ent := e.Value.(*entry)
@@ -327,6 +362,9 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
            continue
        }
        sim := c.simFunc(ent.embedding, embed)
+       if c.adaptiveThreshold != nil {
+           sims = append(sims, sim)
+       }
        if sim < c.minSimilarity {
            continue
        }
@@ -355,6 +393,14 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
        atomic.AddUint64(&c.missCount, 1)
        return "", false
    }
+   // apply adaptive threshold if configured
+   if c.adaptiveThreshold != nil {
+       thr := c.adaptiveThreshold(sims)
+       if bestSim < thr {
+           atomic.AddUint64(&c.missCount, 1)
+           return "", false
+       }
+   }
 
    // Update metadata on the chosen entry under write lock.
    c.mu.Lock()
@@ -374,7 +420,10 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
    }
    ent.accessCount++
    ent.lastAccessed = nowUnix()
-   c.lru.MoveToFront(el)
+   // update LRU position only for LRU policy
+   if c.evictionPolicy == PolicyLRU {
+       c.lru.MoveToFront(el)
+   }
    c.mu.Unlock()
    atomic.AddUint64(&c.hitCount, 1)
    return ent.answer, true
@@ -482,29 +531,63 @@ func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
 }
 
 // Flush clears all cached entries.
+// Flush clears all cached entries (in-memory and ANN index).
 func (c *Cache) Flush() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.entries = make(map[string]*list.Element)
-	c.lru.Init()
+   c.mu.Lock()
+   defer c.mu.Unlock()
+   // clear ANN index
+   if c.annIndex != nil {
+       for key := range c.entries {
+           _ = c.annIndex.Remove(key)
+       }
+   }
+   c.entries = make(map[string]*list.Element)
+   c.lru.Init()
 }
 
 // insertEntry adds a new entry (assumes c.mu is held), evicting the oldest if over capacity.
 func (c *Cache) insertEntry(ent *entry) {
 	el := c.lru.PushFront(ent)
 	c.entries[ent.prompt] = el
-	if c.lru.Len() > c.capacity {
-		tail := c.lru.Back()
-		if tail != nil {
-			oldKey := tail.Value.(*entry).prompt
-			c.lru.Remove(tail)
-			delete(c.entries, oldKey)
-			// remove from ANN index if present
-			if c.annIndex != nil {
-				_ = c.annIndex.Remove(oldKey)
-			}
-		}
-	}
+   if c.lru.Len() > c.capacity {
+       // determine eviction key based on policy
+       var evictKey string
+       switch c.evictionPolicy {
+       case PolicyLFU:
+           // find entry with lowest accessCount
+           minCount := int(^uint(0) >> 1) // max int
+           for key, el0 := range c.entries {
+               cnt := el0.Value.(*entry).accessCount
+               if cnt < minCount {
+                   minCount = cnt
+                   evictKey = key
+               }
+           }
+       case PolicyRR:
+           // random replacement
+           keys := make([]string, 0, len(c.entries))
+           for key := range c.entries {
+               keys = append(keys, key)
+           }
+           if len(keys) > 0 {
+               idx := rand.Intn(len(keys))
+               evictKey = keys[idx]
+           }
+       default:
+           // LRU or FIFO: evict oldest in list (tail)
+           if tail := c.lru.Back(); tail != nil {
+               evictKey = tail.Value.(*entry).prompt
+           }
+       }
+       // perform eviction
+       if el0, ok := c.entries[evictKey]; ok {
+           c.lru.Remove(el0)
+           delete(c.entries, evictKey)
+           if c.annIndex != nil {
+               _ = c.annIndex.Remove(evictKey)
+           }
+       }
+   }
 }
 
 // isExpired returns true if the entry is older than the cache TTL.
@@ -541,15 +624,20 @@ func (c *Cache) ImportData(prompts []string, embeddings [][]float32, answers []s
 		if i < len(answers) {
 			a = answers[i]
 		}
-		if el, ok := c.entries[p]; ok {
-			ent := el.Value.(*entry)
-			ent.embedding = e
-			ent.answer = a
-			ent.accessCount++
-			ent.lastAccessed = now
-			c.lru.MoveToFront(el)
-			continue
-		}
+           if el, ok := c.entries[p]; ok {
+               ent := el.Value.(*entry)
+               ent.embedding = e
+               ent.answer = a
+               // reset timestamp for TTL
+               ent.timestamp = now
+               ent.accessCount++
+               ent.lastAccessed = now
+               // update LRU only for LRU policy
+               if c.evictionPolicy == PolicyLRU {
+                   c.lru.MoveToFront(el)
+               }
+               continue
+           }
 		ent := &entry{
 			prompt:       p,
 			embedding:    e,
