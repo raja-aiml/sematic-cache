@@ -81,7 +81,18 @@ func main() {
 		}
 	}
        // Select cache backend based on config
-       if cfg != nil && cfg.Cache.Type == "redis" {
+       if cfg != nil && cfg.Cache.Type == "gorm" {
+           // Use Postgres via GORM and pgvector
+           dsn := os.Getenv("DATABASE_URL")
+           if dsn == "" {
+               log.Fatalf("DATABASE_URL must be set for GORM cache backend")
+           }
+           store, err := storage.NewGormStore(dsn, cfg.TTLDuration())
+           if err != nil {
+               log.Fatalf("failed to initialize GORM store: %v", err)
+           }
+           cache = store
+       } else if cfg != nil && cfg.Cache.Type == "redis" {
            redisOpts := &redis.ClusterOptions{
                Addrs:    cfg.Cache.Redis.Addrs,
                Password: cfg.Cache.Redis.Password,
@@ -92,6 +103,7 @@ func main() {
            }
            cache = storage.NewRedisStore(client, cfg.TTLDuration())
        } else {
+           // Default to in-memory LRU cache
            cache = core.NewCache(cap, opts...)
        }
 	srv := server.New(cache)
