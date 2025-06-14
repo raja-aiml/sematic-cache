@@ -638,7 +638,8 @@ func (c *Cache) Flush() {
 func (c *Cache) insertEntry(ent *entry) {
 	el := c.lru.PushFront(ent)
 	c.entries[ent.prompt] = el
-   if c.lru.Len() > c.capacity {
+   // evict when reaching or exceeding capacity to maintain max entries
+   if c.lru.Len() >= c.capacity {
        // determine eviction key based on policy
        var evictKey string
        switch c.evictionPolicy {
