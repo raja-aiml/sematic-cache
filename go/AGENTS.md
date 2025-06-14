@@ -7,8 +7,7 @@ initial migration.
 ## Migration Plan
 1. **Assess Current Code** – Review the Python modules in `gptcache` and `gptcache_server` to
    understand the caching API, data manager interfaces and server behaviour.
-2. **Create Go Module** – Add a new directory `go/` at the repository root and initialize it with
-   `go mod init`. Organize packages as `core`, `storage`, `openai`, and `server`.
+2. **Go Module** – The Go module is initialized at the repository root (`go.mod`). Packages are organized under directories such as `core`, `storage`, `openai`, and `server`.
 3. **Core Cache Logic** – Implement a `Cache` struct that mirrors the behaviour of the Python
    `Cache` class (init, get, set). Use goroutines and sync primitives to maximise throughput.
 4. **PostgreSQL Storage** – Provide a storage layer using `database/sql` with connection pooling
@@ -24,7 +23,7 @@ initial migration.
    docs when new Go modules appear.
 
 ## Contribution Guidelines
-- Place all Go code under the `go/` directory.
+- The Go module is initialized at the repository root (`go.mod`). Organize Go code under logical package directories (e.g., `core`, `storage`, `openai`, `server`).
 - Format Go files with `gofmt -w` and run `go vet ./...` and `go test ./...` before committing.
 - When working on Python code, run `pytest` as well.
 - Provide clear commit messages referencing the module or feature being ported.

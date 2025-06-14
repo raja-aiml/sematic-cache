@@ -235,69 +235,81 @@ func (c *Cache) Get(prompt string) (string, bool) {
 
 // GetByEmbedding returns the answer whose embedding is most similar to the query.
 func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
-	// First, scan under read-lock to find the best candidate and collect expired entries.
-	c.mu.RLock()
-	var (
-		best     *list.Element
-		bestSim  float64
-		initBest bool
-		expired  []*list.Element
-	)
-	for e := c.lru.Front(); e != nil; e = e.Next() {
-		ent := e.Value.(*entry)
-		// skip entries of wrong dimension or empty query
-		if len(ent.embedding) != len(embed) || len(embed) == 0 {
-			continue
-		}
-		// collect expired entries
-		if c.isExpired(ent) {
-			expired = append(expired, e)
-			continue
-		}
-		sim := c.simFunc(ent.embedding, embed)
-		if sim < c.minSimilarity {
-			continue
-		}
-		if !initBest || sim > bestSim {
-			best = e
-			bestSim = sim
-			initBest = true
-		}
-	}
-	c.mu.RUnlock()
-	// Evict expired entries under write lock
-	if len(expired) > 0 {
-		c.mu.Lock()
-		for _, e := range expired {
-			key := e.Value.(*entry).prompt
-			c.lru.Remove(e)
-			delete(c.entries, key)
-		}
-		c.mu.Unlock()
-	}
-	// If no match, record miss
-	if best == nil {
-		atomic.AddUint64(&c.missCount, 1)
-		return "", false
-	}
-	// Update metadata on the chosen entry under write lock
-	c.mu.Lock()
-	ent := best.Value.(*entry)
-	// re-check expiry
-	if c.isExpired(ent) {
-		// evict and miss
-		c.lru.Remove(best)
-		delete(c.entries, ent.prompt)
-		atomic.AddUint64(&c.missCount, 1)
-		c.mu.Unlock()
-		return "", false
-	}
-	ent.accessCount++
-	ent.lastAccessed = nowUnix()
-	c.lru.MoveToFront(best)
-	c.mu.Unlock()
-	atomic.AddUint64(&c.hitCount, 1)
-	return ent.answer, true
+   // Return early on empty embedding.
+   if len(embed) == 0 {
+       atomic.AddUint64(&c.missCount, 1)
+       return "", false
+   }
+
+   // Scan under read-lock to find the best candidate and collect expired keys.
+   c.mu.RLock()
+   var (
+       bestKey     string
+       bestSim     float64
+       initBest    bool
+       expiredKeys []string
+   )
+   for e := c.lru.Front(); e != nil; e = e.Next() {
+       ent := e.Value.(*entry)
+       if len(ent.embedding) != len(embed) {
+           continue
+       }
+       if c.isExpired(ent) {
+           expiredKeys = append(expiredKeys, ent.prompt)
+           continue
+       }
+       sim := c.simFunc(ent.embedding, embed)
+       if sim < c.minSimilarity {
+           continue
+       }
+       if !initBest || sim > bestSim {
+           bestKey = ent.prompt
+           bestSim = sim
+           initBest = true
+       }
+   }
+   c.mu.RUnlock()
+
+   // Evict expired entries under write lock.
+   if len(expiredKeys) > 0 {
+       c.mu.Lock()
+       for _, key := range expiredKeys {
+           if el, ok := c.entries[key]; ok {
+               c.lru.Remove(el)
+               delete(c.entries, key)
+           }
+       }
+       c.mu.Unlock()
+   }
+
+   // If no match, record miss.
+   if !initBest {
+       atomic.AddUint64(&c.missCount, 1)
+       return "", false
+   }
+
+   // Update metadata on the chosen entry under write lock.
+   c.mu.Lock()
+   el, ok := c.entries[bestKey]
+   if !ok {
+       atomic.AddUint64(&c.missCount, 1)
+       c.mu.Unlock()
+       return "", false
+   }
+   ent := el.Value.(*entry)
+   if c.isExpired(ent) {
+       c.lru.Remove(el)
+       delete(c.entries, bestKey)
+       atomic.AddUint64(&c.missCount, 1)
+       c.mu.Unlock()
+       return "", false
+   }
+   ent.accessCount++
+   ent.lastAccessed = nowUnix()
+   c.lru.MoveToFront(el)
+   c.mu.Unlock()
+   atomic.AddUint64(&c.hitCount, 1)
+   return ent.answer, true
 }
 
 // GetTopKByEmbedding returns up to k answers whose embeddings are most similar to the query.
