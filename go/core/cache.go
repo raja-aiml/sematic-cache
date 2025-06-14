@@ -115,6 +115,17 @@ type QueryResult struct {
 	ModelName  string
 	ModelID    string
 }
+// CacheBackend defines the interface for a cache backend (in-memory or distributed).
+// Backends must implement prompt-based get/set, model metadata, similarity search, flush, and stats.
+type CacheBackend interface {
+   Get(prompt string) (string, bool)
+   GetModelInfo(prompt string) (modelName, modelID string, found bool)
+   SetWithModel(prompt string, embedding []float32, answer, modelName, modelID string)
+   SetPromptWithModel(prompt, answer, modelName, modelID string) error
+   GetTopKByEmbedding(embed []float32, k int) []QueryResult
+   Flush()
+   Stats() (hits, misses uint64, hitRate float64)
+}
 
 // Cache provides a concurrent LRU cache storing embeddings and answers.
 // It supports cosine similarity search with optional threshold and top-K queries.

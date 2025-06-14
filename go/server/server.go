@@ -33,13 +33,14 @@ type getResponse struct {
 
 // Server provides HTTP access to the cache.
 type Server struct {
-	Cache *core.Cache
-	mux   *http.ServeMux
+   Cache core.CacheBackend
+   mux   *http.ServeMux
 }
 
 // New returns a new Server instance with default routes.
-func New(c *core.Cache) *Server {
-	s := &Server{Cache: c, mux: http.NewServeMux()}
+// New creates a server with the given cache backend.
+func New(c core.CacheBackend) *Server {
+   s := &Server{Cache: c, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }

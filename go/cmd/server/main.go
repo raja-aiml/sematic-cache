@@ -14,8 +14,10 @@ import (
 	"github.com/raja-aiml/sematic-cache/go/config"
 	"github.com/raja-aiml/sematic-cache/go/core"
 	"github.com/raja-aiml/sematic-cache/go/observability"
-	"github.com/raja-aiml/sematic-cache/go/openai"
-	"github.com/raja-aiml/sematic-cache/go/server"
+   "github.com/go-redis/redis/v8"
+   "github.com/raja-aiml/sematic-cache/go/openai"
+   "github.com/raja-aiml/sematic-cache/go/server"
+   "github.com/raja-aiml/sematic-cache/go/storage"
 )
 
 func main() {
@@ -56,7 +58,8 @@ func main() {
 	if cfg != nil && cfg.OpenAI.APIVersion != "" {
 		openaiClient.APIVersion = cfg.OpenAI.APIVersion
 	}
-	// Configure cache
+       // Configure cache backend (in-memory or Redis)
+       var cache core.CacheBackend
 	cap := 100
 	if cfg != nil && cfg.Cache.Capacity > 0 {
 		cap = cfg.Cache.Capacity
@@ -77,7 +80,20 @@ func main() {
 			opts = append(opts, core.WithMinSimilarity(cfg.Cache.MinSimilarity))
 		}
 	}
-	cache := core.NewCache(cap, opts...)
+       // Select cache backend based on config
+       if cfg != nil && cfg.Cache.Type == "redis" {
+           redisOpts := &redis.ClusterOptions{
+               Addrs:    cfg.Cache.Redis.Addrs,
+               Password: cfg.Cache.Redis.Password,
+           }
+           client := redis.NewClusterClient(redisOpts)
+           if err := client.Ping(context.Background()).Err(); err != nil {
+               log.Fatalf("redis ping failed: %v", err)
+           }
+           cache = storage.NewRedisStore(client, cfg.TTLDuration())
+       } else {
+           cache = core.NewCache(cap, opts...)
+       }
 	srv := server.New(cache)
 	httpSrv := &http.Server{
 		Addr:         *addr,

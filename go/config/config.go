@@ -14,10 +14,16 @@ type Config struct {
        Address string `yaml:"address"`
    } `yaml:"server"`
    Cache struct {
-       Capacity       int     `yaml:"capacity"`
-       EvictionPolicy string  `yaml:"eviction_policy"`
-       TTL            string  `yaml:"ttl"`
-       MinSimilarity  float64 `yaml:"min_similarity"`
+       Type           string   `yaml:"type"`
+       Capacity       int      `yaml:"capacity"`
+       EvictionPolicy string   `yaml:"eviction_policy"`
+       TTL            string   `yaml:"ttl"`
+       MinSimilarity  float64  `yaml:"min_similarity"`
+       Redis struct {
+           Addrs    []string `yaml:"addrs"`
+           Password string   `yaml:"password"`
+           DB       int      `yaml:"db"`
+       } `yaml:"redis"`
    } `yaml:"cache"`
    OpenAI struct {
        APIKey     string `yaml:"api_key"`
