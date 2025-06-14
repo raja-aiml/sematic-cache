@@ -2,11 +2,9 @@
 package storage
 
 import (
-   "context"
    "errors"
    "time"
-
-   "github.com/pgvector/pgvector-go"
+   pgvector "github.com/pgvector/pgvector-go"
    "gorm.io/driver/postgres"
    "gorm.io/gorm"
    "gorm.io/gorm/clause"
