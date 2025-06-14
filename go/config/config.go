@@ -1,6 +1,7 @@
 package config
 
 import (
+   "fmt"
    "io/ioutil"
    "time"
 
@@ -34,6 +35,12 @@ func LoadConfig(path string) (*Config, error) {
    var cfg Config
    if err := yaml.Unmarshal(data, &cfg); err != nil {
        return nil, err
+   }
+   // Validate TTL format if set
+   if cfg.Cache.TTL != "" {
+       if _, err := time.ParseDuration(cfg.Cache.TTL); err != nil {
+           return nil, fmt.Errorf("invalid ttl %q: %w", cfg.Cache.TTL, err)
+       }
    }
    return &cfg, nil
 }

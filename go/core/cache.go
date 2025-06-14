@@ -322,7 +322,21 @@ func (c *Cache) SetPrompt(prompt, answer string) error {
 		return err
 	}
 	c.Set(prompt, emb, answer)
-	return nil
+   return nil
+}
+// SetPromptWithModel generates an embedding for the prompt using the configured
+// EmbeddingFunc and stores the answer with model metadata.
+// It returns an error if no EmbeddingFunc is configured or embedding fails.
+func (c *Cache) SetPromptWithModel(prompt, answer, modelName, modelID string) error {
+   if c.embedFunc == nil {
+       return fmt.Errorf("no EmbeddingFunc configured")
+   }
+   emb, err := c.embedFunc(prompt)
+   if err != nil {
+       return err
+   }
+   c.SetWithModel(prompt, emb, answer, modelName, modelID)
+   return nil
 }
 
 // Get returns the cached answer for a prompt and whether it was found.
@@ -711,6 +725,10 @@ func (c *Cache) ImportData(prompts []string, embeddings [][]float32, answers []s
                if c.evictionPolicy == PolicyLRU {
                    c.lru.MoveToFront(el)
                }
+               // update ANN index if configured
+               if c.annIndex != nil {
+                   _ = c.annIndex.Add(p, e)
+               }
                continue
            }
 		ent := &entry{
@@ -721,7 +739,11 @@ func (c *Cache) ImportData(prompts []string, embeddings [][]float32, answers []s
 			lastAccessed: now,
 			accessCount:  1,
 		}
-		c.insertEntry(ent)
+           c.insertEntry(ent)
+           // add to ANN index if configured
+           if c.annIndex != nil {
+               _ = c.annIndex.Add(p, e)
+           }
 	}
 }
 

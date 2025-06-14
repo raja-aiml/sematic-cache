@@ -19,7 +19,8 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "cache_config.yml", "path to YAML configuration file")
+   // Path to YAML configuration file; empty disables config loading
+   configPath := flag.String("config", "", "path to YAML configuration file (empty to skip)")
 	addr := flag.String("address", ":8080", "server address (overrides config)")
 	flag.Parse()
 

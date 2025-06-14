@@ -12,10 +12,11 @@ import (
 
 // setRequest represents the JSON payload for /set.
 type setRequest struct {
-	Prompt    string `json:"prompt"`
-	Answer    string `json:"answer"`
-	ModelName string `json:"modelName,omitempty"`
-	ModelID   string `json:"modelID,omitempty"`
+   Prompt    string     `json:"prompt"`
+   Answer    string     `json:"answer"`
+   Embedding []float32  `json:"embedding,omitempty"`
+   ModelName string     `json:"modelName,omitempty"`
+   ModelID   string     `json:"modelID,omitempty"`
 }
 
 // getRequest represents the JSON payload for /get.
@@ -100,9 +101,17 @@ func (s *Server) handleSet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	// store entry with optional model metadata
-	s.Cache.SetWithModel(req.Prompt, nil, req.Answer, req.ModelName, req.ModelID)
-	w.WriteHeader(http.StatusCreated)
+   // store entry: use provided embedding if present, else attempt to generate embedding
+   if len(req.Embedding) > 0 {
+       s.Cache.SetWithModel(req.Prompt, req.Embedding, req.Answer, req.ModelName, req.ModelID)
+   } else {
+       // try embedding via configured function, fallback to raw set if disabled or on error
+       if err := s.Cache.SetPromptWithModel(req.Prompt, req.Answer, req.ModelName, req.ModelID); err != nil {
+           log.Printf("embedding failed or disabled: %v, storing without embedding", err)
+           s.Cache.SetWithModel(req.Prompt, nil, req.Answer, req.ModelName, req.ModelID)
+       }
+   }
+   w.WriteHeader(http.StatusCreated)
 }
 
 func (s *Server) handleFlush(w http.ResponseWriter, r *http.Request) {
@@ -138,13 +147,19 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
        http.Error(w, err.Error(), http.StatusBadRequest)
        return
    }
-   answer, ok := s.Cache.GetByEmbedding(req.Embedding)
-   if !ok {
+   // perform similarity lookup and include metadata and similarity score
+   results := s.Cache.GetTopKByEmbedding(req.Embedding, 1)
+   if len(results) == 0 {
        http.Error(w, "not found", http.StatusNotFound)
        return
    }
-   modelName, modelID, _ := s.Cache.GetModelInfo(answer)
-   resp := queryResponse{Answer: answer, ModelName: modelName, ModelID: modelID}
+   r0 := results[0]
+   resp := queryResponse{
+       Answer:     r0.Answer,
+       ModelName:  r0.ModelName,
+       ModelID:    r0.ModelID,
+       Similarity: r0.Similarity,
+   }
    w.Header().Set("Content-Type", "application/json")
    json.NewEncoder(w).Encode(resp)
 }
