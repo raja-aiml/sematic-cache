@@ -1,8 +1,0 @@
-gptcache
-pillow
-streamlit
-torch
-faiss-cpu
-torchaudio
-transformers
-sqlalchemy
