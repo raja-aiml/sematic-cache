@@ -5,6 +5,7 @@ package server
 import (
    "log"
    "net/http"
+   "os"
 
    "github.com/gin-gonic/gin"
    "github.com/raja-aiml/sematic-cache/go/core"
@@ -62,6 +63,8 @@ type topKResponseItem struct {
 // New creates a Gin engine with all cache routes configured.
 func New(cache core.CacheBackend) *gin.Engine {
    r := gin.Default()
+   // Load admin token for protecting sensitive endpoints
+   adminToken := os.Getenv("ADMIN_TOKEN")
 
    r.POST("/get", func(c *gin.Context) {
        var req getRequest
@@ -96,7 +99,12 @@ func New(cache core.CacheBackend) *gin.Engine {
        c.Status(http.StatusCreated)
    })
 
-   r.POST("/flush", func(c *gin.Context) {
+   // Admin endpoints: group under /admin and protect with AdminAuth
+   admin := r.Group("/admin")
+   if adminToken != "" {
+       admin.Use(AdminAuth(adminToken))
+   }
+   admin.POST("/flush", func(c *gin.Context) {
        cache.Flush()
        c.Status(http.StatusOK)
    })

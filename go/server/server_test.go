@@ -148,7 +148,7 @@ func TestServerFlush(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]string{"prompt": "p", "answer": "a"})
 	http.Post(ts.URL+"/set", "application/json", bytes.NewBuffer(body))
-	http.Post(ts.URL+"/flush", "application/json", nil)
+		http.Post(ts.URL+"/admin/flush", "application/json", nil)
 
 	body, _ = json.Marshal(map[string]string{"prompt": "p"})
 	resp, _ := http.Post(ts.URL+"/get", "application/json", bytes.NewBuffer(body))
