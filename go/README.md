@@ -87,6 +87,12 @@ This example demonstrates inner-product similarity, a simple ANNIndex plugin, an
 ```bash
 go run examples/advanced/main.go
 ```
+```
+// To enable production-scale ANN (HNSW) integration:
+// 1. Add your chosen HNSW implementation file core/hnsw_hnsw.go with build tag 'hnsw', implementing NewHNSWIndex.
+// 2. Build with 'go build -tags hnsw' so that the HNSW plugin is included.
+// 3. Use core.WithANNIndex(core.NewHNSWIndex(dim, M, efC, efS)) when constructing the cache.
+```
 
 ## License
 MIT

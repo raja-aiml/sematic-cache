@@ -4,12 +4,13 @@
 package openai
 
 import (
-	"context"
-	"fmt"
+   "context"
+   "fmt"
+   "io"
 
-	openai "github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
-	"github.com/openai/openai-go/packages/param"
+   openai "github.com/openai/openai-go"
+   "github.com/openai/openai-go/option"
+   "github.com/openai/openai-go/packages/param"
 )
 
 // Client wraps the OpenAI SDK client.
@@ -18,6 +19,119 @@ type Client struct {
 	BaseURL    string
 	APIVersion string
 	client     openai.Client
+}
+
+// Moderate uses the OpenAI moderation API to check if the input is flagged.
+func (c *Client) Moderate(ctx context.Context, text string) (bool, error) {
+   params := openai.ModerationNewParams{
+       Input: openai.ModerationNewParamsInputUnion{OfStringArray: []string{text}},
+   }
+   resp, err := c.client.Moderations.New(ctx, params)
+   if err != nil {
+       return false, fmt.Errorf("moderation: %w", err)
+   }
+   if len(resp.Results) == 0 {
+       return false, fmt.Errorf("moderation: no results returned")
+   }
+   return resp.Results[0].Flagged, nil
+}
+
+// CreateImage generates images from a text prompt using the OpenAI Images API.
+// Returns a slice of URLs (or base64 strings if configured).
+func (c *Client) CreateImage(ctx context.Context, prompt string, n int, size string) ([]string, error) {
+   params := openai.ImageGenerateParams{
+       Prompt: prompt,
+       N:      param.NewOpt(int64(n)),
+       Size:   openai.ImageGenerateParamsSize(size),
+   }
+   resp, err := c.client.Images.Generate(ctx, params)
+   if err != nil {
+       return nil, fmt.Errorf("create image: %w", err)
+   }
+   urls := make([]string, len(resp.Data))
+   for i, img := range resp.Data {
+       if img.URL != "" {
+           urls[i] = img.URL
+       } else {
+           urls[i] = img.B64JSON
+       }
+   }
+   return urls, nil
+}
+
+// EditImage edits or extends an image given an optional mask.
+func (c *Client) EditImage(ctx context.Context, image, mask io.Reader, prompt string, n int, size string) ([]string, error) {
+   params := openai.ImageEditParams{
+       // 'Image' takes a union since multiple input formats are supported
+       Image: openai.ImageEditParamsImageUnion{OfFile: image},
+       // 'Mask' is a single file reader
+       Mask:  mask,
+       Prompt: prompt,
+       N:      param.NewOpt(int64(n)),
+       Size:   openai.ImageEditParamsSize(size),
+   }
+   resp, err := c.client.Images.Edit(ctx, params)
+   if err != nil {
+       return nil, fmt.Errorf("edit image: %w", err)
+   }
+   urls := make([]string, len(resp.Data))
+   for i, img := range resp.Data {
+       if img.URL != "" {
+           urls[i] = img.URL
+       } else {
+           urls[i] = img.B64JSON
+       }
+   }
+   return urls, nil
+}
+
+// CreateImageVariation creates variations of an image.
+func (c *Client) CreateImageVariation(ctx context.Context, image io.Reader, n int, size string) ([]string, error) {
+   params := openai.ImageNewVariationParams{
+       Image: image,
+       N:     param.NewOpt(int64(n)),
+       Size:  openai.ImageNewVariationParamsSize(size),
+   }
+   resp, err := c.client.Images.NewVariation(ctx, params)
+   if err != nil {
+       return nil, fmt.Errorf("image variation: %w", err)
+   }
+   urls := make([]string, len(resp.Data))
+   for i, img := range resp.Data {
+       if img.URL != "" {
+           urls[i] = img.URL
+       } else {
+           urls[i] = img.B64JSON
+       }
+   }
+   return urls, nil
+}
+
+// TranscribeAudio transcribes the given audio via OpenAI's audio transcription API.
+func (c *Client) TranscribeAudio(ctx context.Context, audio io.Reader) (string, error) {
+   params := openai.AudioTranscriptionNewParams{
+       File:  audio,
+       Model: openai.AudioModelWhisper1,
+   }
+   resp, err := c.client.Audio.Transcriptions.New(ctx, params)
+   if err != nil {
+       return "", fmt.Errorf("transcribe audio: %w", err)
+   }
+   return resp.Text, nil
+}
+
+// TranslateAudio translates the given audio to English via OpenAI's audio translation API.
+func (c *Client) TranslateAudio(ctx context.Context, audio io.Reader) (string, error) {
+   params := openai.AudioTranslationNewParams{
+       File:           audio,
+       Model:          openai.AudioModelWhisper1,
+       ResponseFormat: openai.AudioTranslationNewParamsResponseFormatText,
+   }
+   resp, err := c.client.Audio.Translations.New(ctx, params)
+   if err != nil {
+       return "", fmt.Errorf("translate audio: %w", err)
+   }
+   return resp.Text, nil
 }
 
 // ChatMessage represents a single message in a chat conversation.
