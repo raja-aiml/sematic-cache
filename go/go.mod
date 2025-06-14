@@ -2,6 +2,8 @@ module github.com/raja-aiml/sematic-cache/go
 
 go 1.23.8
 
+require gopkg.in/yaml.v2 v2.4.0
+
 require (
 	github.com/openai/openai-go v1.5.0
 	go.opentelemetry.io/otel v1.17.0
