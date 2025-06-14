@@ -3,9 +3,9 @@
 package storage
 
 import (
-   "database/sql"
-   "fmt"
-   "time"
+	"database/sql"
+	"fmt"
+	"time"
 )
 
 // scanner defines the minimal interface for sql.Row
@@ -92,15 +92,15 @@ func NewPGStore(conn string) (*PGStore, error) {
 
 // Init creates the table if it doesn't exist.
 func (s *PGStore) Init() error {
-   _, err := execFunc(s.db, `CREATE TABLE IF NOT EXISTS cache (
+	_, err := execFunc(s.db, `CREATE TABLE IF NOT EXISTS cache (
         prompt TEXT PRIMARY KEY,
         embedding VECTOR(1536),
         answer TEXT
     )`)
-   if err != nil {
-       return fmt.Errorf("init table: %w", err)
-   }
-   return nil
+	if err != nil {
+		return fmt.Errorf("init table: %w", err)
+	}
+	return nil
 }
 
 // Set inserts or updates a cached answer.
@@ -114,11 +114,11 @@ func (s *PGStore) Set(prompt string, embedding []float32, answer string) error {
 			return err
 		}
 	}
-   _, err := s.setStmt.Exec(prompt, embedding, answer)
-   if err != nil {
-       return fmt.Errorf("set prompt=%q: %w", prompt, err)
-   }
-   return nil
+	_, err := s.setStmt.Exec(prompt, embedding, answer)
+	if err != nil {
+		return fmt.Errorf("set prompt=%q: %w", prompt, err)
+	}
+	return nil
 }
 
 // Get retrieves the answer for a prompt.
@@ -132,12 +132,12 @@ func (s *PGStore) Get(prompt string) (string, bool, error) {
 	}
 	row := s.getStmt.QueryRow(prompt)
 	var ans string
-   if err := row.Scan(&ans); err != nil {
-       if err == sql.ErrNoRows {
-           return "", false, nil
-       }
-       return "", false, fmt.Errorf("get prompt=%q: %w", prompt, err)
-   }
+	if err := row.Scan(&ans); err != nil {
+		if err == sql.ErrNoRows {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("get prompt=%q: %w", prompt, err)
+	}
 	return ans, true, nil
 }
 
@@ -152,27 +152,27 @@ func (s *PGStore) GetByEmbedding(embed []float32) (string, bool, error) {
 	}
 	row := s.similarStmt.QueryRow(embed)
 	var ans string
-   if err := row.Scan(&ans); err != nil {
-       if err == sql.ErrNoRows {
-           return "", false, nil
-       }
-       return "", false, fmt.Errorf("get by embedding: %w", err)
-   }
-   return ans, true, nil
+	if err := row.Scan(&ans); err != nil {
+		if err == sql.ErrNoRows {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("get by embedding: %w", err)
+	}
+	return ans, true, nil
 }
 
 // Flush removes all cached rows.
 // Flush removes all cached rows.
 func (s *PGStore) Flush() error {
-   // If no DB is configured (e.g. in tests), nothing to do
-   if s.db == nil {
-       return nil
-   }
-   _, err := execFunc(s.db, `DELETE FROM cache`)
-   if err != nil {
-       return fmt.Errorf("flush: %w", err)
-   }
-   return nil
+	// If no DB is configured (e.g. in tests), nothing to do
+	if s.db == nil {
+		return nil
+	}
+	_, err := execFunc(s.db, `DELETE FROM cache`)
+	if err != nil {
+		return fmt.Errorf("flush: %w", err)
+	}
+	return nil
 }
 
 // ImportData bulk loads prompts with their embeddings and answers.

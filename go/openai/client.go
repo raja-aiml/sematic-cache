@@ -69,14 +69,14 @@ func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
 			OfString: param.NewOpt(prompt),
 		},
 	}
-   resp, err := c.client.Completions.New(ctx, params)
-   if err != nil {
-       return "", fmt.Errorf("complete: %w", err)
-   }
-   if len(resp.Choices) == 0 {
-       return "", fmt.Errorf("complete: no choices returned")
-   }
-   return resp.Choices[0].Text, nil
+	resp, err := c.client.Completions.New(ctx, params)
+	if err != nil {
+		return "", fmt.Errorf("complete: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("complete: no choices returned")
+	}
+	return resp.Choices[0].Text, nil
 }
 
 // Embedding calls OpenAI's embedding API.
@@ -87,13 +87,13 @@ func (c *Client) Embedding(ctx context.Context, text string) ([]float32, error) 
 			OfArrayOfStrings: []string{text},
 		},
 	}
-   resp, err := c.client.Embeddings.New(ctx, params)
-   if err != nil {
-       return nil, fmt.Errorf("embedding: %w", err)
-   }
-   if len(resp.Data) == 0 {
-       return nil, fmt.Errorf("embedding: no embedding returned")
-   }
+	resp, err := c.client.Embeddings.New(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("embedding: %w", err)
+	}
+	if len(resp.Data) == 0 {
+		return nil, fmt.Errorf("embedding: no embedding returned")
+	}
 	raw := resp.Data[0].Embedding
 	vec := make([]float32, len(raw))
 	for i, v := range raw {
