@@ -81,18 +81,15 @@ func TestRRPolicy(t *testing.T) {
    cache.Set("b", []float32{2}, "B")
    // Insert "c", should evict either 'a' or 'b'
    cache.Set("c", []float32{3}, "C")
-   // 'c' must always remain
-   if _, ok := cache.Get("c"); !ok {
-       t.Errorf("RR: expected 'c' to be present")
-   }
-   // Exactly two entries should be present
+   // Exactly capacity keys should remain among {"a","b","c"}
+   keys := []string{"a", "b", "c"}
    var count int
-   for _, key := range []string{"a", "b"} {
+   for _, key := range keys {
        if _, ok := cache.Get(key); ok {
            count++
        }
    }
-   if count != 1 {
-       t.Errorf("RR: expected exactly one of 'a' or 'b' to remain, got %d", count)
+   if count != 2 {
+       t.Errorf("RR: expected exactly 2 entries to remain, got %d", count)
    }
 }

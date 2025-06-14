@@ -140,6 +140,12 @@ type Cache struct {
    adaptiveThreshold func([]float64) float64
    // ANNIndex for fast approximate searches; if set, GetByEmbedding/GetTopK use it first
    annIndex          ANNIndex
+   // preProcess, if set, transforms the prompt before embedding or lookup
+   preProcess        func(string) string
+   // postProcess, if set, transforms the answer before returning
+   postProcess       func(string) string
+   // evaluators apply additional filtering or scoring to TopK results
+   evaluators        []func([]QueryResult) []QueryResult
    // TTL for entries; if >0, entries older than now-TTL are expired
    ttl time.Duration
    // metrics
@@ -213,6 +219,20 @@ func WithAdaptiveThreshold(fn func([]float64) float64) Option {
 func WithANNIndex(idx ANNIndex) Option {
    return func(c *Cache) { c.annIndex = idx }
 }
+// WithPreProcessor sets a function to transform prompts before caching or lookup.
+func WithPreProcessor(fn func(string) string) Option {
+   return func(c *Cache) { c.preProcess = fn }
+}
+
+// WithPostProcessor sets a function to transform answers before returning from lookup.
+func WithPostProcessor(fn func(string) string) Option {
+   return func(c *Cache) { c.postProcess = fn }
+}
+
+// WithEvaluationFunc adds a function to post-filter TopK results (after threshold and sort).
+func WithEvaluationFunc(fn func([]QueryResult) []QueryResult) Option {
+   return func(c *Cache) { c.evaluators = append(c.evaluators, fn) }
+}
 
 // NewCache creates a cache with the given capacity.
 func NewCache(capacity int, opts ...Option) *Cache {
@@ -244,14 +264,19 @@ func (c *Cache) Set(prompt string, embedding []float32, answer string) {
 // SetWithModel stores an answer and embedding for the given prompt, including model metadata.
 // modelName is the model's name (e.g. "gpt-3.5-turbo"); modelID is the specific deployment or version identifier.
 func (c *Cache) SetWithModel(prompt string, embedding []float32, answer, modelName, modelID string) {
-	if c.cacheEnable != nil && !c.cacheEnable(prompt) {
-		return
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+   // apply pre-processing hook
+   key := prompt
+   if c.preProcess != nil {
+       key = c.preProcess(prompt)
+   }
+   if c.cacheEnable != nil && !c.cacheEnable(key) {
+       return
+   }
+   c.mu.Lock()
+   defer c.mu.Unlock()
 
 	now := nowUnix()
-       if el, ok := c.entries[prompt]; ok {
+       if el, ok := c.entries[key]; ok {
            ent := el.Value.(*entry)
            ent.embedding = embedding
            ent.answer = answer
@@ -269,7 +294,7 @@ func (c *Cache) SetWithModel(prompt string, embedding []float32, answer, modelNa
        }
 
    ent := &entry{
-		prompt:       prompt,
+       prompt:       key,
 		embedding:    embedding,
 		answer:       answer,
 		ModelName:    modelName,
@@ -301,31 +326,41 @@ func (c *Cache) SetPrompt(prompt, answer string) error {
 }
 
 // Get returns the cached answer for a prompt and whether it was found.
+// Get returns the cached answer for a prompt and whether it was found.
+// It applies any registered pre- and post-processing hooks.
 func (c *Cache) Get(prompt string) (string, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if el, ok := c.entries[prompt]; ok {
-		ent := el.Value.(*entry)
-		// expire entry if needed
-		if c.isExpired(ent) {
-			// evict expired entry
-			c.lru.Remove(el)
-			delete(c.entries, prompt)
-			atomic.AddUint64(&c.missCount, 1)
-			return "", false
-		}
-		// cache hit
-		ent.accessCount++
-			ent.lastAccessed = nowUnix()
-			// update LRU position only for LRU policy
-			if c.evictionPolicy == PolicyLRU {
-				c.lru.MoveToFront(el)
-			}
-		atomic.AddUint64(&c.hitCount, 1)
-		return ent.answer, true
-	}
-	atomic.AddUint64(&c.missCount, 1)
-	return "", false
+   // apply pre-processing hook
+   key := prompt
+   if c.preProcess != nil {
+       key = c.preProcess(prompt)
+   }
+   c.mu.Lock()
+   defer c.mu.Unlock()
+   if el, ok := c.entries[key]; ok {
+       ent := el.Value.(*entry)
+       // expire entry if needed
+       if c.isExpired(ent) {
+           c.lru.Remove(el)
+           delete(c.entries, key)
+           atomic.AddUint64(&c.missCount, 1)
+           return "", false
+       }
+       // cache hit
+       ent.accessCount++
+       ent.lastAccessed = nowUnix()
+       if c.evictionPolicy == PolicyLRU {
+           c.lru.MoveToFront(el)
+       }
+       atomic.AddUint64(&c.hitCount, 1)
+       // apply post-processing hook
+       ans := ent.answer
+       if c.postProcess != nil {
+           ans = c.postProcess(ans)
+       }
+       return ans, true
+   }
+   atomic.AddUint64(&c.missCount, 1)
+   return "", false
 }
 
 // GetByEmbedding returns the answer whose embedding is most similar to the query.
@@ -480,6 +515,17 @@ func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
            if len(results) > k {
                results = results[:k]
            }
+           // apply evaluation pipeline
+           for _, eval := range c.evaluators {
+               results = eval(results)
+           }
+           // apply post-processing hook
+           if c.postProcess != nil {
+               for i, r := range results {
+                   r.Answer = c.postProcess(r.Answer)
+                   results[i] = r
+               }
+           }
            return results
        }
    }
@@ -526,6 +572,17 @@ func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
    }
    if len(results) > k {
        results = results[:k]
+   }
+   // apply evaluation pipeline
+   for _, eval := range c.evaluators {
+       results = eval(results)
+   }
+   // apply post-processing hook
+   if c.postProcess != nil {
+       for i, r := range results {
+           r.Answer = c.postProcess(r.Answer)
+           results[i] = r
+       }
    }
    return results
 }
