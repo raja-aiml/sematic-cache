@@ -40,5 +40,11 @@ go test ./...
 go run examples/simple/main.go
 ```
 
+## Advanced Example
+This example demonstrates inner-product similarity, a simple ANNIndex plugin, and adaptive thresholding.
+```bash
+go run examples/advanced/main.go
+```
+
 ## License
 MIT

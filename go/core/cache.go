@@ -3,14 +3,44 @@
 package core
 
 import (
-	"container/list"
-	"fmt"
-	"math"
-	"sort"
-	"sync"
-	"sync/atomic"
-	"time"
+   "container/list"
+   "fmt"
+   "math"
+   "sort"
+   "sync"
+   "sync/atomic"
+   "time"
 )
+// ANNIndex defines an interface for approximate nearest-neighbor search.
+// Users can plug in HNSW, LSH, or other ANN implementations.
+type ANNIndex interface {
+   // Add inserts an item with the given key and vector into the index.
+   Add(key string, vector []float32) error
+   // Remove deletes an item by key from the index.
+   Remove(key string) error
+   // Search returns up to k keys whose vectors are nearest to the query vector.
+   Search(vector []float32, k int) ([]string, error)
+}
+
+// Similarity functions
+// InnerProduct returns the dot-product similarity of a and b.
+func InnerProduct(a, b []float32) float64 {
+   var sum float64
+   for i := range a {
+       sum += float64(a[i]) * float64(b[i])
+   }
+   return sum
+}
+
+// L2Similarity returns a similarity derived from Euclidean distance: 1/(1+distance).
+func L2Similarity(a, b []float32) float64 {
+   var dist2 float64
+   for i := range a {
+       d := float64(a[i] - b[i])
+       dist2 += d * d
+   }
+   return 1.0 / (1.0 + math.Sqrt(dist2))
+}
 
 // entry represents a cached item with its embedding and metadata.
 type entry struct {
@@ -90,12 +120,17 @@ type Cache struct {
 	cacheEnable   func(string) bool
 	embedFunc     EmbeddingFunc
 	simFunc       func(a, b []float32) float64
-	minSimilarity float64 // minimum similarity threshold for search (default: -1)
-	// TTL for entries; if >0, entries older than now-TTL are expired
-	ttl time.Duration
-	// metrics
-	hitCount  uint64 // number of cache hits
-	missCount uint64 // number of cache misses
+   // minimum similarity threshold for brute-force searches
+   minSimilarity     float64 // matches with similarity below this are ignored
+   // adaptiveThreshold, if set, overrides minSimilarity per query using candidate sims
+   adaptiveThreshold func([]float64) float64
+   // ANNIndex for fast approximate searches; if set, GetByEmbedding/GetTopK use it first
+   annIndex          ANNIndex
+   // TTL for entries; if >0, entries older than now-TTL are expired
+   ttl time.Duration
+   // metrics
+   hitCount  uint64 // number of cache hits
+   missCount uint64 // number of cache misses
 }
 
 // EmbeddingFunc converts a prompt into an embedding vector.
@@ -129,6 +164,28 @@ func WithMinSimilarity(th float64) Option {
 // will be considered expired and evicted on access.
 func WithTTL(d time.Duration) Option {
 	return func(c *Cache) { c.ttl = d }
+}
+
+// WithInnerProduct sets the similarity metric to raw dot-product.
+func WithInnerProduct() Option {
+   return func(c *Cache) { c.simFunc = InnerProduct }
+}
+
+// WithL2Similarity sets the similarity metric to an L2-based score (1/(1+distance)).
+func WithL2Similarity() Option {
+   return func(c *Cache) { c.simFunc = L2Similarity }
+}
+
+// WithAdaptiveThreshold sets a function that computes a dynamic threshold
+// from a slice of candidate similarities. If provided, this overrides minSimilarity per query.
+func WithAdaptiveThreshold(fn func([]float64) float64) Option {
+   return func(c *Cache) { c.adaptiveThreshold = fn }
+}
+
+// WithANNIndex enables an approximate nearest-neighbor index for fast searches.
+// The ANNIndex should implement Add, Remove, and Search methods.
+func WithANNIndex(idx ANNIndex) Option {
+   return func(c *Cache) { c.annIndex = idx }
 }
 
 // NewCache creates a cache with the given capacity.
@@ -180,7 +237,7 @@ func (c *Cache) SetWithModel(prompt string, embedding []float32, answer, modelNa
 		return
 	}
 
-	ent := &entry{
+   ent := &entry{
 		prompt:       prompt,
 		embedding:    embedding,
 		answer:       answer,
@@ -190,7 +247,11 @@ func (c *Cache) SetWithModel(prompt string, embedding []float32, answer, modelNa
 		lastAccessed: now,
 		accessCount:  1,
 	}
-	c.insertEntry(ent)
+   c.insertEntry(ent)
+   // add to ANN index if configured
+   if c.annIndex != nil {
+       _ = c.annIndex.Add(prompt, embedding)
+   }
 }
 
 // SetPrompt generates an embedding for the prompt using the configured
@@ -239,6 +300,13 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
    if len(embed) == 0 {
        atomic.AddUint64(&c.missCount, 1)
        return "", false
+   }
+   // Try ANN index if configured for fast lookup
+   if c.annIndex != nil {
+       if keys, err := c.annIndex.Search(embed, 1); err == nil && len(keys) > 0 {
+           // c.Get updates LRU and metrics
+           return c.Get(keys[0])
+       }
    }
 
    // Scan under read-lock to find the best candidate and collect expired keys.
@@ -313,41 +381,104 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
 }
 
 // GetTopKByEmbedding returns up to k answers whose embeddings are most similar to the query.
-// Matches with similarity below the configured threshold are ignored.
+// It supports ANN-based search and adaptive thresholding.
 func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	var results []QueryResult
-	// iterate through entries
-	for prompt, el := range c.entries {
-		ent := el.Value.(*entry)
-		// skip expired entries
-		if c.isExpired(ent) {
-			continue
-		}
-		if len(ent.embedding) != len(embed) || len(embed) == 0 {
-			continue
-		}
-		sim := c.simFunc(ent.embedding, embed)
-		if sim < c.minSimilarity {
-			continue
-		}
-		results = append(results, QueryResult{
-			Prompt:     prompt,
-			Answer:     ent.answer,
-			Similarity: sim,
-			ModelName:  ent.ModelName,
-			ModelID:    ent.ModelID,
-		})
-	}
-	// sort descending by similarity
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Similarity > results[j].Similarity
-	})
-	if len(results) > k {
-		results = results[:k]
-	}
-	return results
+   if len(embed) == 0 || k <= 0 {
+       return nil
+   }
+   // Try ANN index if configured
+   if c.annIndex != nil {
+       if keys, err := c.annIndex.Search(embed, k); err == nil && len(keys) > 0 {
+           var results []QueryResult
+           c.mu.RLock()
+           for _, key := range keys {
+               if el, ok := c.entries[key]; ok {
+                   ent := el.Value.(*entry)
+                   if c.isExpired(ent) {
+                       continue
+                   }
+                   sim := c.simFunc(ent.embedding, embed)
+                   if sim < c.minSimilarity {
+                       continue
+                   }
+                   results = append(results, QueryResult{
+                       Prompt:     ent.prompt,
+                       Answer:     ent.answer,
+                       Similarity: sim,
+                       ModelName:  ent.ModelName,
+                       ModelID:    ent.ModelID,
+                   })
+               }
+           }
+           c.mu.RUnlock()
+           sort.Slice(results, func(i, j int) bool {
+               return results[i].Similarity > results[j].Similarity
+           })
+           if c.adaptiveThreshold != nil && len(results) > 0 {
+               sims := make([]float64, len(results))
+               for i, r := range results {
+                   sims[i] = r.Similarity
+               }
+               thr := c.adaptiveThreshold(sims)
+               filtered := results[:0]
+               for _, r := range results {
+                   if r.Similarity >= thr {
+                       filtered = append(filtered, r)
+                   }
+               }
+               results = filtered
+           }
+           if len(results) > k {
+               results = results[:k]
+           }
+           return results
+       }
+   }
+   // Fallback brute-force
+   c.mu.RLock()
+   var results []QueryResult
+   for key, el := range c.entries {
+       ent := el.Value.(*entry)
+       if c.isExpired(ent) {
+           continue
+       }
+       if len(ent.embedding) != len(embed) {
+           continue
+       }
+       sim := c.simFunc(ent.embedding, embed)
+       if sim < c.minSimilarity {
+           continue
+       }
+       results = append(results, QueryResult{
+           Prompt:     key,
+           Answer:     ent.answer,
+           Similarity: sim,
+           ModelName:  ent.ModelName,
+           ModelID:    ent.ModelID,
+       })
+   }
+   c.mu.RUnlock()
+   sort.Slice(results, func(i, j int) bool {
+       return results[i].Similarity > results[j].Similarity
+   })
+   if c.adaptiveThreshold != nil && len(results) > 0 {
+       sims := make([]float64, len(results))
+       for i, r := range results {
+           sims[i] = r.Similarity
+       }
+       thr := c.adaptiveThreshold(sims)
+       filtered := results[:0]
+       for _, r := range results {
+           if r.Similarity >= thr {
+               filtered = append(filtered, r)
+           }
+       }
+       results = filtered
+   }
+   if len(results) > k {
+       results = results[:k]
+   }
+   return results
 }
 
 // Flush clears all cached entries.
@@ -365,8 +496,13 @@ func (c *Cache) insertEntry(ent *entry) {
 	if c.lru.Len() > c.capacity {
 		tail := c.lru.Back()
 		if tail != nil {
+			oldKey := tail.Value.(*entry).prompt
 			c.lru.Remove(tail)
-			delete(c.entries, tail.Value.(*entry).prompt)
+			delete(c.entries, oldKey)
+			// remove from ANN index if present
+			if c.annIndex != nil {
+				_ = c.annIndex.Remove(oldKey)
+			}
 		}
 	}
 }
