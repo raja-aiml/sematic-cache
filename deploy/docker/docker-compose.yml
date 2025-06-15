@@ -1,0 +1,32 @@
+version: "3.9"
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_DB: cache
+      POSTGRES_USER: cache
+      POSTGRES_PASSWORD: cache
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db_init.sql:/docker-entrypoint-initdb.d/db_init.sql
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://cache:cache@postgres:5432/cache?sslmode=disable
+      OPENAI_API_KEY: your-api-key
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  pgdata:

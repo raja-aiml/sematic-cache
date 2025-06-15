@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-init
+data:
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS vector;

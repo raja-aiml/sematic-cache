@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sematic-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sematic-cache
+  template:
+    metadata:
+      labels:
+        app: sematic-cache
+    spec:
+      containers:
+        - name: sematic-cache
+          image: your-registry/sematic-cache:latest
+          env:
+            - name: DATABASE_URL
+              value: postgres://cache:cache@postgres:5432/cache?sslmode=disable
+            - name: OPENAI_API_KEY
+              value: your-api-key
+          ports:
+            - containerPort: 8080
+          args:
+            - "-address=:8080"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sematic-cache
+spec:
+  selector:
+    app: sematic-cache
+  ports:
+    - port: 8080
+      targetPort: 8080
