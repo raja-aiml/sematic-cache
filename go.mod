@@ -5,6 +5,7 @@ go 1.23.8
 require gopkg.in/yaml.v2 v2.4.0
 
 require (
+	github.com/gin-gonic/gin v1.10.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/openai/openai-go v1.5.0
 	github.com/pgvector/pgvector-go v0.3.0
@@ -13,7 +14,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.17.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.30.0
-	github.com/gin-gonic/gin v1.10.1 
 )
 
 require (
