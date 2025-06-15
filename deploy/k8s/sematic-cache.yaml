@@ -14,7 +14,9 @@ spec:
     spec:
       containers:
         - name: sematic-cache
-          image: your-registry/sematic-cache:latest
+          # Use local Docker image built via cluster.sh; do not force pull
+          image: sematic-cache:latest
+          imagePullPolicy: IfNotPresent
           env:
             - name: DATABASE_URL
               value: postgres://cache:cache@postgres:5432/cache?sslmode=disable
@@ -31,6 +33,7 @@ kind: Service
 metadata:
   name: sematic-cache
 spec:
+  type: LoadBalancer
   selector:
     app: sematic-cache
   ports:

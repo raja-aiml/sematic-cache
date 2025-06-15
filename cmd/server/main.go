@@ -40,9 +40,17 @@ func main() {
 		*addr = cfg.Server.Address
 	}
 
-	shutdown, err := observability.Init(context.Background(), "cache-server", os.Getenv("JAEGER_ENDPOINT"))
-	if err != nil {
-		log.Fatalf("otel init: %v", err)
+	// Initialize OpenTelemetry/Jaeger if endpoint is provided; otherwise no-op
+	var shutdown func(context.Context) error
+	jaegerEndpoint := os.Getenv("JAEGER_ENDPOINT")
+	if jaegerEndpoint != "" {
+		var err error
+		shutdown, err = observability.Init(context.Background(), "cache-server", jaegerEndpoint)
+		if err != nil {
+			log.Fatalf("otel init: %v", err)
+		}
+	} else {
+		shutdown = func(context.Context) error { return nil }
 	}
 	defer shutdown(context.Background())
 
