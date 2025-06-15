@@ -37,8 +37,6 @@ cmd_up() {
     echo "Waiting for deployments to be ready..."
     kubectl --context "$KUBE_CONTEXT" rollout status deployment/postgres --timeout=120s
     kubectl --context "$KUBE_CONTEXT" rollout status deployment/redis --timeout=120s
-    kubectl --context "$KUBE_CONTEXT" rollout status deployment/sematic-cache --timeout=120s
-    echo "Cluster is up and running. Application is available at http://localhost:8080"
 }
 
 cmd_down() {
