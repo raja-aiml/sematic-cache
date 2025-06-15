@@ -14,28 +14,29 @@ This directory contains Kubernetes manifests and helper scripts to deploy the Se
 - `postgres.yaml`: PVC, Deployment, and Service for PostgreSQL.
 - `redis.yaml`: Deployment and Service for Redis.
 - `sematic-cache.yaml`: Deployment and Service for the Sematic Cache API.
-- `cluster.sh`: Helper script to manage the k3d cluster and deploy resources.
+- `registry.yaml`: Deployment and Service for a local Docker registry.
+- `cluster.sh`: Manage the k3d cluster (create, delete, logs).
+- `dev.sh`: CLI to build the image, push to the local registry, and deploy.
 
 ## Usage
 
-1. Make `cluster.sh` executable if needed:
+1. Make the scripts executable if needed:
 
    ```bash
-   chmod +x cluster.sh
+   chmod +x cluster.sh dev.sh
    ```
 
-2. Start the cluster and deploy all components:
+2. Build the image and deploy everything:
 
    ```bash
-   ./cluster.sh up
+   ./dev.sh deploy
    ```
 
    This will:
+   - Start a local Docker registry `sematic-registry` on port `5000`
+   - Build the Docker image `sematic-cache:latest` and push it to the registry
    - Create a k3d cluster named `sematic-cache`
-   - Build the local Docker image `sematic-cache:latest` (using `deploy/docker/Dockerfile`) and import it into the cluster
-   - Expose port `8080` on your localhost to the Sematic Cache service
-   - Apply all Kubernetes manifests
-   - Wait for deployments to be ready
+   - Apply all Kubernetes manifests and wait for deployments
 
 3. View the status of the cluster:
 
@@ -55,15 +56,16 @@ This directory contains Kubernetes manifests and helper scripts to deploy the Se
    ./cluster.sh logs <pod-name> --follow
    ```
 
-5. Tear down the cluster:
+5. Tear down the cluster and registry:
 
    ```bash
-   ./cluster.sh down
+   ./dev.sh down
    ```
+   This command removes the k3d cluster and stops the `sematic-registry` container.
 
 ## Exposing Application
 
-After running `./cluster.sh up`, the Sematic Cache API will be accessible at:
+After running `./dev.sh deploy`, the Sematic Cache API will be accessible at:
 
 ```
 http://localhost:8080
@@ -71,8 +73,8 @@ http://localhost:8080
 
 ## Cleanup
 
-To remove the cluster and all resources:
+To remove the cluster, registry, and all resources:
 
 ```bash
-./cluster.sh down
+./dev.sh down
 ```
