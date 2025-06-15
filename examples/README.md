@@ -30,4 +30,4 @@ Stop the containers with:
 ```bash
 docker compose -f deploy/docker/docker-compose.yml down
 ```
-See `docker/README.md` for more information.
+
