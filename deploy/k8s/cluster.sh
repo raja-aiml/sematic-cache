@@ -9,16 +9,13 @@ KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
 
 # Directory containing Kubernetes manifests
 MANIFEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Repository root (for building Docker image)
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$MANIFEST_DIR/../..")"
-DOCKERFILE="$REPO_ROOT/deploy/docker/Dockerfile"
 
 usage() {
     cat <<EOM
 Usage: $(basename "$0") <command> [args]
 
 Commands:
-  up                    Create k3d cluster and deploy Kubernetes resources
+  up                    Create k3d cluster and apply manifests
   down                  Delete k3d cluster
   ps                    List k3d clusters and Kubernetes resources
   logs [POD] [--follow] Show logs for a pod (default: all pods). Use --follow to tail logs.
@@ -32,10 +29,6 @@ cmd_up() {
     k3d cluster create "$CLUSTER_NAME" --agents 0 --port "8080:8080@loadbalancer" --kubeconfig-switch-context
     echo "Switching kubectl context to '$KUBE_CONTEXT'..."
     kubectl config use-context "$KUBE_CONTEXT"
-    echo "Building local server image 'sematic-cache:latest'..."
-    docker build -t sematic-cache:latest -f "$DOCKERFILE" "$REPO_ROOT"
-    echo "Importing 'sematic-cache:latest' into k3d cluster '$CLUSTER_NAME'..."
-    k3d image import sematic-cache:latest -c "$CLUSTER_NAME"
     echo "Waiting for Kubernetes nodes to be ready..."
     # Wait for the k3d control-plane node (named <context>-server-0)
     kubectl --context "$KUBE_CONTEXT" wait --for=condition=Ready node/"${KUBE_CONTEXT}-server-0" --timeout=60s
