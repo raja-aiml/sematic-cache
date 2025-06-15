@@ -157,6 +157,16 @@ go run cmd/server/main.go -config config.yml
 go run cmd/server/main.go -address :8080
 ```
 
+### Docker Compose
+To run the server with PostgreSQL and Redis via Docker:
+```bash
+docker compose -f deploy/docker/docker-compose.yml up --build
+```
+Stop the containers with:
+```bash
+docker compose -f deploy/docker/docker-compose.yml down
+```
+
 ### API Endpoints
 
 #### Store a Cache Entry
@@ -322,10 +332,10 @@ go test ./server
 ```
 
 ## Examples
-
-Check the `examples/` directory for:
-- **Simple usage**: Basic caching operations
-- **Advanced usage**: ANN index integration, custom similarity functions
+Example programs live under `examples/`. Each subdirectory has its own README.
+- **simple/**: in-memory caching demo
+- **advanced/**: ANN index and custom similarity
+- **docker/**: server setup with Docker Compose
 
 ## Contributing
 
