@@ -6,6 +6,9 @@ REGISTRY_NAME="sematic-registry"
 IMAGE_NAME="sematic-cache:latest"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CLUSTER_SCRIPT="$(cd "$(dirname "$0")" && pwd)/cluster.sh"
+CLUSTER_NAME="sematic-cache"
+KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
+APP_MANIFEST="$REPO_ROOT/deploy/k8s/sematic-cache.yaml"
 
 usage() {
     cat <<EOM
@@ -13,7 +16,7 @@ Usage: $(basename "$0") <command>
 
 Commands:
   build    Build the Docker image and push to local registry
-  deploy   Build, push, and deploy to k3d cluster
+  deploy   Build image, create cluster, and deploy application
   down     Tear down cluster and stop registry
   help     Show this help message
 EOM
@@ -45,6 +48,11 @@ push_image() {
     docker push "localhost:5000/$IMAGE_NAME"
 }
 
+deploy_app() {
+    kubectl --context "$KUBE_CONTEXT" apply -f "$APP_MANIFEST"
+    kubectl --context "$KUBE_CONTEXT" rollout status deployment/sematic-cache --timeout=120s
+}
+
 cmd_build() {
     build_image
     push_image
@@ -53,6 +61,7 @@ cmd_build() {
 cmd_deploy() {
     cmd_build
     "$CLUSTER_SCRIPT" up
+    deploy_app
 }
 
 cmd_down() {

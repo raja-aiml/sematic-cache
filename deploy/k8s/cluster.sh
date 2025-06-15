@@ -32,10 +32,14 @@ cmd_up() {
     echo "Waiting for Kubernetes nodes to be ready..."
     # Wait for the k3d control-plane node (named <context>-server-0)
     kubectl --context "$KUBE_CONTEXT" wait --for=condition=Ready node/"${KUBE_CONTEXT}-server-0" --timeout=60s
-    echo "Applying Kubernetes manifests..."
-    kubectl --context "$KUBE_CONTEXT" apply -f "$MANIFEST_DIR"
+    echo "Applying base manifests..."
+    kubectl --context "$KUBE_CONTEXT" apply -f "$MANIFEST_DIR/pg-init-configmap.yaml"
+    kubectl --context "$KUBE_CONTEXT" apply -f "$MANIFEST_DIR/postgres.yaml"
+    kubectl --context "$KUBE_CONTEXT" apply -f "$MANIFEST_DIR/registry.yaml"
+    kubectl --context "$KUBE_CONTEXT" apply -f "$MANIFEST_DIR/redis.yaml"
     echo "Waiting for deployments to be ready..."
     kubectl --context "$KUBE_CONTEXT" rollout status deployment/postgres --timeout=120s
+    kubectl --context "$KUBE_CONTEXT" rollout status deployment/registry --timeout=120s
     kubectl --context "$KUBE_CONTEXT" rollout status deployment/redis --timeout=120s
 }
 
