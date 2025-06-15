@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-
 set -e
 
-# Name of the k3d cluster
 CLUSTER_NAME="sematic-cache"
-# Kubernetes context name for this k3d cluster
 KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
-
-# Directory containing Kubernetes manifests
-MANIFEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${ROOT_DIR}/config"
+INFRA_DIR="${ROOT_DIR}/infra"
+APP_DIR="${ROOT_DIR}/app"
 
 usage() {
     cat <<EOM
@@ -24,31 +22,42 @@ EOM
 }
 
 cmd_up() {
-    echo "Creating k3d cluster '$CLUSTER_NAME'..."
-    # Create cluster and switch kubectl context to it
-    k3d cluster create "$CLUSTER_NAME" --agents 0 --port "8080:8080@loadbalancer" --kubeconfig-switch-context
-    echo "Switching kubectl context to '$KUBE_CONTEXT'..."
+    echo "🚀 Creating k3d cluster '$CLUSTER_NAME'..."
+    k3d cluster create "$CLUSTER_NAME" \
+        --agents 0 \
+        --port "8080:8080@loadbalancer" \
+        --registry-config "${CONFIG_DIR}/k3d-registry.yaml" \
+        --kubeconfig-switch-context
+
+    echo "⏳ Waiting for cluster to be ready..."
     kubectl config use-context "$KUBE_CONTEXT"
-    echo "Waiting for Kubernetes nodes to be ready..."
-    # Wait for the k3d control-plane node (named <context>-server-0)
     kubectl --context "$KUBE_CONTEXT" wait --for=condition=Ready node/"${KUBE_CONTEXT}-server-0" --timeout=60s
-    echo "Applying Kubernetes manifests..."
-    kubectl --context "$KUBE_CONTEXT" apply -f "$MANIFEST_DIR"
-    echo "Waiting for deployments to be ready..."
-    kubectl --context "$KUBE_CONTEXT" rollout status deployment/postgres --timeout=120s
-    kubectl --context "$KUBE_CONTEXT" rollout status deployment/redis --timeout=120s
+
+    echo "📦 Applying infrastructure manifests..."
+    for file in "${INFRA_DIR}"/*.yaml; do
+        echo "↪ applying: $file"
+        kubectl --context "$KUBE_CONTEXT" apply -f "$file"
+    done
+
+    echo "📦 Deploying application..."
+    kubectl --context "$KUBE_CONTEXT" apply -f "${APP_DIR}/sematic-cache.yaml"
+
+    echo "✅ Waiting for deployments to become ready..."
+    kubectl --context "$KUBE_CONTEXT" rollout status deployment/postgres --timeout=120s || true
+    kubectl --context "$KUBE_CONTEXT" rollout status deployment/redis --timeout=120s || true
+    kubectl --context "$KUBE_CONTEXT" rollout status deployment/sematic-cache --timeout=120s || true
 }
 
 cmd_down() {
-    echo "Deleting k3d cluster '$CLUSTER_NAME'..."
+    echo "🗑️  Deleting k3d cluster '$CLUSTER_NAME'..."
     k3d cluster delete "$CLUSTER_NAME"
 }
 
 cmd_ps() {
-    echo "k3d clusters:"
+    echo "📋 k3d clusters:"
     k3d cluster list
     echo
-    echo "Kubernetes resources in context '$KUBE_CONTEXT':"
+    echo "📋 Kubernetes resources in context '$KUBE_CONTEXT':"
     kubectl --context "$KUBE_CONTEXT" get all
 }
 
@@ -67,29 +76,15 @@ cmd_logs() {
     fi
 }
 
-# Main
 if [ $# -lt 1 ]; then
     usage
     exit 1
 fi
 
-COMMAND="$1"
-shift
-
-case "$COMMAND" in
-    up)
-        cmd_up
-        ;;
-    down)
-        cmd_down
-        ;;
-    ps)
-        cmd_ps
-        ;;
-    logs)
-        cmd_logs "$@"
-        ;;
-    help|*)
-        usage
-        ;;
+case "$1" in
+    up) cmd_up ;;
+    down) cmd_down ;;
+    ps) cmd_ps ;;
+    logs) shift; cmd_logs "$@" ;;
+    help|*) usage ;;
 esac
