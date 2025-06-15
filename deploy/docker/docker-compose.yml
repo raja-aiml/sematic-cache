@@ -12,12 +12,14 @@ services:
       - "5432:5432"
 
   redis:
-    image: redis:7
+    image: redis:8.0.2
     ports:
       - "6379:6379"
 
   app:
-    build: .
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
     environment:
       DATABASE_URL: postgres://cache:cache@postgres:5432/cache?sslmode=disable
       OPENAI_API_KEY: your-api-key
