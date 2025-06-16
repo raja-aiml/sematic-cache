@@ -12,11 +12,8 @@ CLUSTER_NAME="sematic-cache"
 KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
 NAMESPACE_APP="app"
 
-# Derive a tag from Git
-GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-GIT_SHA=$(git rev-parse --short HEAD)
-IMAGE_TAG="${GIT_BRANCH//\//-}-${GIT_SHA}"
-IMAGE_NAME="sematic-cache:${IMAGE_TAG}"
+# Use a simple, consistent image name
+IMAGE_NAME="sematic-cache:working"
 
 # ─────────────────────────────────────────────────────────────
 # 📖 USAGE
@@ -30,9 +27,10 @@ Commands:
   deploy     Apply app manifest to existing cluster
   test       Show app pod, service, and ingress status
   remove     Delete app deployment and associated resources
+  logs       Show application logs
+  status     Show deployment status
 
-Current Git-based image tag:
-  $IMAGE_NAME
+Current image: $IMAGE_NAME
 EOM
 }
 
@@ -40,26 +38,85 @@ EOM
 # 🔨 BUILD & IMPORT IMAGE
 # ─────────────────────────────────────────────────────────────
 function build_image() {
-    echo "🔨 Building image '$IMAGE_NAME' using BuildKit..."
-    DOCKER_BUILDKIT=1 docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" "$REPO_ROOT"
-
+    echo "🔨 Building image '$IMAGE_NAME'..."
+    
+    # Build with no cache to ensure fresh build
+    docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" "$REPO_ROOT" --no-cache
+    
+    echo "🧪 Testing image locally..."
+    if docker run --rm "$IMAGE_NAME" --help >/dev/null 2>&1; then
+        echo "✅ Image test passed"
+    else
+        echo "❌ Image test failed - binary may not exist"
+        echo "🔍 Checking image contents:"
+        docker run --rm "$IMAGE_NAME" ls -la /app/ || echo "Cannot list /app/"
+        return 1
+    fi
+    
     echo "📦 Importing image into k3d cluster '$CLUSTER_NAME'..."
-    k3d image import "$IMAGE_NAME" -c "$CLUSTER_NAME"
+    if k3d image import "$IMAGE_NAME" -c "$CLUSTER_NAME"; then
+        echo "✅ Image imported successfully"
+    else
+        echo "❌ Failed to import image"
+        return 1
+    fi
+    
+    echo "🔍 Verifying image in k3d..."
+    docker exec k3d-sematic-cache-server-0 crictl images | grep sematic-cache || echo "⚠️ Image not found in k3d"
 }
 
 # ─────────────────────────────────────────────────────────────
-# 🚀 DEPLOY APPLICATION ONLY
+# 🚀 DEPLOY APPLICATION
 # ─────────────────────────────────────────────────────────────
 function deploy_app() {
     echo "📁 Creating namespace '$NAMESPACE_APP' (if not exists)..."
     kubectl --context "$KUBE_CONTEXT" create namespace "$NAMESPACE_APP" --dry-run=client -o yaml | kubectl apply -f -
 
-    echo "🚀 Replacing image in manifest with tag: $IMAGE_NAME"
-    sed "s|sematic-cache:latest|$IMAGE_NAME|" "$APP_MANIFEST" | \
-      kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" apply -f -
+    echo "🚀 Applying app manifest..."
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" apply -f "$APP_MANIFEST"
 
     echo "⏳ Waiting for app deployment rollout..."
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" rollout status deployment/sematic-cache --timeout=60s
+    if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" rollout status deployment/sematic-cache --timeout=120s; then
+        echo "✅ Deployment successful"
+        show_status
+    else
+        echo "❌ Deployment failed or timed out"
+        echo "🔍 Checking pod status..."
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get pods
+        echo "📜 Recent logs:"
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" logs deployment/sematic-cache --tail=20 || echo "No logs available"
+        return 1
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────
+# 📊 SHOW STATUS
+# ─────────────────────────────────────────────────────────────
+function show_status() {
+    echo -e "\n📊 Application Status:"
+    echo "🔹 Pods:"
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get pods -o wide
+    
+    echo -e "\n🔹 Services:"
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get svc
+    
+    echo -e "\n🔹 Ingress:"
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get ingress
+    
+    # Check if app is responding
+    echo -e "\n🔹 Health Check:"
+    POD=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get pods -l app=sematic-cache -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    if [[ -n "$POD" ]]; then
+        if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" exec "$POD" -- wget -qO- http://localhost:8080/health 2>/dev/null; then
+            echo "✅ Application is responding"
+        else
+            echo "❌ Application not responding on /health endpoint"
+        fi
+    fi
+    
+    echo -e "\n🌐 Access URLs:"
+    echo "   LoadBalancer: http://localhost:8080"
+    echo "   Ingress:      http://sematic.127.0.0.1.nip.io:8080"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -67,10 +124,26 @@ function deploy_app() {
 # ─────────────────────────────────────────────────────────────
 function test_app() {
     echo "🔍 Testing Semantic Cache App..."
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get pods
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get svc
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get ingress
-    echo "✅ App status check complete."
+    show_status
+    
+    # Try to hit the health endpoint
+    echo -e "\n🧪 Testing endpoints:"
+    echo "Testing health endpoint..."
+    if curl -s http://localhost:8080/health >/dev/null 2>&1; then
+        echo "✅ Health endpoint accessible"
+        curl -s http://localhost:8080/health | jq . 2>/dev/null || curl -s http://localhost:8080/health
+    else
+        echo "❌ Health endpoint not accessible"
+        echo "💡 Try: kubectl port-forward -n app svc/sematic-cache 8080:8080"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────
+# 📜 SHOW LOGS
+# ─────────────────────────────────────────────────────────────
+function show_logs() {
+    echo "📜 Application Logs:"
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" logs deployment/sematic-cache --tail=50 -f
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -79,11 +152,6 @@ function test_app() {
 function remove_app() {
     echo "🗑 Deleting app resources from namespace '$NAMESPACE_APP'..."
     kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" delete -f "$APP_MANIFEST" --ignore-not-found
-
-    # Uncomment to delete the namespace too:
-    # echo "🧹 Deleting namespace '$NAMESPACE_APP'..."
-    # kubectl --context "$KUBE_CONTEXT" delete namespace "$NAMESPACE_APP" --ignore-not-found
-
     echo "✅ Removal complete."
 }
 
@@ -96,6 +164,8 @@ function main() {
         deploy) deploy_app ;;
         test) test_app ;;
         remove) remove_app ;;
+        logs) show_logs ;;
+        status) show_status ;;
         help|*) usage ;;
     esac
 }
