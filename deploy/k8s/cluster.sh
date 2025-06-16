@@ -60,6 +60,20 @@ function cmd_up() {
 function cmd_down() {
     echo "🗑️  Deleting k3d cluster '$CLUSTER_NAME'..."
     k3d cluster delete "$CLUSTER_NAME"
+
+    echo "🧹 Cleaning up dangling Docker volumes and networks..."
+    docker volume prune -f
+    docker network prune -f
+
+    echo "🧽 Removing unused containers matching '$CLUSTER_NAME'..."
+    docker ps -a --filter "name=$CLUSTER_NAME" --format "{{.ID}}" | xargs -r docker rm -f
+
+    echo "🧼 Removing kubeconfig context '$KUBE_CONTEXT'..."
+    kubectl config delete-context "$KUBE_CONTEXT" 2>/dev/null || true
+    kubectl config delete-cluster "$KUBE_CONTEXT" 2>/dev/null || true
+    kubectl config unset "users.${KUBE_CONTEXT}" 2>/dev/null || true
+
+    echo "✅ Full cluster teardown complete."
 }
 
 function cmd_ps() {
