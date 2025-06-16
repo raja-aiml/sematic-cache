@@ -3,12 +3,12 @@ set -e
 
 CLUSTER_NAME="sematic-cache"
 KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
+NAMESPACE="infra"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${ROOT_DIR}/config"
 INFRA_DIR="${ROOT_DIR}/infra"
-APP_DIR="${ROOT_DIR}/app"
 
-usage() {
+function usage() {
     cat <<EOM
 Usage: $(basename "$0") <command> [args]
 
@@ -17,74 +17,106 @@ Commands:
   down                  Delete k3d cluster
   ps                    List k3d clusters and Kubernetes resources
   logs [POD] [--follow] Show logs for a pod (default: all pods). Use --follow to tail logs.
+  test                  Run basic connectivity & deployment checks
   help                  Show this help message
 EOM
 }
 
-cmd_up() {
+function cmd_up() {
     echo "🚀 Creating k3d cluster '$CLUSTER_NAME'..."
     k3d cluster create "$CLUSTER_NAME" \
         --agents 0 \
-        --port "8080:8080@loadbalancer" \
+        --port "8080:80@loadbalancer" \
+        --port "8443:443@loadbalancer" \
+        --port "5001:5000@loadbalancer" \
         --registry-config "${CONFIG_DIR}/k3d-registry.yaml" \
+        --k3s-arg "--disable=traefik@server:0" \
         --kubeconfig-switch-context
 
     echo "⏳ Waiting for cluster to be ready..."
     kubectl config use-context "$KUBE_CONTEXT"
     kubectl --context "$KUBE_CONTEXT" wait --for=condition=Ready node/"${KUBE_CONTEXT}-server-0" --timeout=60s
 
-    echo "📦 Applying infrastructure manifests..."
-    for file in "${INFRA_DIR}"/*.yaml; do
-        echo "↪ applying: $file"
-        kubectl --context "$KUBE_CONTEXT" apply -f "$file"
+    echo "📁 Creating namespace: $NAMESPACE"
+    kubectl --context "$KUBE_CONTEXT" create namespace "$NAMESPACE" || true
+
+    echo "📦 Applying infrastructure manifests (via Kustomize)..."
+    kubectl --context "$KUBE_CONTEXT" apply -k "$INFRA_DIR"
+
+    echo "🌐 Waiting for ingress-nginx controller to be ready..."
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" rollout status deployment/ingress-nginx-controller --timeout=120s || true
+
+    echo "🔐 Waiting for ingress-nginx admission webhooks to be ready..."
+    for job in ingress-nginx-admission-create ingress-nginx-admission-patch; do
+        echo "⏳ Waiting for job $job..."
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" wait --for=condition=complete job/$job --timeout=60s || {
+            echo "❌ Job $job failed or timed out"; exit 1;
+        }
     done
 
-    echo "📦 Deploying application..."
-    kubectl --context "$KUBE_CONTEXT" apply -f "${APP_DIR}/sematic-cache.yaml"
-
-    echo "✅ Waiting for deployments to become ready..."
-    kubectl --context "$KUBE_CONTEXT" rollout status deployment/postgres --timeout=120s || true
-    kubectl --context "$KUBE_CONTEXT" rollout status deployment/redis --timeout=120s || true
-    kubectl --context "$KUBE_CONTEXT" rollout status deployment/sematic-cache --timeout=120s || true
+    echo "✅ Waiting for other deployments to become ready..."
+    for d in postgres redis registry; do
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" rollout status deployment/$d --timeout=120s || true
+    done
 }
 
-cmd_down() {
+function cmd_down() {
     echo "🗑️  Deleting k3d cluster '$CLUSTER_NAME'..."
     k3d cluster delete "$CLUSTER_NAME"
 }
 
-cmd_ps() {
+function cmd_ps() {
     echo "📋 k3d clusters:"
     k3d cluster list
     echo
-    echo "📋 Kubernetes resources in context '$KUBE_CONTEXT':"
-    kubectl --context "$KUBE_CONTEXT" get all
+    echo "📋 Kubernetes resources in namespace '$NAMESPACE':"
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get all
 }
 
-cmd_logs() {
+function cmd_logs() {
     local pod="$1"
     shift || true
     if [ -z "$pod" ]; then
-        pods=$(kubectl --context "$KUBE_CONTEXT" get pods -o name)
+        pods=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get pods -o name)
         for p in $pods; do
             echo "=== Logs for $p ==="
-            kubectl --context "$KUBE_CONTEXT" logs $p "$@"
+            kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" logs $p "$@"
             echo
         done
     else
-        kubectl --context "$KUBE_CONTEXT" logs "$pod" "$@"
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" logs "$pod" "$@"
     fi
 }
 
-if [ $# -lt 1 ]; then
-    usage
-    exit 1
-fi
+function cmd_test() {
+    echo "🔍 Testing registry at http://localhost:5001..."
+    curl -s http://localhost:5001/v2/_catalog || echo "❌ Registry not responding"
 
-case "$1" in
-    up) cmd_up ;;
-    down) cmd_down ;;
-    ps) cmd_ps ;;
-    logs) shift; cmd_logs "$@" ;;
-    help|*) usage ;;
-esac
+    echo -e "\n🔍 Verifying Kubernetes deployments:"
+    for d in postgres redis registry; do
+        echo -n "↪ $d: "
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get deployment "$d" -o=jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "❌ Missing"
+        echo
+    done
+}
+
+function main() {
+    if [ $# -lt 1 ]; then
+        usage
+        exit 1
+    fi
+
+    case "$1" in
+        up) cmd_up ;;
+        down) cmd_down ;;
+        ps) cmd_ps ;;
+        logs) shift; cmd_logs "$@" ;;
+        test) cmd_test ;;
+        help|*) usage ;;
+    esac
+}
+
+# Entry point
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
