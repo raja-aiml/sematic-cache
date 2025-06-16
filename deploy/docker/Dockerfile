@@ -1,13 +1,29 @@
+# ─────────────────────────────────────────────────────────────
+# ⚙️ Builder Stage
+# ─────────────────────────────────────────────────────────────
 FROM golang:1.23 AS builder
-WORKDIR /app
-COPY . .
-# Build the application into a distinct binary name to avoid clashing with the 'server' source directory
-RUN mkdir -p bin && \
-    go build -o bin/server ./cmd/server
 
-FROM debian:stable-slim
 WORKDIR /app
-# Copy only the compiled binary from the builder stage (renamed above) into /app/server
-COPY --from=builder /app/bin/server /app/server
-EXPOSE 8080
-CMD ["/app/server"]
+
+# Copy module files and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the binary from the root (expects main.go in /app)
+RUN go build -o sematic-cache cmd/server/main.go 
+
+# ─────────────────────────────────────────────────────────────
+# 🧼 Final Runtime Image
+# ─────────────────────────────────────────────────────────────
+FROM alpine:latest
+
+WORKDIR /bin
+
+# Copy binary from builder
+COPY --from=builder /app/sematic-cache .
+
+# Run binary
+ENTRYPOINT ["/bin/sematic-cache"]
