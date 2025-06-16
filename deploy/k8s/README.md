@@ -78,3 +78,129 @@ To remove the cluster, registry, and all resources:
 ```bash
 ./dev.sh down
 ```
+
+
+🚀 Kubernetes Deployment for Semantic Cache
+
+This directory provides a simple and reproducible way to deploy the Semantic Cache application locally using k3d and Kubernetes.
+
+⸻
+
+📦 Project Structure
+
+k8s/
+├── cluster.sh           # Manages k3d cluster lifecycle (create, delete, logs)
+├── dev.sh               # Builds, pushes, and deploys Docker image
+├── config/
+│   └── k3d-registry.yaml
+├── infra/               # Infrastructure components
+│   ├── registry.yaml
+│   ├── postgres.yaml
+│   ├── redis.yaml
+│   ├── ingress-nginx/
+│   │   └── kustomization.yaml
+│   └── kustomization.yaml
+├── app/
+│   └── sematic-cache.yaml
+└── README.md
+
+
+⸻
+
+✅ Prerequisites
+	•	Docker
+	•	k3d v5+
+	•	kubectl
+
+⸻
+
+🔧 Usage Guide
+
+1. Make scripts executable
+
+chmod +x cluster.sh dev.sh
+
+2. Build & Deploy
+
+./dev.sh deploy
+
+This will:
+	•	Build and push sematic-cache:latest to the local registry
+	•	Start a k3d cluster named sematic-cache
+	•	Apply all Kubernetes manifests using Kustomize
+
+3. Check Cluster Status
+
+./cluster.sh ps
+
+4. View Pod Logs
+
+# Logs for all pods
+./cluster.sh logs
+
+# Logs for a specific pod
+./cluster.sh logs <pod-name> --follow
+
+5. Shutdown
+
+./dev.sh down
+
+This removes the k3d cluster and local registry.
+
+⸻
+
+🌐 Accessing the Application
+
+After deploying:
+
+http://localhost:8080
+
+Local registry exposed at:
+
+http://localhost:5001/v2/_catalog
+
+
+⸻
+
+📂 Components Summary
+
+Infrastructure (under infra/):
+	•	PostgreSQL with pgvector extension
+	•	Redis for caching
+	•	Ingress NGINX for routing
+	•	Local Registry for pushing Docker images
+
+App Layer (under app/):
+	•	sematic-cache.yaml: Deploys the API, configured via env vars and LoadBalancer
+
+Registry Mapping (under config/):
+	•	k3d-registry.yaml: Maps localhost:5000 to internal k3d registry
+
+⸻
+
+🧪 Testing
+
+Run basic checks with:
+
+./cluster.sh test
+
+
+⸻
+
+📌 Notes
+	•	Ingress is routed with host registry.localhost for local testing.
+	•	PostgreSQL automatically loads the vector extension via init SQL.
+	•	No external pull is needed—sematic-cache image is loaded from local registry.
+
+⸻
+
+🧼 Cleanup
+
+Remove all cluster resources:
+
+./dev.sh down
+
+
+⸻
+
+Happy hacking! 💻
