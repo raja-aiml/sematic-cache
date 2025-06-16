@@ -74,7 +74,6 @@ function cmd_down() {
     kubectl config unset "users.${KUBE_CONTEXT}" 2>/dev/null || true
 
     echo "✅ Full cluster teardown complete."
-}
 
 }
 
