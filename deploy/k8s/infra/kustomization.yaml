@@ -4,7 +4,6 @@ kind: Kustomization
 namespace: infra
 
 resources:
-  - registry.yaml
   - postgres.yaml
   - redis.yaml
   - ingress-nginx

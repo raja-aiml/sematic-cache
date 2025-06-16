@@ -14,19 +14,17 @@ spec:
     spec:
       containers:
         - name: sematic-cache
-          # Use local Docker image built via cluster.sh; do not force pull
           image: sematic-cache:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: DATABASE_URL
-              value: postgres://cache:cache@postgres:5432/cache?sslmode=disable
+              value: postgres://cache:cache@postgres.infra:5432/cache?sslmode=disable
             - name: OPENAI_API_KEY
-              value: your-api-key
+              value: dummy-key
           ports:
             - containerPort: 8080
           args:
             - "-address=:8080"
-      restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
@@ -39,3 +37,23 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sematic-cache-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: sematic.localhost
+      http:
+        paths:
+          - path: /(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: sematic-cache
+                port:
+                  number: 8080
