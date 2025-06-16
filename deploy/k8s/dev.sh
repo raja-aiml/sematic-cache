@@ -5,7 +5,6 @@ set -eo pipefail
 # 🔧 CONFIGURATION
 # ─────────────────────────────────────────────────────────────
 IMAGE_NAME="sematic-cache:latest"
-LOCAL_REGISTRY="localhost:5001"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DOCKERFILE="$REPO_ROOT/deploy/docker/Dockerfile"
 APP_MANIFEST="$REPO_ROOT/deploy/k8s/app/sematic-cache.yaml"
@@ -22,21 +21,21 @@ function usage() {
 Usage: $(basename "$0") <command>
 
 Commands:
-  build      Build and push Docker image to local registry
+  build      Build and import Docker image into k3d cluster
   deploy     Apply app manifest to existing cluster
   test       Show app pod, service, and ingress status
 EOM
 }
 
 # ─────────────────────────────────────────────────────────────
-# 🔨 BUILD & PUSH IMAGE
+# 🔨 BUILD & IMPORT IMAGE
 # ─────────────────────────────────────────────────────────────
 function build_image() {
     echo "🔨 Building image '$IMAGE_NAME' using BuildKit..."
     DOCKER_BUILDKIT=1 docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" "$REPO_ROOT"
-    echo "🏷️  Tagging and pushing image to local registry..."
-    docker tag "$IMAGE_NAME" "$LOCAL_REGISTRY/$IMAGE_NAME"
-    docker push "$LOCAL_REGISTRY/$IMAGE_NAME"
+
+    echo "📦 Importing image into k3d cluster '$CLUSTER_NAME'..."
+    k3d image import "$IMAGE_NAME" -c "$CLUSTER_NAME"
 }
 
 # ─────────────────────────────────────────────────────────────
