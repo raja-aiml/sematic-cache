@@ -35,7 +35,7 @@ chmod +x cluster.sh dev.sh
 
 ### 2. Create k3d cluster and infrastructure
 ```bash
-./cluster.sh up
+deploy/k8s/cluster.sh up
 ```
 
 This will:
@@ -48,37 +48,37 @@ This will:
 ### 3. Build and deploy application
 ```bash
 # Build Docker image and import into k3d cluster
-./dev.sh build
+deploy/k8s/dev.sh build
 
 # Deploy the application
-./dev.sh deploy
+deploy/k8s/dev.sh  deploy
 ```
 
 ### 4. Check deployment status
 ```bash
 # View cluster and infrastructure status
-./cluster.sh ps
+deploy/k8s/cluster.sh ps
 
 # View application status
-./dev.sh test
+deploy/k8s/cluster.sh test
 
 # Run infrastructure health checks
-./cluster.sh test
+deploy/k8s/cluster.sh test
 ```
 
 ### 5. View logs
 ```bash
 # View logs for all infrastructure pods
-./cluster.sh logs
+deploy/k8s/cluster.sh logs
 
 # View logs for a specific pod with follow
-./cluster.sh logs <pod-name> --follow
+deploy/k8s/cluster.sh logs <pod-name> --follow
 ```
 
 ### 6. Cleanup
 ```bash
 # Remove the entire k3d cluster
-./cluster.sh down
+deploy/k8s/cluster.sh down
 ```
 
 ## Accessing the Application
@@ -86,8 +86,7 @@ This will:
 After deployment, the Sematic Cache API is accessible via:
 
 - **LoadBalancer**: `http://localhost:8080`
-- **Ingress**: `http://sematic.localhost` (requires adding `127.0.0.1 sematic.localhost` to `/etc/hosts`)
-
+- **Ingress**: `http://sematic.127.0.0.1.nip.io:8080`
 ## Components
 
 ### Infrastructure (`infra/` namespace)
@@ -109,20 +108,20 @@ After deployment, the Sematic Cache API is accessible via:
 
 ```bash
 # Start fresh
-./cluster.sh up
+deploy/k8s/cluster.sh  up
 
 # Make code changes, then rebuild and redeploy
-./dev.sh build
-./dev.sh deploy
+deploy/k8s/dev.sh build
+deploy/k8s/dev.sh deploy
 
 # Check status
-./dev.sh test
+deploy/k8s/dev.sh test
 
 # View logs if needed
-./cluster.sh logs
+deploy/k8s/cluster.sh  logs
 
 # Clean up when done
-./cluster.sh down
+deploy/k8s/cluster.sh  down
 ```
 
 ## Configuration
