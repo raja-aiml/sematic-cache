@@ -16,7 +16,7 @@ spec:
         - name: sematic-cache
           image: sematic-cache:latest
           imagePullPolicy: IfNotPresent
-          command: ["/bin/sematic-cache"]
+          command: ["/app/sematic-cache"]
           args: ["-address=:8080"]
           ports:
             - containerPort: 8080
