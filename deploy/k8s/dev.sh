@@ -4,7 +4,6 @@ set -eo pipefail
 # ─────────────────────────────────────────────────────────────
 # 🔧 CONFIGURATION
 # ─────────────────────────────────────────────────────────────
-IMAGE_NAME="sematic-cache:latest"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DOCKERFILE="$REPO_ROOT/deploy/docker/Dockerfile"
 APP_MANIFEST="$REPO_ROOT/deploy/k8s/app/sematic-cache.yaml"
@@ -12,6 +11,12 @@ APP_MANIFEST="$REPO_ROOT/deploy/k8s/app/sematic-cache.yaml"
 CLUSTER_NAME="sematic-cache"
 KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
 NAMESPACE_APP="app"
+
+# Derive a tag from Git
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+GIT_SHA=$(git rev-parse --short HEAD)
+IMAGE_TAG="${GIT_BRANCH//\//-}-${GIT_SHA}"
+IMAGE_NAME="sematic-cache:${IMAGE_TAG}"
 
 # ─────────────────────────────────────────────────────────────
 # 📖 USAGE
@@ -25,6 +30,9 @@ Commands:
   deploy     Apply app manifest to existing cluster
   test       Show app pod, service, and ingress status
   remove     Delete app deployment and associated resources
+
+Current Git-based image tag:
+  $IMAGE_NAME
 EOM
 }
 
@@ -46,8 +54,9 @@ function deploy_app() {
     echo "📁 Creating namespace '$NAMESPACE_APP' (if not exists)..."
     kubectl --context "$KUBE_CONTEXT" create namespace "$NAMESPACE_APP" --dry-run=client -o yaml | kubectl apply -f -
 
-    echo "🚀 Applying app manifest: $APP_MANIFEST"
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" apply -f "$APP_MANIFEST"
+    echo "🚀 Replacing image in manifest with tag: $IMAGE_NAME"
+    sed "s|sematic-cache:latest|$IMAGE_NAME|" "$APP_MANIFEST" | \
+      kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" apply -f -
 
     echo "⏳ Waiting for app deployment rollout..."
     kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" rollout status deployment/sematic-cache --timeout=60s
