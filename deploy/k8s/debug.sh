@@ -660,10 +660,10 @@ function run_clean_api_tests() {
     # Core functionality tests
     test_endpoint_clean_format "📊 Health Check" "GET" "/health" ""
     test_endpoint_clean_format "📈 Metrics" "GET" "/metrics" ""
-    test_endpoint_clean_format "💾 Cache SET" "POST" "/set" '{"key": "test", "value": "value"}'
-    test_endpoint_clean_format "🔍 Cache GET" "POST" "/get" '{"key": "test"}'
-    test_endpoint_clean_format "🔎 Semantic Query" "POST" "/query" '{"query": "test", "threshold": 0.8}'
-    test_endpoint_clean_format "🏆 Top-K Search" "POST" "/topk" '{"query": "test", "k": 5}'
+    test_endpoint_clean_format "💾 Cache SET" "POST" "/set" '{"prompt": "test", "answer": "value", "embedding": [0.1, 0.2]}'
+    test_endpoint_clean_format "🔍 Cache GET" "POST" "/get" '{"prompt": "test"}'
+    test_endpoint_clean_format "🔎 Semantic Query" "POST" "/query" '{"embedding": [0.1, 0.2]}'
+    test_endpoint_clean_format "🏆 Top-K Search" "POST" "/topk" '{"embedding": [0.1, 0.2], "k": 5}'
     test_endpoint_clean_format "🧹 Admin Flush" "POST" "/admin/flush" '{}'
     
     echo ""
@@ -693,13 +693,13 @@ function test_api_endpoints_detailed() {
     
     # Storage operations
     test_single_endpoint "Cache SET Operation" "POST" "/set" \
-      '{"key": "test-basic", "value": "basic storage test"}'
+      '{"prompt": "test-basic", "answer": "basic storage test", "embedding": [0.1, 0.2]}'
     test_single_endpoint "Cache GET Operation" "POST" "/get" \
-      '{"key": "test-basic"}'
+      '{"prompt": "test-basic"}'
     
     # AI-dependent features  
     test_single_endpoint "Query Operation (semantic search)" "POST" "/query" \
-      '{"query": "test question", "threshold": 0.8}'
+      '{"embedding": [0.1, 0.2]}'
     
     # Test query endpoint internally to compare results
     echo ""
@@ -707,11 +707,11 @@ function test_api_endpoints_detailed() {
     local internal_query_result=$(kubectl exec -n "$NAMESPACE" "$POD" -- curl -s -o /dev/null -w "%{http_code}" \
       -X POST http://localhost:8080/query \
       -H 'Content-Type: application/json' \
-      -d '{"query":"test"}' 2>/dev/null || echo "000")
+      -d '{"embedding":[0.1,0.2]}' 2>/dev/null || echo "000")
     echo "Internal query test: HTTP $internal_query_result"
     
     test_single_endpoint "Top-K Search (vector search)" "POST" "/topk" \
-      '{"query": "test", "k": 5}'
+      '{"embedding": [0.1, 0.2], "k": 5}'
     
     # Admin operations
     test_single_endpoint "Admin Flush" "POST" "/admin/flush" '{}'
@@ -723,8 +723,8 @@ function run_quick_api_tests() {
     
     # Test key endpoints quickly
     local health_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" http://$BASE_URL/health 2>/dev/null || echo "000")
-    local set_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/set -d '{"key":"test","value":"test"}' 2>/dev/null || echo "000")
-    local query_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/query -d '{"query":"test"}' 2>/dev/null || echo "000")
+    local set_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/set -d '{"prompt":"test","answer":"test","embedding":[0.1,0.2]}' 2>/dev/null || echo "000")
+    local query_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/query -d '{"embedding":[0.1,0.2]}' 2>/dev/null || echo "000")
     
     echo "📊 Health Endpoint: $([[ "$health_status" == "200" ]] && echo "✅ $health_status" || echo "❌ $health_status")"
     echo "💾 Storage Endpoint: $([[ "$set_status" =~ ^(200|201)$ ]] && echo "✅ $set_status" || echo "❌ $set_status")"
@@ -1030,8 +1030,8 @@ function run_comprehensive_issue_analysis() {
     
     # Test key endpoints
     local health_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" http://$BASE_URL/health 2>/dev/null || echo "000")
-    local query_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/query -d '{"query":"test"}' 2>/dev/null || echo "000")
-    local set_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/set -d '{"key":"test","value":"test"}' 2>/dev/null || echo "000")
+    local query_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/query -d '{"embedding":[0.1,0.2]}' 2>/dev/null || echo "000")
+    local set_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/set -d '{"prompt":"test","answer":"test","embedding":[0.1,0.2]}' 2>/dev/null || echo "000")
     
     # Check database connectivity
     local db_reachable="false"
@@ -1159,7 +1159,7 @@ function run_comprehensive_issue_analysis() {
             echo "1. Fix query endpoint routing issue:"
             echo "   • Check ingress configuration for /query path"
             echo "   • Verify service port mapping for query endpoint"
-            echo "   • Test: kubectl exec -n app deployment/sematic-cache -- curl -X POST http://localhost:8080/query -d '{\"query\":\"test\"}'"
+            echo "   • Test: kubectl exec -n app deployment/sematic-cache -- curl -X POST http://localhost:8080/query -d '{\"embedding\":[0.1,0.2]}'"
             echo "   • Compare internal vs external access patterns"
         fi
         if [[ "$db_reachable" == "false" ]]; then
@@ -1212,10 +1212,10 @@ function run_comprehensive_issue_analysis() {
     echo "  curl -H 'Host: sematic.127.0.0.1.nip.io' http://localhost:8080/health"
     echo ""
     echo "  # Test storage"
-    echo "  curl -H 'Host: sematic.127.0.0.1.nip.io' -H 'Content-Type: application/json' -X POST http://localhost:8080/set -d '{\"key\":\"test\",\"value\":\"hello\"}'"
+    echo "  curl -H 'Host: sematic.127.0.0.1.nip.io' -H 'Content-Type: application/json' -X POST http://localhost:8080/set -d '{\"prompt\":\"test\",\"answer\":\"hello\",\"embedding\":[0.1,0.2]}'"
     echo ""
     echo "  # Test query endpoint directly in pod"
-    echo "  kubectl exec -n app deployment/sematic-cache -- curl -X POST http://localhost:8080/query -H 'Content-Type: application/json' -d '{\"query\":\"test\"}'"
+    echo "  kubectl exec -n app deployment/sematic-cache -- curl -X POST http://localhost:8080/query -H 'Content-Type: application/json' -d '{\"embedding\":[0.1,0.2]}'"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
