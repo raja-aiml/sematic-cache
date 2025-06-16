@@ -15,6 +15,7 @@ spec:
       containers:
         - name: registry
           image: registry:2
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
           volumeMounts:
@@ -34,4 +35,23 @@ spec:
   ports:
     - port: 5000
       targetPort: 5000
-  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: registry-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: registry.localhost
+      http:
+        paths:
+          - path: /registry(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: registry
+                port:
+                  number: 5000
