@@ -1,36 +1,55 @@
 # ─────────────────────────────────────────────────────────────
 # ⚙️ Builder Stage
 # ─────────────────────────────────────────────────────────────
-FROM golang:1.23 AS builder
+FROM golang:1.23-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git file
 
 WORKDIR /app
 
-# Copy go module files and download dependencies
+# Copy go module files first (for better caching)
 COPY go.mod go.sum ./
-RUN go mod download
 
-# Copy the rest of the application source
+# Download dependencies
+RUN go mod download && go mod verify
+
+# Copy source code
 COPY . .
 
-# Build the Go binary (assuming main.go is at cmd/server/main.go)
-RUN go build -o sematic-cache ./cmd/server/main.go
+# Verify source files exist
+RUN ls -la cmd/server/
+
+# Build with verbose output and static linking
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -a -installsuffix cgo \
+    -ldflags '-extldflags "-static"' \
+    -o sematic-cache \
+    ./cmd/server/main.go
+
+# Verify the binary was created
+RUN ls -la sematic-cache && echo "Binary created successfully"
 
 # ─────────────────────────────────────────────────────────────
-# 🧼 Final Runtime Image
+# 🧼 Final Runtime Image  
 # ─────────────────────────────────────────────────────────────
 FROM alpine:latest
 
-# Set working directory for runtime
+# Install ca-certificates for HTTPS calls
+RUN apk --no-cache add ca-certificates tzdata
+
 WORKDIR /app
 
-# Install any needed OS packages (optional, minimal base)
-# RUN apk add --no-cache ca-certificates
-
-# Copy binary from the builder
+# Copy the binary from builder
 COPY --from=builder /app/sematic-cache .
 
-# Make sure it’s executable
-RUN chmod +x /app/sematic-cache
+# Verify the binary exists and is executable
+RUN ls -la /app/sematic-cache && \
+    chmod +x /app/sematic-cache && \
+    echo "Binary verification complete"
 
-# Set default entrypoint
+# Expose the port
+EXPOSE 8080
+
+# Set the entrypoint
 ENTRYPOINT ["/app/sematic-cache"]
