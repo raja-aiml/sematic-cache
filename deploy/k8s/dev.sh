@@ -24,6 +24,7 @@ Commands:
   build      Build and import Docker image into k3d cluster
   deploy     Apply app manifest to existing cluster
   test       Show app pod, service, and ingress status
+  remove     Delete app deployment and associated resources
 EOM
 }
 
@@ -64,6 +65,20 @@ function test_app() {
 }
 
 # ─────────────────────────────────────────────────────────────
+# 🗑 REMOVE DEPLOYMENT
+# ─────────────────────────────────────────────────────────────
+function remove_app() {
+    echo "🗑 Deleting app resources from namespace '$NAMESPACE_APP'..."
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" delete -f "$APP_MANIFEST" --ignore-not-found
+
+    # Uncomment to delete the namespace too:
+    # echo "🧹 Deleting namespace '$NAMESPACE_APP'..."
+    # kubectl --context "$KUBE_CONTEXT" delete namespace "$NAMESPACE_APP" --ignore-not-found
+
+    echo "✅ Removal complete."
+}
+
+# ─────────────────────────────────────────────────────────────
 # 🧭 MAIN
 # ─────────────────────────────────────────────────────────────
 function main() {
@@ -71,6 +86,7 @@ function main() {
         build) build_image ;;
         deploy) deploy_app ;;
         test) test_app ;;
+        remove) remove_app ;;
         help|*) usage ;;
     esac
 }
