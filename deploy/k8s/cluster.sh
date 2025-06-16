@@ -1,130 +1,99 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-CLUSTER_NAME="sematic-cache"
-KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
-NAMESPACE="infra"
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INFRA_DIR="${ROOT_DIR}/infra"
+NAMESPACE="app"
+APP_LABEL="app=sematic-cache"
+IMAGE_NAME="sematic-cache:latest"
 
-function usage() {
-    cat <<EOM
-Usage: $(basename "$0") <command> [args]
+echo "🔍 Searching for pods with label '$APP_LABEL' in namespace '$NAMESPACE'..."
 
-Commands:
-  up                    Create k3d cluster and apply manifests
-  down                  Delete k3d cluster
-  ps                    List k3d clusters and Kubernetes resources
-  logs [POD] [--follow] Show logs for a pod (default: all pods). Use --follow to tail logs.
-  test                  Run basic connectivity & deployment checks
-  help                  Show this help message
-EOM
-}
+POD=$(kubectl get pods -n "$NAMESPACE" -l "$APP_LABEL" -o json \
+  | jq -r '.items | sort_by(-.status.containerStatuses[0].restartCount) | .[0].metadata.name')
 
-function cmd_up() {
-    echo "🚀 Creating k3d cluster '$CLUSTER_NAME'..."
-    k3d cluster create "$CLUSTER_NAME" \
-        --agents 0 \
-        --port "8080:80@loadbalancer" \
-        --port "8443:443@loadbalancer" \
-        --k3s-arg "--disable=traefik@server:0" \
-        --kubeconfig-switch-context
-
-    echo "⏳ Waiting for cluster to be ready..."
-    kubectl config use-context "$KUBE_CONTEXT"
-    kubectl --context "$KUBE_CONTEXT" wait --for=condition=Ready node/"${KUBE_CONTEXT}-server-0" --timeout=60s
-
-    echo "📁 Creating namespace: $NAMESPACE"
-    kubectl --context "$KUBE_CONTEXT" create namespace "$NAMESPACE" || true
-
-    echo "📦 Applying infrastructure manifests (via Kustomize)..."
-    kubectl --context "$KUBE_CONTEXT" apply -k "$INFRA_DIR"
-
-    echo "🌐 Waiting for ingress-nginx controller to be ready..."
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" rollout status deployment/ingress-nginx-controller --timeout=120s || true
-
-    echo "🔐 Waiting for ingress-nginx admission webhooks to be ready..."
-    for job in ingress-nginx-admission-create ingress-nginx-admission-patch; do
-        echo "⏳ Waiting for job $job..."
-        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" wait --for=condition=complete job/$job --timeout=60s || {
-            echo "❌ Job $job failed or timed out"; exit 1;
-        }
-    done
-
-    echo "✅ Waiting for other deployments to become ready..."
-    for d in postgres redis ; do
-        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" rollout status deployment/$d --timeout=120s || true
-    done
-}
-
-function cmd_down() {
-    echo "🗑️  Deleting k3d cluster '$CLUSTER_NAME'..."
-    k3d cluster delete "$CLUSTER_NAME"
-
-    echo "🧹 Cleaning up dangling Docker volumes and networks..."
-    docker volume prune -f
-    docker network prune -f
-
-    echo "🧽 Removing unused containers matching '$CLUSTER_NAME'..."
-    docker ps -a --filter "name=$CLUSTER_NAME" --format "{{.ID}}" | xargs -r docker rm -f
-
-    echo "🧼 Removing kubeconfig context '$KUBE_CONTEXT'..."
-    kubectl config delete-context "$KUBE_CONTEXT" 2>/dev/null || true
-    kubectl config delete-cluster "$KUBE_CONTEXT" 2>/dev/null || true
-    kubectl config unset "users.${KUBE_CONTEXT}" 2>/dev/null || true
-
-    echo "✅ Full cluster teardown complete."
-}
-
-function cmd_ps() {
-    echo "📋 k3d clusters:"
-    k3d cluster list
-    echo
-    echo "📋 Kubernetes resources in namespace '$NAMESPACE':"
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get all
-}
-
-function cmd_logs() {
-    local pod="$1"
-    shift || true
-    if [ -z "$pod" ]; then
-        pods=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get pods -o name)
-        for p in $pods; do
-            echo "=== Logs for $p ==="
-            kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" logs $p "$@"
-            echo
-        done
-    else
-        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" logs "$pod" "$@"
-    fi
-}
-
-function cmd_test() {
-    echo -e "\n🔍 Verifying Kubernetes deployments:"
-    for d in postgres redis ; do
-        echo -n "↪ $d: "
-        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get deployment "$d" -o=jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "❌ Missing"
-        echo
-    done
-}
-
-function main() {
-    if [ $# -lt 1 ]; then
-        usage
-        exit 1
-    fi
-
-    case "$1" in
-        up) cmd_up ;;
-        down) cmd_down ;;
-        ps) cmd_ps ;;
-        logs) shift; cmd_logs "$@" ;;
-        test) cmd_test ;;
-        help|*) usage ;;
-    esac
-}
-
-# Entry point
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
+if [[ -z "${POD:-}" || "$POD" == "null" ]]; then
+  echo "❌ No pods found with label '$APP_LABEL'"
+  exit 1
 fi
+
+echo "🎯 Selected pod: $POD"
+
+echo -e "\n📦 Pods in '$NAMESPACE' namespace:"
+kubectl get pods -n "$NAMESPACE"
+
+# Get container details
+POD_JSON=$(kubectl get pod -n "$NAMESPACE" "$POD" -o json)
+CONTAINER=$(echo "$POD_JSON" | jq -r '.spec.containers[0].name')
+IMAGE=$(echo "$POD_JSON" | jq -r '.spec.containers[0].image')
+RESTARTS=$(echo "$POD_JSON" | jq -r '.status.containerStatuses[0].restartCount')
+STATE=$(echo "$POD_JSON" | jq -r '.status.containerStatuses[0].state | keys[0]')
+EXIT_CODE=$(echo "$POD_JSON" | jq -r '.status.containerStatuses[0].state.terminated.exitCode // "N/A"')
+REASON=$(echo "$POD_JSON" | jq -r '.status.containerStatuses[0].state.terminated.reason // "N/A"')
+LAST_EXIT=$(echo "$POD_JSON" | jq -r '.status.containerStatuses[0].lastState.terminated.exitCode // "N/A"')
+LAST_REASON=$(echo "$POD_JSON" | jq -r '.status.containerStatuses[0].lastState.terminated.reason // "N/A"')
+PHASE=$(echo "$POD_JSON" | jq -r '.status.phase')
+READY=$(echo "$POD_JSON" | jq -r '.status.containerStatuses[0].ready')
+
+echo -e "\n📊 Pod Status Summary:"
+echo "🆔 Pod Name:       $POD"
+echo "📊 Phase:          $PHASE"
+echo "✅ Ready:          $READY"
+echo "🔁 Restart Count:  $RESTARTS"
+echo "🐳 Image:          $IMAGE"
+echo "📌 Current State:  $STATE"
+echo "💥 Exit Code:      $EXIT_CODE"
+echo "📖 Reason:         $REASON"
+
+echo -e "\n🔄 Last Termination:"
+echo "💥 Last Exit Code: $LAST_EXIT"
+echo "📖 Last Reason:    $LAST_REASON"
+
+echo -e "\n📅 Recent Events:"
+kubectl get events -n "$NAMESPACE" --field-selector involvedObject.name="$POD" --sort-by='.lastTimestamp' | tail -n 10
+
+echo -e "\n📜 Container Logs:"
+if kubectl logs -n "$NAMESPACE" "$POD" > /tmp/sematic-cache.log 2>/dev/null; then
+  tail -n 20 /tmp/sematic-cache.log
+  echo "✅ Logs retrieved successfully"
+else
+  echo "⚠️ Failed to retrieve logs"
+fi
+
+echo -e "\n🔍 Advanced Debugging:"
+if ! kubectl exec -n "$NAMESPACE" "$POD" -- true &>/dev/null; then
+  echo "⚠️ Pod is not ready for exec (likely due to crashes)"
+else
+  echo "📁 /app/sematic-cache:"
+  kubectl exec -n "$NAMESPACE" "$POD" -- ls -l /app/sematic-cache || echo "❌ Not found"
+fi
+
+echo "🐳 Checking Docker image locally..."
+if docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
+  echo "✅ Image '$IMAGE_NAME' found locally"
+  echo "🔍 Image layers and commands:"
+  docker history "$IMAGE_NAME" --no-trunc | head -n 5
+else
+  echo "❌ Image '$IMAGE_NAME' not found locally"
+fi
+
+echo -e "\n💡 Troubleshooting Suggestions:"
+if [[ "$REASON" == "Error" && "$EXIT_CODE" == "255" ]]; then
+  echo "🔧 Issue: Binary not found"
+  echo "   Solutions:"
+  echo "   1. Check if the Docker build completed successfully"
+  echo "   2. Verify the binary path in the Dockerfile"
+  echo "   3. Ensure the binary is copied to /app/sematic-cache in the image"
+  echo "   4. Check if the binary was built for the correct architecture"
+fi
+
+if [[ "$RESTARTS" -gt 2 ]]; then
+  echo "🔧 High restart count detected"
+  echo "   Solutions:"
+  echo "   1. Check application startup requirements (e.g., DB connection)"
+  echo "   2. Verify required env vars"
+  echo "   3. Inspect resource limits or crashes"
+fi
+
+echo -e "\n✅ Debug analysis complete!"
+echo "💡 To rebuild and redeploy:"
+echo "   deploy/k8s/dev.sh build"
+echo "   deploy/k8s/dev.sh deploy"
