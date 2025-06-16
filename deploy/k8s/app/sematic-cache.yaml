@@ -22,10 +22,15 @@ spec:
             - containerPort: 8080
           env:
             - name: DATABASE_URL
-              value: postgres://cache:cache@postgres.infra:5432/cache?sslmode=disable
+              valueFrom:
+                secretKeyRef:
+                  name: sematic-cache-secrets
+                  key: DATABASE_URL
             - name: OPENAI_API_KEY
-              value: dummy-key
-          # Add resource limits to prevent crashes
+              valueFrom:
+                secretKeyRef:
+                  name: sematic-cache-secrets
+                  key: OPENAI_API_KEY
           resources:
             requests:
               memory: "64Mi"
@@ -33,7 +38,6 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
-          # Add health checks
           livenessProbe:
             httpGet:
               path: /health
