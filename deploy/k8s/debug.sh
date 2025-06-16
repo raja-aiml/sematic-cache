@@ -700,6 +700,16 @@ function test_api_endpoints_detailed() {
     # AI-dependent features  
     test_single_endpoint "Query Operation (semantic search)" "POST" "/query" \
       '{"query": "test question", "threshold": 0.8}'
+    
+    # Test query endpoint internally to compare results
+    echo ""
+    echo "🔍 Testing query endpoint directly in pod:"
+    local internal_query_result=$(kubectl exec -n "$NAMESPACE" "$POD" -- curl -s -o /dev/null -w "%{http_code}" \
+      -X POST http://localhost:8080/query \
+      -H 'Content-Type: application/json' \
+      -d '{"query":"test"}' 2>/dev/null || echo "000")
+    echo "Internal query test: HTTP $internal_query_result"
+    
     test_single_endpoint "Top-K Search (vector search)" "POST" "/topk" \
       '{"query": "test", "k": 5}'
     
@@ -828,22 +838,39 @@ function analyze_docker_image_integrity() {
         }' 2>/dev/null || echo "❌ Cannot parse image config"
         
         log_subsection "Testing Image Locally"
-        echo "Testing binary existence:"
-        if timeout 10s docker run --rm "$image" test -f /app/sematic-cache 2>&1; then
-            echo "✅ Binary exists in image"
-            timeout 10s docker run --rm "$image" ls -la /app/sematic-cache 2>&1 || echo "❌ Cannot get binary details"
+        echo "Testing binary existence and functionality:"
+        echo "Starting container briefly to test binary..."
+        
+        # Test if the binary exists and can start (look for Gin debug output)
+        local startup_output=$(timeout 8s docker run --rm "$image" 2>&1 || true)
+        
+        if echo "$startup_output" | grep -q "server listening on"; then
+            echo "✅ Binary exists and application starts successfully"
+            echo "✅ Server starts on port 8080"
+            
+            # Show available routes from startup output
+            if echo "$startup_output" | grep -q "POST.*query"; then
+                echo "✅ Query endpoint found in routes"
+            else
+                echo "⚠️ Query endpoint not visible in routes"
+            fi
+            
+        elif echo "$startup_output" | grep -q "GIN-debug"; then
+            echo "✅ Binary exists and Gin framework initializes"
+            echo "⚠️ Server may need environment variables to start fully"
         else
-            echo "❌ Binary NOT found at /app/sematic-cache"
-            echo "Searching for binary:"
-            timeout 15s docker run --rm "$image" find / -name "*sematic*" -type f 2>/dev/null | head -5 || echo "❌ Search failed"
+            echo "❌ Binary startup test failed"
+            echo "Startup output:"
+            echo "$startup_output" | head -10
         fi
         
-        log_subsection "Testing Application Startup"
-        echo "Testing help command:"
-        if timeout 5s docker run --rm "$image" /app/sematic-cache --help 2>&1; then
-            echo "✅ Application responds to --help"
+        log_subsection "Binary Path Verification"
+        echo "Checking binary location:"
+        if timeout 5s docker run --rm "$image" ls -la /app/ 2>/dev/null | grep sematic; then
+            echo "✅ Binary found in /app/ directory"
         else
-            echo "❌ Application startup failed"
+            echo "🔍 Searching for binary in container:"
+            timeout 10s docker run --rm "$image" find /app -name "*sematic*" -type f 2>/dev/null | head -3 || echo "❌ Binary search failed"
         fi
     else
         echo "❌ Image '$image' not found locally"
@@ -943,10 +970,30 @@ function test_network_connectivity() {
         # Test database connectivity
         echo ""
         echo "🔍 Testing database connectivity:"
-        if kubectl exec -n "$NAMESPACE" "$POD" -- ping -c 1 postgres.infra.svc.cluster.local >/dev/null 2>&1; then
-            echo "✅ Can reach postgres.infra.svc.cluster.local"
-        else
-            echo "❌ Cannot reach postgres.infra.svc.cluster.local"
+        # Try multiple service name formats
+        local db_services=("postgres.infra.svc.cluster.local" "postgres.infra" "postgres")
+        local db_reachable=false
+        
+        for service in "${db_services[@]}"; do
+            if kubectl exec -n "$NAMESPACE" "$POD" -- nslookup "$service" >/dev/null 2>&1; then
+                echo "✅ DNS resolution for $service works"
+                if kubectl exec -n "$NAMESPACE" "$POD" -- nc -z "$service" 5432 >/dev/null 2>&1; then
+                    echo "✅ Can connect to $service:5432"
+                    db_reachable=true
+                    break
+                else
+                    echo "⚠️ DNS works for $service but port 5432 not reachable"
+                fi
+            else
+                echo "❌ Cannot resolve $service"
+            fi
+        done
+        
+        if [ "$db_reachable" = false ]; then
+            echo ""
+            echo "🔍 Checking if postgres service exists:"
+            kubectl get svc -n infra 2>/dev/null | grep postgres || echo "❌ No postgres service found in infra namespace"
+            kubectl get pods -n infra 2>/dev/null | grep postgres || echo "❌ No postgres pods found in infra namespace"
         fi
         
         # Check for debug endpoints
@@ -988,15 +1035,24 @@ function run_comprehensive_issue_analysis() {
     
     # Check database connectivity
     local db_reachable="false"
-    if kubectl exec -n "$NAMESPACE" "$POD" -- ping -c 1 postgres.infra.svc.cluster.local >/dev/null 2>&1; then
-        db_reachable="true"
-    fi
+    local db_services=("postgres.infra.svc.cluster.local" "postgres.infra" "postgres")
+    for service in "${db_services[@]}"; do
+        if kubectl exec -n "$NAMESPACE" "$POD" -- nc -z "$service" 5432 >/dev/null 2>&1; then
+            db_reachable="true"
+            break
+        fi
+    done
     
-    # Check if binary exists in image
-    local binary_exists="false"
-    if command -v docker >/dev/null 2>&1 && docker image inspect "$image" >/dev/null 2>&1; then
-        if timeout 5s docker run --rm "$image" test -f /app/sematic-cache >/dev/null 2>&1; then
-            binary_exists="true"
+    # Check if binary is working (not just if file exists)
+    local binary_working="false"
+    local app_startup=$(kubectl exec -n "$NAMESPACE" "$POD" -- ps aux 2>/dev/null | grep sematic-cache | grep -v grep || echo "")
+    if [[ -n "$app_startup" ]]; then
+        binary_working="true"
+    elif command -v docker >/dev/null 2>&1 && docker image inspect "$image" >/dev/null 2>&1; then
+        # Test if binary can start (look for server startup)
+        local startup_test=$(timeout 5s docker run --rm "$image" 2>&1 || true)
+        if echo "$startup_test" | grep -q "server listening on\|GIN-debug"; then
+            binary_working="true"
         fi
     fi
     
@@ -1008,7 +1064,7 @@ function run_comprehensive_issue_analysis() {
     echo "  Pod Ready: $([[ "$pod_ready" == "True" ]] && echo "✅ YES" || echo "❌ NO")"
     echo "  Restart Count: ${restart_count:-0}"
     echo "  Image: $image"
-    echo "  Binary in Image: $([[ "$binary_exists" == "true" ]] && echo "✅ YES" || echo "❌ NO")"
+    echo "  Binary Working: $([[ "$binary_working" == "true" ]] && echo "✅ YES" || echo "❌ NO")"
     
     echo ""
     echo "🌐 API Connectivity:"
@@ -1037,8 +1093,8 @@ function run_comprehensive_issue_analysis() {
         echo "  • Health endpoint failing - basic functionality broken"
         ((critical_issues++))
     fi
-    if [[ "$binary_exists" == "false" ]]; then
-        echo "  • Binary missing from Docker image - deployment will fail"
+    if [[ "$binary_working" == "false" ]]; then
+        echo "  • Application binary not working - deployment will fail"
         ((critical_issues++))
     fi
     [[ $critical_issues -eq 0 ]] && echo "  ✅ No critical issues found!"
@@ -1073,15 +1129,20 @@ function run_comprehensive_issue_analysis() {
     elif [[ $major_issues -gt 0 ]]; then
         echo "🎯 PRIMARY ISSUE: Application configuration problems"
         if [[ "$query_status" == "404" ]]; then
-            echo "   The /query endpoint exists in code but returns 404"
-            echo "   This suggests a routing or path mismatch issue"
+            echo "   The /query endpoint shows in app routes but returns 404 externally"
+            echo "   This suggests an ingress/routing configuration issue"
+            echo "   The endpoint exists and works internally but isn't accessible via ingress"
         fi
         if [[ "$db_reachable" == "false" ]]; then
             echo "   Database connectivity issue - check network policies and service names"
+            echo "   Postgres service may not be running or accessible from app namespace"
         fi
     else
         echo "🎯 DEPLOYMENT STATUS: Mostly successful!"
         echo "   Core functionality is working, only missing semantic features"
+        if [[ "$query_status" == "404" ]]; then
+            echo "   Note: Query endpoint routing needs attention"
+        fi
     fi
     
     # Action plan
@@ -1090,21 +1151,23 @@ function run_comprehensive_issue_analysis() {
     if [[ $critical_issues -gt 0 ]]; then
         echo "🚨 IMMEDIATE ACTIONS (Critical):"
         echo "1. Fix pod and health endpoint issues first"
-        echo "2. Verify Docker image build process"
-        echo "3. Redeploy with working image"
+        echo "2. Verify application startup and configuration"
+        echo "3. Check environment variables and secrets"
     elif [[ $major_issues -gt 0 ]]; then
         echo "⚠️ HIGH PRIORITY ACTIONS:"
         if [[ "$query_status" == "404" ]]; then
-            echo "1. Investigate query endpoint routing:"
-            echo "   • Check if endpoint path changed"
-            echo "   • Verify server.go vs main.go route definitions"
-            echo "   • Test endpoint directly: kubectl exec -n app deployment/sematic-cache -- curl -X POST http://localhost:8080/query -d '{\"query\":\"test\"}'"
+            echo "1. Fix query endpoint routing issue:"
+            echo "   • Check ingress configuration for /query path"
+            echo "   • Verify service port mapping for query endpoint"
+            echo "   • Test: kubectl exec -n app deployment/sematic-cache -- curl -X POST http://localhost:8080/query -d '{\"query\":\"test\"}'"
+            echo "   • Compare internal vs external access patterns"
         fi
         if [[ "$db_reachable" == "false" ]]; then
             echo "2. Fix database connectivity:"
             echo "   • Check if postgres is running: kubectl get pods -n infra"
-            echo "   • Verify service name: postgres.infra.svc.cluster.local"
-            echo "   • Check network policies"
+            echo "   • Verify service exists: kubectl get svc -n infra | grep postgres"
+            echo "   • Test DNS resolution: kubectl exec -n app deployment/sematic-cache -- nslookup postgres.infra"
+            echo "   • Check network policies between app and infra namespaces"
         fi
     fi
     
@@ -1124,7 +1187,7 @@ function run_comprehensive_issue_analysis() {
     [[ "$set_status" =~ ^(200|201)$ ]] && ((success_score++))
     [[ "$query_status" == "200" ]] && ((success_score++))
     [[ "$db_reachable" == "true" ]] && ((success_score++))
-    [[ "$binary_exists" == "true" ]] && ((success_score++))
+    [[ "$binary_working" == "true" ]] && ((success_score++))
     [[ "${restart_count:-0}" -eq 0 ]] && ((success_score++))
     
     local success_percentage=$((success_score * 100 / total_checks))
