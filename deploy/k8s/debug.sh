@@ -1,53 +1,223 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─────────────────────────────────────────────────────────────
-# 🔧 CONFIGURATION
-# ─────────────────────────────────────────────────────────────
-NAMESPACE="app"
-APP_LABEL="app=sematic-cache"
-BASE_URL="localhost:8080"
-HOST_HEADER="sematic.127.0.0.1.nip.io"
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🚀 SEMATIC CACHE MANAGEMENT TOOL
+# ═══════════════════════════════════════════════════════════════════════════════
+# Complete tool for managing Kubernetes secrets, deployment, and debugging
+# of the Sematic Cache application.
+#
+# Features:
+# - Secrets management (OpenAI API keys, database URLs)
+# - Comprehensive debugging and analysis
+# - API endpoint testing
+# - Pod status monitoring
+# - Network connectivity testing
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Global variables
+# ─────────────────────────────────────────────────────────────────────────────
+# 🔧 GLOBAL CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────────────
+readonly NAMESPACE="app"
+readonly SECRET_NAME="sematic-cache-secrets"
+readonly CONFIGMAP_NAME="sematic-cache-config"
+readonly APP_LABEL="app=sematic-cache"
+readonly BASE_URL="localhost:8080"
+readonly HOST_HEADER="sematic.127.0.0.1.nip.io"
+
+# Global variables for pod management
 POD=""
 
-# ─────────────────────────────────────────────────────────────
-# 📖 USAGE
-# ─────────────────────────────────────────────────────────────
-function usage() {
+# ─────────────────────────────────────────────────────────────────────────────
+# 📖 USAGE AND HELP
+# ─────────────────────────────────────────────────────────────────────────────
+function show_main_usage() {
     cat <<EOM
-Usage: $(basename "$0") <command>
+🚀 SEMATIC CACHE MANAGEMENT TOOL
+================================
 
-Commands:
-  full           Complete debugging analysis (default)
-  api            Test API endpoints only (quick test)
-  apitest        Clean API test suite
-  pod            Pod status and logs only
-  image          Docker image analysis only
-  source         Source code analysis only
-  network        Network connectivity tests
-  summary        Issue analysis and recommendations only
-  help           Show this help message
+Usage: $(basename "$0") <category> <command> [options]
 
-Examples:
-  $(basename "$0")           # Run full analysis
-  $(basename "$0") api       # Test API endpoints (part of full analysis)
-  $(basename "$0") apitest   # Clean, standalone API test
-  $(basename "$0") pod       # Check pod status
-  $(basename "$0") source    # Analyze source code
-  $(basename "$0") summary   # Get issue analysis and action plan
+CATEGORIES:
+━━━━━━━━━━
+  secrets    Manage Kubernetes secrets and configuration
+  debug      Debug and analyze running deployment
+  test       Test API endpoints and functionality
+  help       Show detailed help for any category
 
-Quick Commands:
-  $(basename "$0") apitest   # Fast API testing (recommended for regular use)
-  $(basename "$0") summary   # Quick issue diagnosis and action plan
-  $(basename "$0") full      # Complete analysis (use when troubleshooting)
+QUICK COMMANDS:
+━━━━━━━━━━━━━━━
+  $(basename "$0") secrets create     # Create secrets from environment
+  $(basename "$0") test api           # Quick API test
+  $(basename "$0") debug full         # Complete diagnostic analysis
+  $(basename "$0") debug summary      # Quick issue analysis
+
+EXAMPLES:
+━━━━━━━━━
+  # Initial setup
+  export OPENAI_API_KEY="sk-your-key-here"
+  $(basename "$0") secrets create
+
+  # Test your deployment
+  $(basename "$0") test api
+
+  # Debug issues
+  $(basename "$0") debug summary
+
+  # Get detailed help
+  $(basename "$0") help secrets
+  $(basename "$0") help debug
+  $(basename "$0") help test
+
+For detailed usage of any category, use:
+  $(basename "$0") help <category>
 EOM
 }
 
-# ─────────────────────────────────────────────────────────────
-# 🔍 UTILITY FUNCTIONS
-# ─────────────────────────────────────────────────────────────
+function show_secrets_help() {
+    cat <<EOM
+🔐 SECRETS MANAGEMENT COMMANDS
+==============================
+
+Usage: $(basename "$0") secrets <command>
+
+COMMANDS:
+━━━━━━━━━
+  create           Create secrets from environment variables
+  update-openai    Update OpenAI API key only
+  update-db        Update database URL only
+  view             View current secrets (safely decoded)
+  delete           Delete all secrets and config
+  create-config    Create non-sensitive configuration
+  load-env         Load environment variables from .env file
+  create-env       Create sample .env file
+
+ENVIRONMENT VARIABLES:
+━━━━━━━━━━━━━━━━━━━━━━
+  OPENAI_API_KEY   Your OpenAI API key (required for semantic features)
+  DATABASE_URL     Database connection string (optional, uses default)
+
+SETUP METHODS:
+━━━━━━━━━━━━━━
+  Method 1: Direct environment variable
+    export OPENAI_API_KEY="sk-your-real-key-here"
+    $(basename "$0") secrets create
+
+  Method 2: Using .env file
+    $(basename "$0") secrets create-env
+    # Edit .env file with your keys
+    $(basename "$0") secrets load-env
+    $(basename "$0") secrets create
+
+  Method 3: One-liner
+    OPENAI_API_KEY="sk-your-key" $(basename "$0") secrets create
+
+EXAMPLES:
+━━━━━━━━━
+  $(basename "$0") secrets create        # Create secrets
+  $(basename "$0") secrets view          # View current secrets
+  $(basename "$0") secrets update-openai # Update just the API key
+EOM
+}
+
+function show_debug_help() {
+    cat <<EOM
+🔍 DEBUG AND ANALYSIS COMMANDS
+===============================
+
+Usage: $(basename "$0") debug <command>
+
+COMMANDS:
+━━━━━━━━━
+  full             Complete diagnostic analysis (recommended for troubleshooting)
+  summary          Quick issue analysis and action plan (recommended for regular use)
+  pod              Pod status and logs analysis
+  image            Docker image analysis
+  source           Source code analysis
+  network          Network connectivity testing
+
+COMMAND DESCRIPTIONS:
+━━━━━━━━━━━━━━━━━━━━━
+  full      - Comprehensive analysis of all components
+            - Use when troubleshooting complex issues
+            - Includes: pod status, logs, image analysis, network tests
+
+  summary   - Quick diagnostic with actionable recommendations
+            - Use for regular health checks
+            - Provides prioritized action plan
+
+  pod       - Analyze pod status, restart counts, logs
+            - Check container health and recent events
+
+  image     - Verify Docker image integrity
+            - Check if binary exists and is executable
+
+  source    - Analyze source code for available endpoints
+            - Verify route definitions and configurations
+
+  network   - Test internal and external connectivity
+            - Verify database connections and API access
+
+EXAMPLES:
+━━━━━━━━━
+  $(basename "$0") debug summary         # Quick health check
+  $(basename "$0") debug full           # Complete analysis
+  $(basename "$0") debug pod            # Check pod issues
+EOM
+}
+
+function show_test_help() {
+    cat <<EOM
+🧪 TESTING COMMANDS
+===================
+
+Usage: $(basename "$0") test <command>
+
+COMMANDS:
+━━━━━━━━━
+  api              Quick API endpoint test (recommended)
+  endpoints        Detailed API endpoint analysis
+  clean            Clean, standalone API test suite
+
+COMMAND DESCRIPTIONS:
+━━━━━━━━━━━━━━━━━━━━━
+  api         - Fast API testing for regular use
+              - Tests all core endpoints
+              - Shows semantic feature status
+
+  endpoints   - Detailed endpoint testing with analysis
+              - Part of full debugging workflow
+              - Includes error analysis
+
+  clean       - Standalone test suite
+              - Clean output format
+              - Good for CI/CD integration
+
+EXAMPLES:
+━━━━━━━━━
+  $(basename "$0") test api             # Quick API test
+  $(basename "$0") test clean           # Clean test output
+  $(basename "$0") test endpoints       # Detailed analysis
+EOM
+}
+
+function show_category_help() {
+    local category="$1"
+    case "$category" in
+        secrets) show_secrets_help ;;
+        debug) show_debug_help ;;
+        test) show_test_help ;;
+        *) 
+            echo "❌ Unknown category: $category"
+            echo "Available categories: secrets, debug, test"
+            show_main_usage
+            ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🛠️ UTILITY FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────────
 function log_section() {
     local title="$1"
     echo ""
@@ -59,7 +229,6 @@ function log_subsection() {
     local title="$1"
     echo ""
     echo "🔹 $title"
-    # Fix the printf issue - use a different approach for creating dashes
     local dashes=""
     for ((i=0; i<$((${#title} + 4)); i++)); do
         dashes+="-"
@@ -67,7 +236,14 @@ function log_subsection() {
     echo "$dashes"
 }
 
-function check_prerequisites() {
+function ensure_namespace_exists() {
+    if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
+        echo "📁 Creating namespace: $NAMESPACE"
+        kubectl create namespace "$NAMESPACE"
+    fi
+}
+
+function check_deployment_prerequisites() {
     log_section "🔧 Checking Prerequisites"
     
     # Check if namespace exists
@@ -88,7 +264,7 @@ function check_prerequisites() {
     echo "✅ Prerequisites check passed"
 }
 
-function get_pod_info() {
+function get_latest_pod_info() {
     local pods=$(kubectl get pods -n "$NAMESPACE" -l "$APP_LABEL" -o json)
     POD=$(echo "$pods" | jq -r '.items | sort_by(.metadata.creationTimestamp) | reverse | .[0].metadata.name')
     
@@ -100,10 +276,284 @@ function get_pod_info() {
     echo "🎯 Selected pod: $POD"
 }
 
-# ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# 🔐 SECRETS MANAGEMENT FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────────
+function load_environment_file() {
+    local env_file="${1:-.env}"
+    
+    if [[ ! -f "$env_file" ]]; then
+        echo "❌ Environment file '$env_file' not found"
+        echo "💡 Create a .env file with:"
+        echo "   OPENAI_API_KEY=sk-your-real-key-here"
+        echo "   DATABASE_URL=postgres://cache:cache@postgres.infra:5432/cache?sslmode=disable"
+        return 1
+    fi
+    
+    echo "📄 Loading environment variables from $env_file..."
+    
+    # Load .env file safely
+    set -a  # automatically export all variables
+    source "$env_file"
+    set +a  # disable auto-export
+    
+    echo "✅ Environment variables loaded"
+    echo "🔑 OPENAI_API_KEY: ${OPENAI_API_KEY:0:8}... (${#OPENAI_API_KEY} chars)"
+    echo "🗄️ DATABASE_URL: ${DATABASE_URL:0:20}... (${#DATABASE_URL} chars)"
+}
+
+function get_openai_api_key() {
+    local openai_key="${OPENAI_API_KEY:-}"
+    
+    # If no key in environment, try to prompt (only in interactive mode)
+    if [[ -z "$openai_key" ]]; then
+        if [[ -t 0 ]]; then  # Check if running interactively
+            echo "🔑 OpenAI API key not found in environment variables."
+            echo "Enter your OpenAI API key (or press Enter to use dummy-key):"
+            read -s openai_key
+            echo ""
+        else
+            echo "⚠️  No OPENAI_API_KEY found in environment and not running interactively."
+            echo "Using dummy-key. Semantic features will be disabled."
+            openai_key="dummy-key"
+        fi
+    fi
+    
+    # Default to dummy-key if still empty
+    if [[ -z "$openai_key" ]]; then
+        echo "⚠️  No API key provided. Using dummy-key. Semantic features will be disabled."
+        openai_key="dummy-key"
+    fi
+    
+    # Validate key format (basic check)
+    if [[ "$openai_key" != "dummy-key" && ! "$openai_key" =~ ^sk- ]]; then
+        echo "⚠️  Warning: OpenAI API key should start with 'sk-'. Current key: ${openai_key:0:8}..."
+        echo "Are you sure this is correct? (y/n)"
+        if [[ -t 0 ]]; then
+            read -n 1 confirm
+            echo ""
+            if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+                echo "❌ Aborted."
+                exit 1
+            fi
+        fi
+    fi
+    
+    echo "$openai_key"
+}
+
+function create_kubernetes_secrets() {
+    echo "🔐 Creating Kubernetes secrets..."
+    
+    ensure_namespace_exists
+    
+    # Get OpenAI API key from environment or prompt
+    local openai_key
+    openai_key=$(get_openai_api_key)
+    
+    # Default database URL (can be overridden by environment)
+    local db_url="${DATABASE_URL:-postgres://cache:cache@postgres.infra:5432/cache?sslmode=disable}"
+    
+    echo "📝 Creating secret: $SECRET_NAME"
+    echo "🔑 OpenAI Key: ${openai_key:0:8}... (${#openai_key} characters)"
+    echo "🗄️ Database: ${db_url%%\?*} (connection string)"
+    
+    # Delete existing secret if it exists
+    kubectl delete secret "$SECRET_NAME" -n "$NAMESPACE" 2>/dev/null || true
+    
+    # Create new secret
+    kubectl create secret generic "$SECRET_NAME" \
+        --namespace="$NAMESPACE" \
+        --from-literal=DATABASE_URL="$db_url" \
+        --from-literal=OPENAI_API_KEY="$openai_key"
+    
+    echo "✅ Secret created successfully!"
+    
+    # Show status
+    if [[ "$openai_key" == "dummy-key" ]]; then
+        echo "⚠️  Using dummy OpenAI key - semantic features will be disabled"
+        echo "💡 To enable semantic features later:"
+        echo "   export OPENAI_API_KEY='sk-your-real-key'"
+        echo "   $(basename "$0") secrets update-openai"
+    else
+        echo "🎉 Real OpenAI key detected - semantic features will be enabled!"
+    fi
+    
+    echo ""
+    echo "🔍 To verify:"
+    echo "  kubectl get secret $SECRET_NAME -n $NAMESPACE"
+    echo "  $(basename "$0") secrets view"
+    echo ""
+    echo "🚀 Next steps:"
+    echo "  1. Apply the secure deployment manifest"
+    echo "  2. kubectl apply -f secure-sematic-cache.yaml"
+}
+
+function update_openai_api_key() {
+    echo "🔑 Updating OpenAI API key..."
+    
+    # Check if key is in environment first
+    local new_key="${OPENAI_API_KEY:-}"
+    
+    if [[ -n "$new_key" ]]; then
+        echo "🌍 Using OpenAI key from environment variable"
+        echo "🔑 Key: ${new_key:0:8}... (${#new_key} characters)"
+    else
+        if [[ -t 0 ]]; then
+            echo "Enter new OpenAI API key:"
+            read -s new_key
+            echo ""
+        else
+            echo "❌ No OPENAI_API_KEY in environment and not running interactively"
+            echo "💡 Set environment variable: export OPENAI_API_KEY='sk-your-key'"
+            exit 1
+        fi
+    fi
+    
+    if [[ -z "$new_key" ]]; then
+        echo "❌ Empty key provided. Aborted."
+        exit 1
+    fi
+    
+    # Validate key format
+    if [[ "$new_key" != "dummy-key" && ! "$new_key" =~ ^sk- ]]; then
+        echo "⚠️  Warning: OpenAI API key should start with 'sk-'"
+    fi
+    
+    # Update the secret
+    kubectl patch secret "$SECRET_NAME" -n "$NAMESPACE" -p="{\"data\":{\"OPENAI_API_KEY\":\"$(echo -n "$new_key" | base64)\"}}"
+    
+    echo "✅ OpenAI API key updated!"
+    echo "🔄 Restart deployment to pick up new key:"
+    echo "  kubectl rollout restart deployment/sematic-cache -n $NAMESPACE"
+}
+
+function update_database_url() {
+    echo "🗄️ Updating database URL..."
+    
+    # Check if URL is in environment first
+    local new_url="${DATABASE_URL:-}"
+    
+    if [[ -n "$new_url" ]]; then
+        echo "🌍 Using database URL from environment variable"
+        echo "🗄️ URL: ${new_url%%\?*}... (connection string)"
+    else
+        if [[ -t 0 ]]; then
+            echo "Enter new database URL:"
+            read new_url
+            echo ""
+        else
+            echo "❌ No DATABASE_URL in environment and not running interactively"
+            exit 1
+        fi
+    fi
+    
+    if [[ -z "$new_url" ]]; then
+        echo "❌ Empty URL provided. Aborted."
+        exit 1
+    fi
+    
+    # Update the secret
+    kubectl patch secret "$SECRET_NAME" -n "$NAMESPACE" -p="{\"data\":{\"DATABASE_URL\":\"$(echo -n "$new_url" | base64)\"}}"
+    
+    echo "✅ Database URL updated!"
+    echo "🔄 Restart deployment to pick up new URL:"
+    echo "  kubectl rollout restart deployment/sematic-cache -n $NAMESPACE"
+}
+
+function view_current_secrets() {
+    echo "🔍 Current secrets (decoded):"
+    echo "=============================="
+    
+    if ! kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+        echo "❌ Secret '$SECRET_NAME' not found in namespace '$NAMESPACE'"
+        echo "💡 Run: $(basename "$0") secrets create"
+        return 1
+    fi
+    
+    echo "🔑 OPENAI_API_KEY:"
+    local openai_key=$(kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.OPENAI_API_KEY}' | base64 --decode)
+    echo "   ${openai_key:0:8}... (${#openai_key} characters)"
+    if [[ "$openai_key" == "dummy-key" ]]; then
+        echo "   ⚠️  Using dummy key - semantic features disabled"
+    else
+        echo "   ✅ Real API key - semantic features enabled"
+    fi
+    echo ""
+    
+    echo "🗄️ DATABASE_URL:"
+    local db_url=$(kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o jsonpath='{.data.DATABASE_URL}' | base64 --decode)
+    echo "   ${db_url%%\?*}... (connection string)"
+    echo ""
+    
+    echo "📊 Secret metadata:"
+    kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" -o yaml | head -20
+}
+
+function delete_all_secrets() {
+    echo "🗑️ Deleting secrets..."
+    
+    echo "⚠️  This will delete all secrets for sematic-cache!"
+    echo "Are you sure? (yes/no)"
+    read confirmation
+    
+    if [[ "$confirmation" != "yes" ]]; then
+        echo "❌ Aborted."
+        return 1
+    fi
+    
+    kubectl delete secret "$SECRET_NAME" -n "$NAMESPACE" 2>/dev/null || echo "Secret not found"
+    kubectl delete configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" 2>/dev/null || echo "ConfigMap not found"
+    
+    echo "✅ Secrets deleted."
+}
+
+function create_configuration_map() {
+    echo "⚙️ Creating non-sensitive configuration..."
+    
+    ensure_namespace_exists
+    
+    # Delete existing configmap if it exists
+    kubectl delete configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" 2>/dev/null || true
+    
+    # Create configmap
+    kubectl create configmap "$CONFIGMAP_NAME" \
+        --namespace="$NAMESPACE" \
+        --from-literal=GIN_MODE="release" \
+        --from-literal=LOG_LEVEL="info" \
+        --from-literal=SERVER_ADDRESS=":8080"
+    
+    echo "✅ ConfigMap created successfully!"
+}
+
+function create_sample_environment_file() {
+    echo "📄 Creating sample .env file..."
+    
+    cat > .env.example << 'EOF'
+# Sematic Cache Environment Variables
+# Copy this file to .env and fill in your actual values
+
+# OpenAI API Key (get from https://platform.openai.com/)
+OPENAI_API_KEY=sk-your-real-openai-api-key-here
+
+# Database URL (usually you don't need to change this for local k3d)
+DATABASE_URL=postgres://cache:cache@postgres.infra:5432/cache?sslmode=disable
+
+# Optional: Override other settings
+# GIN_MODE=release
+# LOG_LEVEL=info
+EOF
+
+    echo "✅ Created .env.example"
+    echo "💡 Copy to .env and fill in your values:"
+    echo "   cp .env.example .env"
+    echo "   # Edit .env with your actual OpenAI API key"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 🧪 API TESTING FUNCTIONS
-# ─────────────────────────────────────────────────────────────
-function test_endpoint() {
+# ─────────────────────────────────────────────────────────────────────────────
+function test_single_endpoint() {
     local name="$1"
     local method="$2"
     local endpoint="$3"
@@ -140,7 +590,7 @@ function test_endpoint() {
     fi
 }
 
-function test_endpoint_clean() {
+function test_endpoint_clean_format() {
     local name="$1"
     local method="$2"
     local endpoint="$3"
@@ -179,7 +629,7 @@ function test_endpoint_clean() {
     fi
 }
 
-function run_clean_api_test() {
+function run_clean_api_tests() {
     echo "🚀 Sematic Cache API Test Suite"
     echo "==============================="
     
@@ -189,13 +639,13 @@ function run_clean_api_test() {
     echo "• ❌ Semantic search requires real OpenAI key"
     
     # Core functionality tests
-    test_endpoint_clean "📊 Health Check" "GET" "/health" ""
-    test_endpoint_clean "📈 Metrics" "GET" "/metrics" ""
-    test_endpoint_clean "💾 Cache SET" "POST" "/set" '{"key": "test", "value": "value"}'
-    test_endpoint_clean "🔍 Cache GET" "POST" "/get" '{"key": "test"}'
-    test_endpoint_clean "🔎 Semantic Query" "POST" "/query" '{"query": "test", "threshold": 0.8}'
-    test_endpoint_clean "🏆 Top-K Search" "POST" "/topk" '{"query": "test", "k": 5}'
-    test_endpoint_clean "🧹 Admin Flush" "POST" "/admin/flush" '{}'
+    test_endpoint_clean_format "📊 Health Check" "GET" "/health" ""
+    test_endpoint_clean_format "📈 Metrics" "GET" "/metrics" ""
+    test_endpoint_clean_format "💾 Cache SET" "POST" "/set" '{"key": "test", "value": "value"}'
+    test_endpoint_clean_format "🔍 Cache GET" "POST" "/get" '{"key": "test"}'
+    test_endpoint_clean_format "🔎 Semantic Query" "POST" "/query" '{"query": "test", "threshold": 0.8}'
+    test_endpoint_clean_format "🏆 Top-K Search" "POST" "/topk" '{"query": "test", "k": 5}'
+    test_endpoint_clean_format "🧹 Admin Flush" "POST" "/admin/flush" '{}'
     
     echo ""
     echo ""
@@ -205,10 +655,10 @@ function run_clean_api_test() {
     echo ""
     echo "💡 To enable semantic features:"
     echo "   Get an OpenAI API key and update the deployment"
-    echo "   kubectl patch deployment sematic-cache -n app -p '{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"sematic-cache\",\"env\":[{\"name\":\"OPENAI_API_KEY\",\"value\":\"your-key\"}]}]}}}}'"
+    echo "   $(basename "$0") secrets update-openai"
 }
 
-function test_api_endpoints() {
+function test_api_endpoints_detailed() {
     log_section "🚀 API Endpoint Testing"
     
     echo ""
@@ -219,29 +669,53 @@ function test_api_endpoints() {
     echo "• ❌ GET operations return empty (can't find without embeddings)"
     
     # Core endpoints
-    test_endpoint "Health Check" "GET" "/health" ""
-    test_endpoint "Metrics" "GET" "/metrics" ""
+    test_single_endpoint "Health Check" "GET" "/health" ""
+    test_single_endpoint "Metrics" "GET" "/metrics" ""
     
     # Storage operations
-    test_endpoint "Cache SET Operation" "POST" "/set" \
+    test_single_endpoint "Cache SET Operation" "POST" "/set" \
       '{"key": "test-basic", "value": "basic storage test"}'
-    test_endpoint "Cache GET Operation" "POST" "/get" \
+    test_single_endpoint "Cache GET Operation" "POST" "/get" \
       '{"key": "test-basic"}'
     
     # AI-dependent features  
-    test_endpoint "Query Operation (semantic search)" "POST" "/query" \
+    test_single_endpoint "Query Operation (semantic search)" "POST" "/query" \
       '{"query": "test question", "threshold": 0.8}'
-    test_endpoint "Top-K Search (vector search)" "POST" "/topk" \
+    test_single_endpoint "Top-K Search (vector search)" "POST" "/topk" \
       '{"query": "test", "k": 5}'
     
     # Admin operations
-    test_endpoint "Admin Flush" "POST" "/admin/flush" '{}'
+    test_single_endpoint "Admin Flush" "POST" "/admin/flush" '{}'
 }
 
-# ─────────────────────────────────────────────────────────────
-# 🐳 POD ANALYSIS FUNCTIONS  
-# ─────────────────────────────────────────────────────────────
-function analyze_pod_status() {
+function run_quick_api_tests() {
+    echo "🧪 Quick API Test"
+    echo "=================="
+    
+    # Test key endpoints quickly
+    local health_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" http://$BASE_URL/health 2>/dev/null || echo "000")
+    local set_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/set -d '{"key":"test","value":"test"}' 2>/dev/null || echo "000")
+    local query_status=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $HOST_HEADER" -H "Content-Type: application/json" -X POST http://$BASE_URL/query -d '{"query":"test"}' 2>/dev/null || echo "000")
+    
+    echo "📊 Health Endpoint: $([[ "$health_status" == "200" ]] && echo "✅ $health_status" || echo "❌ $health_status")"
+    echo "💾 Storage Endpoint: $([[ "$set_status" =~ ^(200|201)$ ]] && echo "✅ $set_status" || echo "❌ $set_status")"
+    echo "🔎 Query Endpoint: $([[ "$query_status" == "200" ]] && echo "✅ $query_status" || echo "❌ $query_status")"
+    
+    echo ""
+    if [[ "$health_status" == "200" && "$set_status" =~ ^(200|201)$ ]]; then
+        echo "🎉 Core functionality is working!"
+        if [[ "$query_status" != "200" ]]; then
+            echo "⚠️  Semantic features need attention (query endpoint issue)"
+        fi
+    else
+        echo "❌ Core functionality has issues - run '$(basename "$0") debug summary' for analysis"
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🐳 POD AND DEPLOYMENT ANALYSIS FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────────
+function analyze_pod_detailed_status() {
     log_section "📦 Pod Status Analysis"
     
     # Display pods overview
@@ -292,7 +766,7 @@ function analyze_pod_status() {
     fi
 }
 
-function show_pod_logs() {
+function show_pod_logs_and_events() {
     log_section "📜 Pod Logs Analysis"
     
     echo "📜 Recent container logs:"
@@ -306,18 +780,12 @@ function show_pod_logs() {
             echo "❌ No logs available"
         fi
     fi
-}
-
-function show_recent_events() {
-    log_section "📅 Recent Kubernetes Events"
     
+    log_section "📅 Recent Kubernetes Events"
     kubectl get events -n "$NAMESPACE" --field-selector involvedObject.name="$POD" --sort-by='.lastTimestamp' | tail -10
 }
 
-# ─────────────────────────────────────────────────────────────
-# 🐳 DOCKER IMAGE ANALYSIS FUNCTIONS
-# ─────────────────────────────────────────────────────────────
-function analyze_docker_image() {
+function analyze_docker_image_integrity() {
     log_section "🐳 Docker Image Analysis"
     
     local image=$(kubectl get pod -n "$NAMESPACE" "$POD" -o jsonpath='{.spec.containers[0].image}')
@@ -365,10 +833,7 @@ function analyze_docker_image() {
     fi
 }
 
-# ─────────────────────────────────────────────────────────────
-# 📄 SOURCE CODE ANALYSIS FUNCTIONS
-# ─────────────────────────────────────────────────────────────
-function analyze_source_code() {
+function analyze_source_code_structure() {
     log_section "📄 Source Code Analysis"
     
     log_subsection "Checking Available Endpoints"
@@ -433,9 +898,6 @@ function analyze_source_code() {
     fi
 }
 
-# ─────────────────────────────────────────────────────────────
-# 🌐 NETWORK CONNECTIVITY FUNCTIONS
-# ─────────────────────────────────────────────────────────────
 function test_network_connectivity() {
     log_section "🌐 Network Connectivity Analysis"
     
@@ -489,10 +951,10 @@ function test_network_connectivity() {
     fi
 }
 
-# ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # 📋 COMPREHENSIVE ISSUE ANALYSIS AND SUMMARY
-# ─────────────────────────────────────────────────────────────
-function analyze_issues_and_summarize() {
+# ─────────────────────────────────────────────────────────────────────────────
+function run_comprehensive_issue_analysis() {
     log_section "🔍 COMPREHENSIVE ISSUE ANALYSIS"
     
     # Collect current status
@@ -630,7 +1092,7 @@ function analyze_issues_and_summarize() {
     echo ""
     echo "✨ ENHANCEMENT ACTIONS (Optional):"
     echo "1. Add real OpenAI API key for semantic features:"
-    echo "   kubectl patch deployment sematic-cache -n app -p '{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"sematic-cache\",\"env\":[{\"name\":\"OPENAI_API_KEY\",\"value\":\"sk-your-key\"}]}]}}}}'"
+    echo "   $(basename "$0") secrets update-openai"
     
     # Success indicators
     log_subsection "Success Indicators"
@@ -674,81 +1136,154 @@ function analyze_issues_and_summarize() {
     echo "  kubectl exec -n app deployment/sematic-cache -- curl -X POST http://localhost:8080/query -H 'Content-Type: application/json' -d '{\"query\":\"test\"}'"
 }
 
-# ─────────────────────────────────────────────────────────────
-# 🧭 MAIN FUNCTION
-# ─────────────────────────────────────────────────────────────
-function main() {
-    local command="${1:-full}"
+# ─────────────────────────────────────────────────────────────────────────────
+# 🧭 COMMAND DISPATCHERS
+# ─────────────────────────────────────────────────────────────────────────────
+function handle_secrets_commands() {
+    local command="${1:-help}"
+    
+    case "$command" in
+        create)
+            create_kubernetes_secrets
+            ;;
+        update-openai)
+            update_openai_api_key
+            ;;
+        update-db)
+            update_database_url
+            ;;
+        view)
+            view_current_secrets
+            ;;
+        delete)
+            delete_all_secrets
+            ;;
+        create-config)
+            create_configuration_map
+            ;;
+        load-env)
+            load_environment_file "${2:-.env}"
+            ;;
+        create-env)
+            create_sample_environment_file
+            ;;
+        help|*)
+            show_secrets_help
+            ;;
+    esac
+}
+
+function handle_debug_commands() {
+    local command="${1:-help}"
     
     case "$command" in
         full)
             echo "🔍 COMPREHENSIVE SEMATIC CACHE DEBUGGING"
             echo "========================================"
-            check_prerequisites
-            get_pod_info
-            analyze_pod_status
-            show_pod_logs
-            show_recent_events
-            test_api_endpoints
-            analyze_docker_image
-            analyze_source_code
+            check_deployment_prerequisites
+            get_latest_pod_info
+            analyze_pod_detailed_status
+            show_pod_logs_and_events
+            test_api_endpoints_detailed
+            analyze_docker_image_integrity
+            analyze_source_code_structure
             test_network_connectivity
-            analyze_issues_and_summarize
-            ;;
-        api)
-            echo "🧪 API ENDPOINT TESTING"
-            echo "======================"
-            check_prerequisites
-            get_pod_info
-            test_api_endpoints
-            ;;
-        apitest)
-            echo "🚀 CLEAN API TEST SUITE"
-            echo "======================"
-            run_clean_api_test
-            ;;
-        pod)
-            echo "📦 POD STATUS ANALYSIS"
-            echo "====================="
-            check_prerequisites
-            get_pod_info
-            analyze_pod_status
-            show_pod_logs
-            show_recent_events
-            ;;
-        image)
-            echo "🐳 DOCKER IMAGE ANALYSIS"
-            echo "========================"
-            check_prerequisites
-            get_pod_info
-            analyze_docker_image
-            ;;
-        source)
-            echo "📄 SOURCE CODE ANALYSIS"
-            echo "======================"
-            analyze_source_code
-            ;;
-        network)
-            echo "🌐 NETWORK CONNECTIVITY TESTING"
-            echo "==============================="
-            check_prerequisites
-            get_pod_info
-            test_network_connectivity
+            run_comprehensive_issue_analysis
             ;;
         summary)
             echo "📋 ISSUE ANALYSIS & SUMMARY"
             echo "==========================="
-            check_prerequisites
-            get_pod_info
-            analyze_issues_and_summarize
+            check_deployment_prerequisites
+            get_latest_pod_info
+            run_comprehensive_issue_analysis
+            ;;
+        pod)
+            echo "📦 POD STATUS ANALYSIS"
+            echo "====================="
+            check_deployment_prerequisites
+            get_latest_pod_info
+            analyze_pod_detailed_status
+            show_pod_logs_and_events
+            ;;
+        image)
+            echo "🐳 DOCKER IMAGE ANALYSIS"
+            echo "========================"
+            check_deployment_prerequisites
+            get_latest_pod_info
+            analyze_docker_image_integrity
+            ;;
+        source)
+            echo "📄 SOURCE CODE ANALYSIS"
+            echo "======================"
+            analyze_source_code_structure
+            ;;
+        network)
+            echo "🌐 NETWORK CONNECTIVITY TESTING"
+            echo "==============================="
+            check_deployment_prerequisites
+            get_latest_pod_info
+            test_network_connectivity
             ;;
         help|*)
-            usage
+            show_debug_help
             ;;
     esac
 }
 
-# Entry point
+function handle_test_commands() {
+    local command="${1:-help}"
+    
+    case "$command" in
+        api)
+            run_quick_api_tests
+            ;;
+        endpoints)
+            check_deployment_prerequisites
+            get_latest_pod_info
+            test_api_endpoints_detailed
+            ;;
+        clean)
+            run_clean_api_tests
+            ;;
+        help|*)
+            show_test_help
+            ;;
+    esac
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🚀 MAIN ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
+function main() {
+    local category="${1:-help}"
+    local command="${2:-help}"
+    
+    case "$category" in
+        secrets)
+            handle_secrets_commands "$command" "$3"
+            ;;
+        debug)
+            handle_debug_commands "$command"
+            ;;
+        test)
+            handle_test_commands "$command"
+            ;;
+        help)
+            if [[ -n "$command" && "$command" != "help" ]]; then
+                show_category_help "$command"
+            else
+                show_main_usage
+            fi
+            ;;
+        *)
+            echo "❌ Unknown category: $category"
+            echo ""
+            show_main_usage
+            ;;
+    esac
+}
+
+# Entry point - only run main if script is executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi
