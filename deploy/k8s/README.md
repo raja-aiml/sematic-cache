@@ -8,199 +8,169 @@ This directory contains Kubernetes manifests and helper scripts to deploy the Se
 - [k3d](https://k3d.io/) (tested with v5+)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 
-## Files
+## Project Structure
 
-- `pg-init-configmap.yaml`: ConfigMap to initialize PostgreSQL with the `vector` extension.
-- `postgres.yaml`: PVC, Deployment, and Service for PostgreSQL.
-- `redis.yaml`: Deployment and Service for Redis.
-- `sematic-cache.yaml`: Deployment and Service for the Sematic Cache API.
-- `registry.yaml`: Deployment and Service for a local Docker registry.
-- `cluster.sh`: Manage the k3d cluster (create, delete, logs).
-- `dev.sh`: CLI to build the image, push to the local registry, and deploy.
+```
+k8s/
+├── cluster.sh           # Manages k3d cluster lifecycle (create, delete, logs)
+├── dev.sh               # Builds and deploys Docker image using k3d import
+├── infra/               # Infrastructure components
+│   ├── postgres.yaml    # PostgreSQL with pgvector extension
+│   ├── redis.yaml       # Redis cache
+│   ├── ingress-nginx/   # Ingress controller
+│   │   └── kustomization.yaml
+│   └── kustomization.yaml
+├── app/                 # Application layer
+│   ├── sematic-cache.yaml  # Sematic Cache API deployment
+│   └── kustomization.yaml
+└── README.md
+```
 
 ## Usage
 
-1. Make the scripts executable if needed:
-
-   ```bash
-   chmod +x cluster.sh dev.sh
-   ```
-
-2. Build the image and deploy everything:
-
-   ```bash
-   ./dev.sh deploy
-   ```
-
-   This will:
-   - Start a local Docker registry `sematic-registry` on port `5000`
-   - Build the Docker image `sematic-cache:latest` and push it to the registry
-   - Create a k3d cluster named `sematic-cache`
-   - Apply all Kubernetes manifests and wait for deployments
-
-3. View the status of the cluster:
-
-   ```bash
-   ./cluster.sh ps
-   ```
-
-4. View logs of all pods:
-
-   ```bash
-   ./cluster.sh logs
-   ```
-
-   To follow logs of a specific pod:
-
-   ```bash
-   ./cluster.sh logs <pod-name> --follow
-   ```
-
-5. Tear down the cluster and registry:
-
-   ```bash
-   ./dev.sh down
-   ```
-   This command removes the k3d cluster and stops the `sematic-registry` container.
-
-## Exposing Application
-
-After running `./dev.sh deploy`, the Sematic Cache API will be accessible at:
-
-```
-http://localhost:8080
-```
-
-## Cleanup
-
-To remove the cluster, registry, and all resources:
-
+### 1. Make scripts executable
 ```bash
-./dev.sh down
+chmod +x cluster.sh dev.sh
 ```
 
-
-🚀 Kubernetes Deployment for Semantic Cache
-
-This directory provides a simple and reproducible way to deploy the Semantic Cache application locally using k3d and Kubernetes.
-
-⸻
-
-📦 Project Structure
-
-k8s/
-├── cluster.sh           # Manages k3d cluster lifecycle (create, delete, logs)
-├── dev.sh               # Builds, pushes, and deploys Docker image
-├── config/
-│   └── k3d-registry.yaml
-├── infra/               # Infrastructure components
-│   ├── registry.yaml
-│   ├── postgres.yaml
-│   ├── redis.yaml
-│   ├── ingress-nginx/
-│   │   └── kustomization.yaml
-│   └── kustomization.yaml
-├── app/
-│   └── sematic-cache.yaml
-└── README.md
-
-
-⸻
-
-✅ Prerequisites
-	•	Docker
-	•	k3d v5+
-	•	kubectl
-
-⸻
-
-🔧 Usage Guide
-
-1. Make scripts executable
-
-chmod +x cluster.sh dev.sh
-
-2. Build & Deploy
-
-./dev.sh deploy
+### 2. Create k3d cluster and infrastructure
+```bash
+./cluster.sh up
+```
 
 This will:
-	•	Build and push sematic-cache:latest to the local registry
-	•	Start a k3d cluster named sematic-cache
-	•	Apply all Kubernetes manifests using Kustomize
+- Create a k3d cluster named `sematic-cache`
+- Deploy PostgreSQL with pgvector extension
+- Deploy Redis cache
+- Deploy Ingress NGINX controller
+- Wait for all deployments to be ready
 
-3. Check Cluster Status
+### 3. Build and deploy application
+```bash
+# Build Docker image and import into k3d cluster
+./dev.sh build
 
+# Deploy the application
+./dev.sh deploy
+```
+
+### 4. Check deployment status
+```bash
+# View cluster and infrastructure status
 ./cluster.sh ps
 
-4. View Pod Logs
+# View application status
+./dev.sh test
 
-# Logs for all pods
+# Run infrastructure health checks
+./cluster.sh test
+```
+
+### 5. View logs
+```bash
+# View logs for all infrastructure pods
 ./cluster.sh logs
 
-# Logs for a specific pod
+# View logs for a specific pod with follow
 ./cluster.sh logs <pod-name> --follow
+```
 
-5. Shutdown
+### 6. Cleanup
+```bash
+# Remove the entire k3d cluster
+./cluster.sh down
+```
 
-./dev.sh down
+## Accessing the Application
 
-This removes the k3d cluster and local registry.
+After deployment, the Sematic Cache API is accessible via:
 
-⸻
+- **LoadBalancer**: `http://localhost:8080`
+- **Ingress**: `http://sematic.localhost` (requires adding `127.0.0.1 sematic.localhost` to `/etc/hosts`)
 
-🌐 Accessing the Application
+## Components
 
-After deploying:
+### Infrastructure (`infra/` namespace)
+- **PostgreSQL**: Database with pgvector extension for vector operations
+- **Redis**: In-memory cache for fast data retrieval
+- **Ingress NGINX**: HTTP/HTTPS ingress controller for routing
 
-http://localhost:8080
+### Application (`app/` namespace)
+- **Sematic Cache API**: Main application service with REST endpoints
 
-Local registry exposed at:
+## Architecture Benefits
 
-http://localhost:5001/v2/_catalog
+- **Simple**: No registry complexity - uses k3d's native image import
+- **Fast**: Direct image import vs registry push/pull cycle
+- **Local**: Everything runs locally with k3d
+- **Reproducible**: Consistent deployment using Kustomize
 
+## Development Workflow
 
-⸻
+```bash
+# Start fresh
+./cluster.sh up
 
-📂 Components Summary
+# Make code changes, then rebuild and redeploy
+./dev.sh build
+./dev.sh deploy
 
-Infrastructure (under infra/):
-	•	PostgreSQL with pgvector extension
-	•	Redis for caching
-	•	Ingress NGINX for routing
-	•	Local Registry for pushing Docker images
+# Check status
+./dev.sh test
 
-App Layer (under app/):
-	•	sematic-cache.yaml: Deploys the API, configured via env vars and LoadBalancer
+# View logs if needed
+./cluster.sh logs
 
-Registry Mapping (under config/):
-	•	k3d-registry.yaml: Maps localhost:5000 to internal k3d registry
+# Clean up when done
+./cluster.sh down
+```
 
-⸻
+## Configuration
 
-🧪 Testing
+### Database Connection
+The application connects to PostgreSQL using:
+```
+postgres://cache:cache@postgres.infra:5432/cache?sslmode=disable
+```
 
-Run basic checks with:
+### Environment Variables
+- `DATABASE_URL`: PostgreSQL connection string
+- `OPENAI_API_KEY`: Set to `dummy-key` for local development
 
-./cluster.sh test
+## Troubleshooting
 
+### Check pod status
+```bash
+kubectl get pods -A
+```
 
-⸻
+### View specific deployment logs
+```bash
+kubectl logs -n app deployment/sematic-cache
+kubectl logs -n infra deployment/postgres
+kubectl logs -n infra deployment/redis
+```
 
-📌 Notes
-	•	Ingress is routed with host registry.localhost for local testing.
-	•	PostgreSQL automatically loads the vector extension via init SQL.
-	•	No external pull is needed—sematic-cache image is loaded from local registry.
+### Restart a deployment
+```bash
+kubectl rollout restart deployment/sematic-cache -n app
+```
 
-⸻
+### Access services directly
+```bash
+# Port forward to access services directly
+kubectl port-forward -n app svc/sematic-cache 8080:8080
+kubectl port-forward -n infra svc/postgres 5432:5432
+kubectl port-forward -n infra svc/redis 6379:6379
+```
 
-🧼 Cleanup
+## Notes
 
-Remove all cluster resources:
+- PostgreSQL automatically installs the `vector` extension on startup
+- Images are imported directly into k3d using `k3d image import`
+- No external registry or complex networking required
+- Ingress NGINX handles HTTP routing with LoadBalancer integration
+- All data is ephemeral - destroyed when cluster is deleted
 
-./dev.sh down
+---
 
-
-⸻
-
-Happy hacking! 💻

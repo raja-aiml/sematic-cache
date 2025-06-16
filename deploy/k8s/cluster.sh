@@ -5,7 +5,6 @@ CLUSTER_NAME="sematic-cache"
 KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
 NAMESPACE="infra"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="${ROOT_DIR}/config"
 INFRA_DIR="${ROOT_DIR}/infra"
 
 function usage() {
@@ -28,8 +27,6 @@ function cmd_up() {
         --agents 0 \
         --port "8080:80@loadbalancer" \
         --port "8443:443@loadbalancer" \
-        --port "5001:5000@loadbalancer" \
-        --registry-config "${CONFIG_DIR}/k3d-registry.yaml" \
         --k3s-arg "--disable=traefik@server:0" \
         --kubeconfig-switch-context
 
@@ -55,7 +52,7 @@ function cmd_up() {
     done
 
     echo "✅ Waiting for other deployments to become ready..."
-    for d in postgres redis registry; do
+    for d in postgres redis ; do
         kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" rollout status deployment/$d --timeout=120s || true
     done
 }
@@ -89,11 +86,8 @@ function cmd_logs() {
 }
 
 function cmd_test() {
-    echo "🔍 Testing registry at http://localhost:5001..."
-    curl -s http://localhost:5001/v2/_catalog || echo "❌ Registry not responding"
-
     echo -e "\n🔍 Verifying Kubernetes deployments:"
-    for d in postgres redis registry; do
+    for d in postgres redis ; do
         echo -n "↪ $d: "
         kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get deployment "$d" -o=jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "❌ Missing"
         echo
