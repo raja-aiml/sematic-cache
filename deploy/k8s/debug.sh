@@ -369,6 +369,9 @@ function create_kubernetes_secrets() {
     
     echo "✅ Secret created successfully!"
     
+    # Create .gitignore for secrets
+    create_gitignore_for_secrets
+    
     # Show status
     if [[ "$openai_key" == "dummy-key" ]]; then
         echo "⚠️  Using dummy OpenAI key - semantic features will be disabled"
@@ -548,6 +551,22 @@ EOF
     echo "💡 Copy to .env and fill in your values:"
     echo "   cp .env.example .env"
     echo "   # Edit .env with your actual OpenAI API key"
+}
+
+function create_gitignore_for_secrets() {
+    echo "📄 Creating .gitignore for secrets..."
+    
+    if [[ ! -f .gitignore ]]; then
+        touch .gitignore
+    fi
+    
+    # Add secrets patterns to .gitignore if not already present
+    grep -q "secrets.yaml" .gitignore 2>/dev/null || echo "secrets.yaml" >> .gitignore
+    grep -q "*.secret" .gitignore 2>/dev/null || echo "*.secret" >> .gitignore
+    grep -q ".env" .gitignore 2>/dev/null || echo ".env" >> .gitignore
+    grep -q ".env.*" .gitignore 2>/dev/null || echo ".env.*" >> .gitignore
+    
+    echo "✅ Updated .gitignore to exclude secrets"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1141,6 +1160,7 @@ function run_comprehensive_issue_analysis() {
 # ─────────────────────────────────────────────────────────────────────────────
 function handle_secrets_commands() {
     local command="${1:-help}"
+    local option="${2:-}"
     
     case "$command" in
         create)
@@ -1162,7 +1182,7 @@ function handle_secrets_commands() {
             create_configuration_map
             ;;
         load-env)
-            load_environment_file "${2:-.env}"
+            load_environment_file "${option:-.env}"
             ;;
         create-env)
             create_sample_environment_file
@@ -1257,10 +1277,11 @@ function handle_test_commands() {
 function main() {
     local category="${1:-help}"
     local command="${2:-help}"
+    local option="${3:-}"
     
     case "$category" in
         secrets)
-            handle_secrets_commands "$command" "$3"
+            handle_secrets_commands "$command" "$option"
             ;;
         debug)
             handle_debug_commands "$command"
@@ -1287,3 +1308,11 @@ function main() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi
+
+# # This will now work without errors
+# deploy/k8s/debug.sh secrets create
+
+# # Other commands will also work correctly
+# deploy/k8s/debug.sh test api
+# deploy/k8s/debug.sh debug summary
+# deploy/k8s/debug.sh help
