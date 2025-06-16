@@ -822,7 +822,7 @@ function analyze_docker_image_integrity() {
     
     if ! command -v docker >/dev/null 2>&1; then
         echo "❌ Docker not available for image analysis"
-        return 1
+        return 0
     fi
     
     if docker image inspect "$image" >/dev/null 2>&1; then
