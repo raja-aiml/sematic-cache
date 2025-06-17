@@ -6,35 +6,34 @@ This directory contains the complete deployment solution for the Semantic Cache 
 
 ```
 deploy/
-├── cluster.sh                # Wrapper script for cluster management  
-├── dev.sh                   # Wrapper script for development workflow
-├── README.md                # This file
-├── app/                     # Application components
-│   ├── kustomization.yaml        # App kustomization
-│   ├── ingress.yaml              # Shared app ingress
-│   ├── sematic-cache/            # Sematic Cache API service
-│   │   ├── deployment.yaml       # API deployment
-│   │   ├── service.yaml          # API service
-│   │   └── kustomization.yaml    # Service kustomization
-│   └── web/                      # Static web service
-│       ├── deployment.yaml       # Web deployment (nginx)
-│       ├── service.yaml          # Web service
-│       ├── kustomization.yaml    # Service kustomization with configMapGenerator
-│       └── content/               # Web content
-│           └── index.html         # Static HTML content
-├── infra/                   # Infrastructure components
-│   ├── kustomization.yaml        # Infrastructure kustomization
-│   ├── postgres/                 # PostgreSQL service
-│   │   ├── deployment.yaml       # PostgreSQL deployment
-│   │   └── kustomization.yaml    # Service kustomization
-│   ├── redis/                    # Redis service
-│   │   ├── deployment.yaml       # Redis deployment
-│   │   └── kustomization.yaml    # Service kustomization
-│   └── ingress-nginx/            # Ingress controller
-│       ├── kustomization.yaml
-│       ├── nginx-web.yaml
-│       └── test-ingress-nginx.yaml
-└── scripts/                 # Development and utility scripts
+├── kustomization.yaml       # Root orchestration for entire deployment
+├── cluster.sh               # Wrapper script for cluster management  
+├── dev.sh                  # Wrapper script for development workflow
+├── README.md               # This file
+├── app/                    # Application components
+│   ├── kustomization.yaml       # App kustomization
+│   ├── ingress.yaml             # Shared app ingress
+│   ├── sematic-cache/           # Sematic Cache API service
+│   │   ├── deployment.yaml      # API deployment
+│   │   ├── service.yaml         # API service
+│   │   └── kustomization.yaml   # Service kustomization
+│   └── web/                     # Static web service
+│       ├── deployment.yaml      # Web deployment (nginx)
+│       ├── service.yaml         # Web service
+│       ├── kustomization.yaml   # Service kustomization with configMapGenerator
+│       └── content/              # Web content
+│           └── index.html        # Static HTML content
+├── infra/                  # Infrastructure components
+│   ├── kustomization.yaml       # Infrastructure kustomization
+│   ├── postgres/                # PostgreSQL service
+│   │   ├── deployment.yaml      # PostgreSQL deployment
+│   │   └── kustomization.yaml   # Service kustomization
+│   ├── redis/                   # Redis service
+│   │   ├── deployment.yaml      # Redis deployment
+│   │   └── kustomization.yaml   # Service kustomization
+│   └── ingress-nginx/           # Ingress controller only
+│       └── kustomization.yaml   # Controller deployment
+└── scripts/                # Development and utility scripts
     ├── cluster.sh          # Cluster infrastructure management
     ├── dev.sh              # Application development workflow
     └── debug.sh            # Debugging utilities
@@ -56,28 +55,31 @@ The deployment follows enterprise-standard organization:
 - **`scripts/`**: Development and utility scripts
 
 This structure provides:
+- **Root orchestration**: Single command deployment with proper dependency management
 - **Service-based organization**: Each service has its own directory with all related manifests
 - **Clear separation**: Infrastructure vs application concerns
 - **No configuration confusion**: Configs live with their respective services
 - **Scalable structure**: Easy to add new services or applications
 - **Intuitive navigation**: Find what you need where you expect it
 - **Optimal maintainability**: Component-based organization reduces complexity
+- **Clean infrastructure**: No duplicate or conflicting components
 
 ## Project Structure
 
 ```
 deploy/
-├── cluster.sh           # Manages k3d cluster lifecycle (create, delete, logs)
-├── dev.sh               # Builds and deploys Docker image using k3d import
-├── infra/               # Infrastructure components
-│   ├── postgres/        # PostgreSQL service
-│   ├── redis/           # Redis service
-│   ├── ingress-nginx/   # Ingress controller
+├── kustomization.yaml   # Root orchestration
+├── cluster.sh          # Manages k3d cluster lifecycle (create, delete, logs)
+├── dev.sh              # Builds and deploys Docker image using k3d import
+├── infra/              # Infrastructure components
+│   ├── postgres/       # PostgreSQL service
+│   ├── redis/          # Redis service
+│   ├── ingress-nginx/  # Ingress controller
 │   └── kustomization.yaml
-├── app/                 # Application layer
-│   ├── sematic-cache/   # Sematic Cache API service
-│   ├── web/             # Static web service
-│   ├── ingress.yaml     # Shared app ingress
+├── app/                # Application layer
+│   ├── sematic-cache/  # Sematic Cache API service
+│   ├── web/            # Static web service
+│   ├── ingress.yaml    # Shared app ingress
 │   └── kustomization.yaml
 └── README.md
 ```
@@ -92,6 +94,12 @@ chmod +x cluster.sh dev.sh
 ### 2. Create k3d cluster and infrastructure
 ```bash
 deploy/cluster.sh up
+```
+
+### Alternative: Deploy entire stack at once
+```bash
+# Deploy everything with single command
+kubectl apply -k deploy/
 ```
 
 This will:
