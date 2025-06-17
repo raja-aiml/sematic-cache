@@ -136,6 +136,12 @@ function check_ingress_accessibility() {
 # 🧪 Master test function
 function cmd_test() {
     local status=0
+    local with_ingress_check=false
+
+    # Parse argument
+    if [[ "$1" == "--with-ingress" ]]; then
+        with_ingress_check=true
+    fi
 
     echo -e "\n🔍 Verifying Kubernetes Deployments in namespace '$NAMESPACE' (context: $KUBE_CONTEXT)..."
 
@@ -145,7 +151,12 @@ function cmd_test() {
     done
 
     check_deployment "ingress-nginx-controller" || status=1
-    check_ingress_accessibility || status=1
+
+    if [[ "$with_ingress_check" == true ]]; then
+        check_ingress_accessibility || status=1
+    else
+        echo -e "\nℹ️  Skipping Ingress accessibility check"
+    fi
 
     echo -e "\n✅ Test completed. Overall status: $([[ $status -eq 0 ]] && echo PASS || echo FAIL)"
     return $status
@@ -162,7 +173,7 @@ function main() {
         down) cmd_down ;;
         ps) cmd_ps ;;
         logs) shift; cmd_logs "$@" ;;
-        test) cmd_test ;;
+        test) shift; cmd_test "$@" ;;
         help|*) usage ;;
     esac
 }
