@@ -1,6 +1,6 @@
-﻿# Docker Compose Deployment
+# Docker Compose Deployment
 
-This directory contains the Docker Compose setup to build and run the caching server along with its dependencies.
+This directory contains the Docker Compose setup to build and run the semantic cache system with all its dependencies, matching the functionality of the Kubernetes deployment.
 
 ## Prerequisites
 
@@ -12,34 +12,143 @@ This directory contains the Docker Compose setup to build and run the caching se
 
 - **postgres**: PostgreSQL with pgvector extension
   - Image: `pgvector/pgvector:pg17`
-  - Environment:
-    - `POSTGRES_DB=cache`
-    - `POSTGRES_USER=cache`
-    - `POSTGRES_PASSWORD=cache`
-- **redis**: Redis 7
-- **app**: Go caching server
-  - Built from the project root (`../../`) using `deploy/docker/Dockerfile`
-  - Environment:
-    - `DATABASE_URL` (e.g., `postgres://cache:cache@postgres:5432/cache?sslmode=disable`)
-    - `OPENAI_API_KEY`
+  - Database: `cache` with user `cache:cache`
+  - Automatically initializes vector extension
+- **redis**: Redis 8.0.2 for caching
+- **nginx**: Static web content server
+- **app**: Go semantic cache server
+  - Built from the project root using multi-stage Dockerfile
+  - Supports `.env` file configuration
+- **proxy**: Nginx reverse proxy for path-based routing
+  - Routes `/web/*` to nginx service (static content)
+  - Routes `/semantic-cache/*` to app service (API)
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file in the project root (see `.env.example`):
+
+```bash
+# Database Configuration
+DATABASE_URL=postgres://cache:cache@postgres:5432/cache?sslmode=disable
+
+# OpenAI API Configuration
+OPENAI_API_KEY=your-actual-api-key-here
+
+# Optional: Jaeger Tracing
+JAEGER_ENDPOINT=http://localhost:14268/api/traces
+```
+
+**Note**: The `.env` file is automatically loaded and should not be committed to git.
 
 ## Usage
 
-Build and start all services:
-```shell
-COMPOSE_BAKE=true docker compose -f deploy/docker/docker-compose.yml up --build
+### Quick Start
+
+```bash
+# Start all services
+deploy/docker/dev.sh up
+
+# Check status
+deploy/docker/dev.sh status
+
+# Test the deployment
+deploy/docker/dev.sh test
+
+# Stop services
+deploy/docker/dev.sh down
 ```
 
-This will:
-1. Build the Go server binary in a multi-stage Dockerfile.
-2. Start `postgres`, `redis`, and the `app` server (listening on `:8080`).
+### Manual Commands
 
-Stop and remove the containers:
-```shell
+```bash
+# Build and start all services
+COMPOSE_BAKE=true docker compose -f deploy/docker/docker-compose.yml up --build -d
+
+# Stop and remove containers
 docker compose -f deploy/docker/docker-compose.yml down
+
+# View logs
+docker compose -f deploy/docker/docker-compose.yml logs -f
 ```
 
-## Customization
+### Development Script
 
-- To change server settings, edit environment variables in `docker-compose.yml` or pass flags to the binary.
-- The multi-stage build produces a minimal final image (`debian:stable-slim`) containing only `/app/server`.
+The `dev.sh` script provides consistent functionality with the Kubernetes deployment:
+
+```bash
+Usage: dev.sh <command>
+
+Commands:
+  up         Build and start all services
+  down       Stop and remove all services
+  build      Build application image
+  logs       Show logs from all services
+  status     Show status of all services
+  test       Test the deployment endpoints
+  clean      Remove all containers, networks, and volumes
+```
+
+## Access URLs
+
+After deployment, the services are available at:
+
+- **Web Interface**: http://localhost:8080/web/
+- **API Health**: http://localhost:8080/semantic-cache/health
+- **API Metrics**: http://localhost:8080/semantic-cache/metrics
+- **API Endpoints**: http://localhost:8080/semantic-cache/*
+
+## API Testing
+
+```bash
+# Check health
+curl http://localhost:8080/semantic-cache/health
+
+# Get metrics
+curl http://localhost:8080/semantic-cache/metrics
+
+# Set cache entry
+curl -X POST http://localhost:8080/semantic-cache/set \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "What is AI?", "answer": "Artificial Intelligence", "modelName": "gpt-3.5-turbo"}'
+
+# Get cache entry
+curl -X POST http://localhost:8080/semantic-cache/get \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "What is AI?"}'
+```
+
+## Architecture
+
+The Docker deployment mirrors the Kubernetes setup:
+
+1. **Path-based routing** via nginx proxy
+2. **Environment-based configuration** with `.env` support
+3. **Same service architecture** as K8s deployment
+4. **Consistent API endpoints** and functionality
+5. **Proper networking** with dedicated Docker network
+
+## Troubleshooting
+
+### View Logs
+```bash
+deploy/docker/dev.sh logs
+```
+
+### Check Service Status
+```bash
+deploy/docker/dev.sh status
+docker compose -f deploy/docker/docker-compose.yml ps
+```
+
+### Restart Services
+```bash
+deploy/docker/dev.sh down
+deploy/docker/dev.sh up
+```
+
+### Clean Up Everything
+```bash
+deploy/docker/dev.sh clean
+```
