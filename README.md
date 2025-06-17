@@ -184,15 +184,18 @@ Access URLs:
 ## Project Structure
 
 ```
+├── Dockerfile              # Application container build definition
 ├── cmd/server/              # Application entry point
 ├── core/                   # Core cache and agent logic
 ├── config/                 # Configuration management
 ├── deploy/                 # Kubernetes deployment
 │   ├── app/                # Application deployments and services
-│   ├── build/              # Dockerfile and build artifacts
+│   │   └── sematic-cache/  # Sematic Cache service with web content
 │   ├── infra/              # Infrastructure components
-│   ├── scripts/            # Development and utility scripts
-│   └── web/                # Static web content
+│   │   ├── postgres/       # PostgreSQL service
+│   │   ├── redis/          # Redis service
+│   │   └── ingress-nginx/  # Ingress controller
+│   └── scripts/            # Development and utility scripts
 ├── storage/                # Storage backend implementations
 ├── server/                 # HTTP server and API handlers
 ├── openai/                 # OpenAI API integration
@@ -202,11 +205,12 @@ Access URLs:
 ### Deployment Organization
 
 The Kubernetes deployment follows enterprise-standard patterns:
-- **Organized directory structure** for maintainability
+- **Service-based organization** with each service in its own directory
 - **Clean separation** between infrastructure and application concerns
 - **Comprehensive scripting interface** for development workflow
 - **Single deployment target** eliminates complexity and overhead
 - **Enterprise-ready** with production-grade capabilities
+- **Optimal maintainability** through component-based organization
 
 ### API Endpoints
 

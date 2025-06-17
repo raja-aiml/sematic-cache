@@ -9,25 +9,31 @@ deploy/
 ├── cluster.sh                # Wrapper script for cluster management  
 ├── dev.sh                   # Wrapper script for development workflow
 ├── README.md                # This file
-├── build/                   # Build artifacts and Dockerfile
-│   └── Dockerfile           # Application container build definition
 ├── app/                     # Application components
 │   ├── kustomization.yaml        # App kustomization
-│   └── sematic-cache.yaml        # App deployment, service, ingress
+│   └── sematic-cache/            # Sematic Cache service
+│       ├── deployment.yaml       # App deployment
+│       ├── service.yaml          # App service
+│       ├── ingress.yaml          # App ingress
+│       ├── kustomization.yaml    # Service kustomization
+│       └── web/                  # Static web content
+│           └── index.html        # Kubernetes deployment web interface
 ├── infra/                   # Infrastructure components
 │   ├── kustomization.yaml        # Infrastructure kustomization
-│   ├── postgres.yaml             # PostgreSQL with pgvector
-│   ├── redis.yaml                # Redis cache
-│   └── ingress-nginx/
+│   ├── postgres/                 # PostgreSQL service
+│   │   ├── deployment.yaml       # PostgreSQL deployment
+│   │   └── kustomization.yaml    # Service kustomization
+│   ├── redis/                    # Redis service
+│   │   ├── deployment.yaml       # Redis deployment
+│   │   └── kustomization.yaml    # Service kustomization
+│   └── ingress-nginx/            # Ingress controller
 │       ├── kustomization.yaml
 │       ├── nginx-web.yaml
 │       └── test-ingress-nginx.yaml
-├── scripts/                 # Development and utility scripts
-│   ├── cluster.sh          # Cluster infrastructure management
-│   ├── dev.sh              # Application development workflow
-│   └── debug.sh            # Debugging utilities
-└── web/                     # Static web content
-    └── index.html          # Kubernetes deployment web interface
+└── scripts/                 # Development and utility scripts
+    ├── cluster.sh          # Cluster infrastructure management
+    ├── dev.sh              # Application development workflow
+    └── debug.sh            # Debugging utilities
 ```
 
 ## Prerequisites
@@ -41,33 +47,31 @@ deploy/
 
 The deployment follows enterprise-standard organization:
 
-- **`app/`**: Application deployments, services, and ingress
-- **`build/`**: Container build artifacts and Dockerfile
-- **`infra/`**: Infrastructure components (database, cache, ingress controller)
+- **`app/`**: Application deployments, services, and ingress with service-based structure
+- **`infra/`**: Infrastructure components (database, cache, ingress controller) with service-based structure
 - **`scripts/`**: Development and utility scripts
-- **`web/`**: Static web content served via ingress
 
 This structure provides:
-- **Component-based organization**: Each directory contains related manifests
+- **Service-based organization**: Each service has its own directory with all related manifests
 - **Clear separation**: Infrastructure vs application concerns
-- **No configuration confusion**: Configs live with their components
-- **Scalable structure**: Easy to add new components or applications
+- **No configuration confusion**: Configs live with their respective services
+- **Scalable structure**: Easy to add new services or applications
 - **Intuitive navigation**: Find what you need where you expect it
+- **Optimal maintainability**: Component-based organization reduces complexity
 
 ## Project Structure
 
 ```
-k8s/
+deploy/
 ├── cluster.sh           # Manages k3d cluster lifecycle (create, delete, logs)
 ├── dev.sh               # Builds and deploys Docker image using k3d import
 ├── infra/               # Infrastructure components
-│   ├── postgres.yaml    # PostgreSQL with pgvector extension
-│   ├── redis.yaml       # Redis cache
+│   ├── postgres/        # PostgreSQL service
+│   ├── redis/           # Redis service
 │   ├── ingress-nginx/   # Ingress controller
-│   │   └── kustomization.yaml
 │   └── kustomization.yaml
 ├── app/                 # Application layer
-│   ├── sematic-cache.yaml  # Sematic Cache API deployment
+│   ├── sematic-cache/   # Sematic Cache service
 │   └── kustomization.yaml
 └── README.md
 ```
@@ -81,7 +85,7 @@ chmod +x cluster.sh dev.sh
 
 ### 2. Create k3d cluster and infrastructure
 ```bash
-deploy/k8s/cluster.sh up
+deploy/cluster.sh up
 ```
 
 This will:
@@ -94,37 +98,37 @@ This will:
 ### 3. Build and deploy application
 ```bash
 # Build Docker image and import into k3d cluster
-deploy/k8s/dev.sh build
+deploy/dev.sh build
 
 # Deploy the application
-deploy/k8s/dev.sh  deploy
+deploy/dev.sh  deploy
 ```
 
 ### 4. Check deployment status
 ```bash
 # View cluster and infrastructure status
-deploy/k8s/cluster.sh ps
+deploy/cluster.sh ps
 
 # View application status
-deploy/k8s/cluster.sh test
+deploy/cluster.sh test
 
 # Run infrastructure health checks
-deploy/k8s/cluster.sh test
+deploy/cluster.sh test
 ```
 
 ### 5. View logs
 ```bash
 # View logs for all infrastructure pods
-deploy/k8s/cluster.sh logs
+deploy/cluster.sh logs
 
 # View logs for a specific pod with follow
-deploy/k8s/cluster.sh logs <pod-name> --follow
+deploy/cluster.sh logs <pod-name> --follow
 ```
 
 ### 6. Cleanup
 ```bash
 # Remove the entire k3d cluster
-deploy/k8s/cluster.sh down
+deploy/cluster.sh down
 ```
 
 ## Accessing the Application
@@ -154,20 +158,20 @@ After deployment, the Sematic Cache API is accessible via:
 
 ```bash
 # Start fresh
-deploy/k8s/cluster.sh  up
+deploy/cluster.sh  up
 
 # Make code changes, then rebuild and redeploy
-deploy/k8s/dev.sh build
-deploy/k8s/dev.sh deploy
+deploy/dev.sh build
+deploy/dev.sh deploy
 
 # Check status
-deploy/k8s/dev.sh test
+deploy/dev.sh test
 
 # View logs if needed
-deploy/k8s/cluster.sh  logs
+deploy/cluster.sh  logs
 
 # Clean up when done
-deploy/k8s/cluster.sh  down
+deploy/cluster.sh  down
 ```
 
 ## Configuration
@@ -215,7 +219,7 @@ kubectl port-forward -n infra svc/redis 6379:6379
 
 ```bash
 # Test infrastructure components
-deploy/k8s/cluster.sh test
+deploy/cluster.sh test
 
 # Test individual services
 kubectl get pods -n infra

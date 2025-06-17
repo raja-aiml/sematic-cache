@@ -6,8 +6,8 @@ set -eo pipefail
 # ─────────────────────────────────────────────────────────────
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DEPLOY_DIR="$REPO_ROOT/deploy"
-DOCKERFILE="$DEPLOY_DIR/build/Dockerfile"
-APP_MANIFEST="$DEPLOY_DIR/app/sematic-cache.yaml"
+DOCKERFILE="$REPO_ROOT/Dockerfile"
+APP_MANIFEST="$DEPLOY_DIR/app/"
 ENV_FILE="$REPO_ROOT/.env"
 
 CLUSTER_NAME="sematic-cache"
@@ -132,7 +132,7 @@ function deploy_app() {
     create_secrets
 
     echo "📦 Applying app manifest..."
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" apply -f "$APP_MANIFEST"
+    kubectl --context "$KUBE_CONTEXT" apply -k "$APP_MANIFEST"
 
     echo "⏳ Waiting for app deployment rollout..."
     if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" rollout status deployment/sematic-cache --timeout=180s; then
@@ -218,7 +218,7 @@ function show_logs() {
 # ─────────────────────────────────────────────────────────────
 function remove_app() {
     echo "🗑 Deleting app resources from namespace '$NAMESPACE_APP'..."
-    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" delete -f "$APP_MANIFEST" --ignore-not-found
+    kubectl --context "$KUBE_CONTEXT" delete -k "$APP_MANIFEST" --ignore-not-found
     echo "✅ Removal complete."
 }
 

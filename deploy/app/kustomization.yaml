@@ -4,4 +4,4 @@ kind: Kustomization
 namespace: app
 
 resources:
-  - sematic-cache.yaml
+  - sematic-cache/
