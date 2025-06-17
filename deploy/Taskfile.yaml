@@ -22,13 +22,13 @@ tasks:
         echo "🚀 Semantic Cache Deployment Tasks"
         echo "===================================="
         echo ""
-        echo "Quick Start:"
+        'echo "Quick Start:"'
         echo "  task full          # Complete end-to-end workflow"
         echo "  task quick         # Quick development workflow"
         echo "  task status        # Check deployment status"
         echo "  task reset         # Reset and redeploy everything"
         echo ""
-        echo "For detailed help: task --list"
+        'echo "For detailed help: task --list"'
     silent: true
 
   # === CORE WORKFLOWS ===
@@ -98,16 +98,16 @@ tasks:
     desc: Quick health check of all services
     cmds:
       - echo "❤️  Performing health check..."
-      - echo "API Health:"
+      - 'echo "API Health:"'
       - curl -s {{.API_URL}}/health | jq . || echo "❌ API not responding"
       - echo ""
-      - echo "Web Interface:"
+      - 'echo "Web Interface:"'
       - curl -s {{.WEB_URL}}/ | head -1 || echo "❌ Web not responding"
 
   metrics:
     desc: Show API metrics
     cmds:
-      - echo "📈 API Metrics:"
+      - 'echo "📈 API Metrics:"'
       - curl -s {{.API_URL}}/metrics | jq . || echo "❌ Metrics not available"
 
   # === API TESTING ===
@@ -115,16 +115,16 @@ tasks:
     desc: Test API endpoints with sample data
     cmds:
       - echo "🔬 Testing API endpoints..."
-      - echo "Testing health endpoint:"
+      - 'echo "Testing health endpoint:"'
       - curl -s {{.API_URL}}/health
       - echo ""
-      - echo "Testing cache SET:"
+      - 'echo "Testing cache SET:"'
       - |
         curl -s -X POST {{.API_URL}}/set \
           -H "Content-Type: application/json" \
           -d '{"prompt":"What is Kubernetes?","answer":"Container orchestration platform","modelName":"test"}'
       - echo ""
-      - echo "Testing cache GET:"
+      - 'echo "Testing cache GET:"'
       - |
         curl -s -X POST {{.API_URL}}/get \
           -H "Content-Type: application/json" \
@@ -179,7 +179,7 @@ tasks:
   cluster:info:
     desc: Show cluster information
     cmds:
-      - echo "🏗️  Cluster Information:"
+      - 'echo "🏗️  Cluster Information:"'
       - k3d cluster list
       - echo ""
       - kubectl cluster-info
@@ -189,7 +189,7 @@ tasks:
   cluster:events:
     desc: Show recent cluster events
     cmds:
-      - echo "📅 Recent Cluster Events:"
+      - 'echo "📅 Recent Cluster Events:"'
       - kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
 
   # === TESTING SUITES ===
@@ -228,13 +228,13 @@ tasks:
     desc: Verify deployment is working correctly
     cmds:
       - echo "✅ Verifying deployment..."
-      - echo "Checking cluster:"
+      - 'echo "Checking cluster:"'
       - k3d cluster list | grep {{.CLUSTER_NAME}} && echo "✅ Cluster exists" || echo "❌ Cluster missing"
-      - echo "Checking pods:"
+      - 'echo "Checking pods:"'
       - kubectl get pods -A | grep -E "(Running|Ready)" && echo "✅ Pods running" || echo "❌ Pod issues"
-      - echo "Checking API:"
+      - 'echo "Checking API:"'
       - curl -s --max-time 5 {{.API_URL}}/health >/dev/null && echo "✅ API responding" || echo "❌ API not responding"
-      - echo "Checking web:"
+      - 'echo "Checking web:"'
       - curl -s --max-time 5 {{.WEB_URL}}/ >/dev/null && echo "✅ Web responding" || echo "❌ Web not responding"
 
   validate:
@@ -249,23 +249,23 @@ tasks:
   docs:
     desc: Show deployment documentation
     cmds:
-      - echo "📚 Deployment Documentation:"
-      - echo "Main README: ../README.md"
-      - echo "Deploy README: ./README.md"
-      - echo "Test README: ./tests/README.md"
+      - 'echo "📚 Deployment Documentation:"'
+      - 'echo "Main README: ../README.md"'
+      - 'echo "Deploy README: ./README.md"'
+      - 'echo "Test README: ./tests/README.md"'
       - echo ""
-      - echo "Quick reference:"
-      - echo "  Cluster: {{.CLUSTER_NAME}}"
-      - echo "  API: {{.API_URL}}/"
-      - echo "  Web: {{.WEB_URL}}/"
-      - echo "  Logs: task logs"
-      - echo "  Status: task status"
+      - 'echo "Quick reference:"'
+      - 'echo "  Cluster: {{.CLUSTER_NAME}}"'
+      - 'echo "  API: {{.API_URL}}/"'
+      - 'echo "  Web: {{.WEB_URL}}/"'
+      - 'echo "  Logs: task logs"'
+      - 'echo "  Status: task status"'
 
   # === DEBUGGING ===
   debug:
     desc: Debug deployment issues
     cmds:
-      - echo "🐛 Debug Information:"
+      - 'echo "🐛 Debug Information:"'
       - echo "=== Cluster Status ==="
       - k3d cluster list
       - echo ""
@@ -284,7 +284,7 @@ tasks:
   debug:pods:
     desc: Debug pod issues
     cmds:
-      - echo "🔍 Pod Debug Information:"
+      - 'echo "🔍 Pod Debug Information:"'
       - echo "=== Pod Status ==="
       - kubectl get pods -A -o wide
       - echo ""
@@ -292,16 +292,16 @@ tasks:
       - kubectl describe pods -n app
       - echo ""
       - echo "=== Pod Logs ==="
-      - echo "Sematic Cache logs:"
+      - 'echo "Sematic Cache logs:"'
       - kubectl logs -n app -l app=sematic-cache --tail=20
       - echo ""
-      - echo "Web service logs:"
+      - 'echo "Web service logs:"'
       - kubectl logs -n app -l app=web --tail=20
 
   debug:network:
     desc: Debug network connectivity issues
     cmds:
-      - echo "🌐 Network Debug Information:"
+      - 'echo "🌐 Network Debug Information:"'
       - echo "=== Services ==="
       - kubectl get svc -A
       - echo ""
@@ -312,9 +312,9 @@ tasks:
       - kubectl get ingress -A
       - echo ""
       - echo "=== External Connectivity ==="
-      - echo "Testing API:"
+      - 'echo "Testing API:"'
       - curl -I {{.API_URL}}/health 2>/dev/null || echo "API not accessible"
-      - echo "Testing Web:"
+      - 'echo "Testing Web:"'
       - curl -I {{.WEB_URL}}/ 2>/dev/null || echo "Web not accessible"
 
   # === CI/CD HELPERS ===
@@ -378,7 +378,7 @@ tasks:
   resources:
     desc: Show resource usage across cluster
     cmds:
-      - echo "📊 Resource Usage:"
+      - 'echo "📊 Resource Usage:"'
       - kubectl top nodes 2>/dev/null || echo "Metrics server not available"
       - echo ""
       - kubectl top pods -A 2>/dev/null || echo "Pod metrics not available"
@@ -386,10 +386,10 @@ tasks:
   describe:api:
     desc: Describe API deployment and pods
     cmds:
-      - echo "📋 API Deployment Details:"
+      - 'echo "📋 API Deployment Details:"'
       - kubectl describe deployment sematic-cache -n app
       - echo ""
-      - echo "📋 API Pod Details:"
+      - 'echo "📋 API Pod Details:"'
       - kubectl describe pods -l app=sematic-cache -n app
 
   # === WORKFLOW COMBINATIONS ===
