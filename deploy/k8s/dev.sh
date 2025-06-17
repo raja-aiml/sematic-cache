@@ -7,13 +7,63 @@ set -eo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DOCKERFILE="$REPO_ROOT/deploy/docker/Dockerfile"
 APP_MANIFEST="$REPO_ROOT/deploy/k8s/app/sematic-cache.yaml"
+ENV_FILE="$REPO_ROOT/.env"
 
 CLUSTER_NAME="sematic-cache"
 KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
 NAMESPACE_APP="app"
+SECRET_NAME="sematic-cache-secrets"
 
 # Use a simple, consistent image name
 IMAGE_NAME="sematic-cache:working"
+
+# ─────────────────────────────────────────────────────────────
+# 🔐 LOAD ENVIRONMENT VARIABLES
+# ─────────────────────────────────────────────────────────────
+function load_env_vars() {
+    echo "🔐 Loading environment variables..."
+    
+    # Default values
+    DATABASE_URL=${DATABASE_URL:-"postgres://cache:cache@postgres.infra:5432/cache?sslmode=disable"}
+    OPENAI_API_KEY=${OPENAI_API_KEY:-"dummy-key"}
+    
+    # Load from .env file if it exists
+    if [[ -f "$ENV_FILE" ]]; then
+        echo "📄 Found .env file: $ENV_FILE"
+        # Source the .env file, ignoring comments and empty lines
+        set -a  # automatically export all variables
+        source <(grep -v '^#' "$ENV_FILE" | grep -v '^$')
+        set +a
+        echo "✅ Environment variables loaded from .env"
+    else
+        echo "⚠️  No .env file found at $ENV_FILE, using default values"
+    fi
+    
+    # Log the configuration (without sensitive values)
+    echo "🔧 Configuration:"
+    echo "   DATABASE_URL: ${DATABASE_URL//:*@/:***@}"  # Hide password
+    echo "   OPENAI_API_KEY: ${OPENAI_API_KEY:0:8}..."   # Show only first 8 chars
+}
+
+# ─────────────────────────────────────────────────────────────
+# 🔑 CREATE KUBERNETES SECRETS
+# ─────────────────────────────────────────────────────────────
+function create_secrets() {
+    echo "🔑 Creating Kubernetes secrets..."
+    
+    # Check if secret already exists
+    if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get secret "$SECRET_NAME" >/dev/null 2>&1; then
+        echo "🔄 Secret '$SECRET_NAME' already exists, updating..."
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" delete secret "$SECRET_NAME"
+    fi
+    
+    # Create the secret
+    kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" create secret generic "$SECRET_NAME" \
+        --from-literal=DATABASE_URL="$DATABASE_URL" \
+        --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY"
+    
+    echo "✅ Secret '$SECRET_NAME' created successfully"
+}
 
 # ─────────────────────────────────────────────────────────────
 # 📖 USAGE
@@ -69,20 +119,36 @@ function build_image() {
 # 🚀 DEPLOY APPLICATION
 # ─────────────────────────────────────────────────────────────
 function deploy_app() {
+    echo "🚀 Starting deployment process..."
+    
+    # Load environment variables first
+    load_env_vars
+    
     echo "📁 Creating namespace '$NAMESPACE_APP' (if not exists)..."
     kubectl --context "$KUBE_CONTEXT" create namespace "$NAMESPACE_APP" --dry-run=client -o yaml | kubectl apply -f -
 
-    echo "🚀 Applying app manifest..."
+    # Create secrets before deploying the app
+    create_secrets
+
+    echo "📦 Applying app manifest..."
     kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" apply -f "$APP_MANIFEST"
 
     echo "⏳ Waiting for app deployment rollout..."
-    if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" rollout status deployment/sematic-cache --timeout=120s; then
+    if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" rollout status deployment/sematic-cache --timeout=180s; then
         echo "✅ Deployment successful"
         show_status
     else
         echo "❌ Deployment failed or timed out"
+        echo ""
         echo "🔍 Checking pod status..."
-        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get pods
+        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get pods -o wide
+        echo ""
+        echo "📜 Pod describe (last pod):"
+        POD=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" get pods -l app=sematic-cache -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+        if [[ -n "$POD" ]]; then
+            kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" describe pod "$POD"
+        fi
+        echo ""
         echo "📜 Recent logs:"
         kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE_APP" logs deployment/sematic-cache --tail=20 || echo "No logs available"
         return 1
