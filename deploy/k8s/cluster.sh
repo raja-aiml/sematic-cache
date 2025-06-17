@@ -100,13 +100,51 @@ function cmd_logs() {
     fi
 }
 
+# 🔧 Check if a deployment is ready
+function check_deployment() {
+    local name="$1"
+    echo -n "🔧 Deployment '$name': "
+    local ready
+    ready=$(kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get deployment "$name" -o=jsonpath='{.status.readyReplicas}' 2>/dev/null)
+
+    if [[ -z "$ready" ]]; then
+        echo "❌ Not Ready or Missing"
+        return 1
+    else
+        echo "✅ Ready Replicas: $ready"
+        return 0
+    fi
+}
+
+# 🌐 Check ingress service accessibility on localhost:8080
+function check_ingress_accessibility() {
+    echo -e "\n🌐 Checking Ingress Service Accessibility at http://localhost:8080..."
+
+    if curl -s --head --max-time 5 "http://localhost:8080" | grep -q "200 OK"; then
+        echo "✅ Ingress is accessible at http://localhost:8080"
+        return 0
+    else
+        echo "❌ Ingress is NOT responding at http://localhost:8080"
+        return 1
+    fi
+}
+
+# 🧪 Master test function
 function cmd_test() {
-    echo -e "\n🔍 Verifying Kubernetes deployments:"
-    for d in postgres redis ; do
-        echo -n "↪ $d: "
-        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get deployment "$d" -o=jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "❌ Missing"
-        echo
+    local status=0
+
+    echo -e "\n🔍 Verifying Kubernetes Deployments in namespace '$NAMESPACE' (context: $KUBE_CONTEXT)..."
+
+    local components=("postgres" "redis")
+    for comp in "${components[@]}"; do
+        check_deployment "$comp" || status=1
     done
+
+    check_deployment "ingress-nginx-controller" || status=1
+    check_ingress_accessibility || status=1
+
+    echo -e "\n✅ Test completed. Overall status: $([[ $status -eq 0 ]] && echo PASS || echo FAIL)"
+    return $status
 }
 
 function main() {
