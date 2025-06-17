@@ -1,11 +1,11 @@
-# Kubernetes Deployment for Sematic Cache
+# Semantic Cache Deployment
 
-This directory contains Kubernetes manifests and helper scripts to deploy the Sematic Cache application using a local [k3d](https://k3d.io/) cluster.
+This directory contains the complete deployment solution for the Semantic Cache application using Kubernetes with [k3d](https://k3d.io/) for local development and production-ready manifests.
 
 ## Directory Structure
 
 ```
-deploy/k8s/
+deploy/
 ├── cluster.sh                # Wrapper script for cluster management  
 ├── dev.sh                   # Wrapper script for development workflow
 ├── README.md                # This file
@@ -40,7 +40,7 @@ deploy/k8s/
 
 ## Organized Structure
 
-The Kubernetes deployment follows enterprise-standard organization:
+The deployment follows enterprise-standard organization:
 
 - **`build/`**: Container build artifacts and Dockerfile
 - **`config/`**: Kubernetes manifests organized by component
@@ -53,7 +53,8 @@ This structure provides:
 - Clear separation between infrastructure and application concerns
 - Scalable organization for complex deployments
 - Easy maintenance and configuration management
-- Consistent patterns across Docker and Kubernetes deployments
+- Single deployment target eliminates complexity
+- Production-ready with development-friendly tooling
 
 ## Project Structure
 
@@ -298,6 +299,21 @@ Notes
 - Ingress NGINX handles HTTP routing with LoadBalancer integration
 - All data is ephemeral - destroyed when cluster is deleted
 - HTTPie provides clean JSON output for API testing and debugging
+- Single deployment target reduces maintenance overhead and complexity
+- Enterprise-ready with production capabilities built-in
+
+## Production Deployment
+
+For production environments:
+
+1. **Replace k3d with production Kubernetes cluster**
+2. **Update ingress configuration** for your domain
+3. **Configure persistent storage** for PostgreSQL data
+4. **Set up proper secrets management** (e.g., sealed-secrets, external-secrets)
+5. **Configure resource limits and requests**
+6. **Set up monitoring and alerting**
+
+The manifests are designed to be production-ready with minimal modifications.
 
 ---
 

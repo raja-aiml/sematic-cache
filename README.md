@@ -157,49 +157,29 @@ go run cmd/server/main.go -config config.yml
 go run cmd/server/main.go -address :8080
 ```
 
-## Deployment Options
+## Deployment
 
-### Docker Compose Deployment
+### Kubernetes Deployment with k3d
 
-Quick start with organized Docker structure:
-```bash
-# Start all services with path-based routing
-deploy/docker/dev.sh up
-
-# Test the deployment
-deploy/docker/dev.sh test
-
-# Stop services  
-deploy/docker/dev.sh down
-```
-
-Access URLs:
-- **Web Interface**: http://localhost:8080/web/
-- **API**: http://localhost:8080/semantic-cache/*
-
-### Kubernetes Deployment
-
-Enterprise-ready Kubernetes deployment with k3d:
+Quick start with enterprise-ready Kubernetes deployment:
 ```bash
 # Create cluster and deploy infrastructure
-deploy/k8s/cluster.sh up
+deploy/cluster.sh up
 
 # Build and deploy application
-deploy/k8s/dev.sh build
-deploy/k8s/dev.sh deploy
+deploy/dev.sh build
+deploy/dev.sh deploy
 
 # Test the deployment
-deploy/k8s/cluster.sh test
+deploy/cluster.sh test
 
 # Cleanup
-deploy/k8s/cluster.sh down
+deploy/cluster.sh down
 ```
 
 Access URLs:
 - **Web Interface**: http://localhost:8080/web/
 - **API**: http://localhost:8080/semantic-cache/*
-
-Both deployments provide identical functionality and consistent access patterns.
 
 ## Project Structure
 
@@ -207,31 +187,27 @@ Both deployments provide identical functionality and consistent access patterns.
 ├── cmd/server/              # Application entry point
 ├── core/                   # Core cache and agent logic
 ├── config/                 # Configuration management
-├── deploy/                 # Deployment configurations
-│   ├── docker/            # Docker Compose deployment
-│   │   ├── config/        # Nginx configurations
-│   │   ├── database/      # Database initialization
-│   │   ├── scripts/       # Development scripts
-│   │   └── web/           # Static web content
-│   └── k8s/               # Kubernetes deployment
-│       ├── build/         # Dockerfile and build artifacts
-│       ├── config/        # Kubernetes manifests
-│       ├── scripts/       # Development scripts
-│       └── web/           # Static web content
-├── storage/               # Storage backend implementations
-├── server/                # HTTP server and API handlers
-├── openai/                # OpenAI API integration
-└── observability/         # Monitoring and tracing
+├── deploy/                 # Kubernetes deployment
+│   ├── build/              # Dockerfile and build artifacts
+│   ├── config/             # Kubernetes manifests
+│   │   ├── app/            # Application deployments and services
+│   │   └── infra/          # Infrastructure components
+│   ├── scripts/            # Development and utility scripts
+│   └── web/                # Static web content
+├── storage/                # Storage backend implementations
+├── server/                 # HTTP server and API handlers
+├── openai/                 # OpenAI API integration
+└── observability/          # Monitoring and tracing
 ```
 
 ### Deployment Organization
 
-Both Docker and Kubernetes deployments follow consistent patterns:
+The Kubernetes deployment follows enterprise-standard patterns:
 - **Organized directory structure** for maintainability
-- **Consistent scripting interface** (`dev.sh` commands)
-- **Same access URLs and API endpoints**
-- **Identical web interfaces** adapted for each platform
-- **Enterprise-standard organization** for scalability
+- **Clean separation** between infrastructure and application concerns
+- **Comprehensive scripting interface** for development workflow
+- **Single deployment target** eliminates complexity and overhead
+- **Enterprise-ready** with production-grade capabilities
 
 ### API Endpoints
 
@@ -244,8 +220,7 @@ Install HTTPie for clean API testing: `pip install httpie`
 http POST http://localhost:8080/semantic-cache/set \
   prompt="What is Go?" \
   answer="Go is a programming language..." \
-  modelName="gpt-3.5-turbo" \
-  modelID="gpt-3.5-turbo-0613"
+  modelName="gpt-3.5-turbo"
 ```
 
 #### Retrieve a Cache Entry

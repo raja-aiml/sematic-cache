@@ -5,9 +5,9 @@ set -eo pipefail
 # 🔧 CONFIGURATION
 # ─────────────────────────────────────────────────────────────
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-K8S_DIR="$REPO_ROOT/deploy/k8s"
-DOCKERFILE="$K8S_DIR/build/Dockerfile"
-APP_MANIFEST="$K8S_DIR/config/app/sematic-cache.yaml"
+DEPLOY_DIR="$REPO_ROOT/deploy"
+DOCKERFILE="$DEPLOY_DIR/build/Dockerfile"
+APP_MANIFEST="$DEPLOY_DIR/config/app/sematic-cache.yaml"
 ENV_FILE="$REPO_ROOT/.env"
 
 CLUSTER_NAME="sematic-cache"

@@ -30,30 +30,21 @@ go test ./storage
 go test ./server
 ```
 
-### Development with Docker
-```bash
-# Start all services (PostgreSQL, Redis, App)
-docker compose -f deploy/docker/docker-compose.yml up --build
-
-# Stop services
-docker compose -f deploy/docker/docker-compose.yml down
-```
-
 ### Kubernetes Development
 ```bash
 # Create k3d cluster and deploy infrastructure
-deploy/k8s/cluster.sh up
+deploy/cluster.sh up
 
 # Build and deploy application
-deploy/k8s/dev.sh build
-deploy/k8s/dev.sh deploy
+deploy/dev.sh build
+deploy/dev.sh deploy
 
 # Check status and logs
-deploy/k8s/cluster.sh ps
-deploy/k8s/cluster.sh logs
+deploy/cluster.sh ps
+deploy/cluster.sh logs
 
 # Cleanup
-deploy/k8s/cluster.sh down
+deploy/cluster.sh down
 ```
 
 ## Architecture
@@ -136,10 +127,11 @@ database_url: "host=localhost user=postgres dbname=cache sslmode=disable"
 ## Development Notes
 
 - PostgreSQL requires the `vector` extension for pgvector functionality
-- Docker setup includes automatic database initialization with extensions
 - K8s deployment uses k3d for local development with no registry complexity
+- Kubernetes deployment includes automatic database initialization with extensions
 - All test files follow Go testing conventions with descriptive test names
 - The codebase uses OpenTelemetry for observability with Jaeger integration
+- Single deployment target (Kubernetes) eliminates Docker/K8s maintenance overhead
 
 ## Commit Message Guidelines
 
