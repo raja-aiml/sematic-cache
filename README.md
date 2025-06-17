@@ -157,49 +157,120 @@ go run cmd/server/main.go -config config.yml
 go run cmd/server/main.go -address :8080
 ```
 
-### Docker Compose
-To run the server with PostgreSQL and Redis via Docker:
+## Deployment Options
+
+### Docker Compose Deployment
+
+Quick start with organized Docker structure:
 ```bash
-docker compose -f deploy/docker/docker-compose.yml up --build
+# Start all services with path-based routing
+deploy/docker/dev.sh up
+
+# Test the deployment
+deploy/docker/dev.sh test
+
+# Stop services  
+deploy/docker/dev.sh down
 ```
-Stop the containers with:
+
+Access URLs:
+- **Web Interface**: http://localhost:8080/web/
+- **API**: http://localhost:8080/semantic-cache/*
+
+### Kubernetes Deployment
+
+Enterprise-ready Kubernetes deployment with k3d:
 ```bash
-docker compose -f deploy/docker/docker-compose.yml down
+# Create cluster and deploy infrastructure
+deploy/k8s/cluster.sh up
+
+# Build and deploy application
+deploy/k8s/dev.sh build
+deploy/k8s/dev.sh deploy
+
+# Test the deployment
+deploy/k8s/cluster.sh test
+
+# Cleanup
+deploy/k8s/cluster.sh down
 ```
+
+Access URLs:
+- **Web Interface**: http://localhost:8080/web/
+- **API**: http://localhost:8080/semantic-cache/*
+
+Both deployments provide identical functionality and consistent access patterns.
+
+## Project Structure
+
+```
+├── cmd/server/              # Application entry point
+├── core/                   # Core cache and agent logic
+├── config/                 # Configuration management
+├── deploy/                 # Deployment configurations
+│   ├── docker/            # Docker Compose deployment
+│   │   ├── config/        # Nginx configurations
+│   │   ├── database/      # Database initialization
+│   │   ├── scripts/       # Development scripts
+│   │   └── web/           # Static web content
+│   └── k8s/               # Kubernetes deployment
+│       ├── build/         # Dockerfile and build artifacts
+│       ├── config/        # Kubernetes manifests
+│       ├── scripts/       # Development scripts
+│       └── web/           # Static web content
+├── storage/               # Storage backend implementations
+├── server/                # HTTP server and API handlers
+├── openai/                # OpenAI API integration
+└── observability/         # Monitoring and tracing
+```
+
+### Deployment Organization
+
+Both Docker and Kubernetes deployments follow consistent patterns:
+- **Organized directory structure** for maintainability
+- **Consistent scripting interface** (`dev.sh` commands)
+- **Same access URLs and API endpoints**
+- **Identical web interfaces** adapted for each platform
+- **Enterprise-standard organization** for scalability
 
 ### API Endpoints
 
+### API Testing with HTTPie
+
+Install HTTPie for clean API testing: `pip install httpie`
+
 #### Store a Cache Entry
 ```bash
-curl -X POST http://localhost:8080/set \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "What is Go?",
-    "answer": "Go is a programming language...",
-    "modelName": "gpt-3.5-turbo",
-    "modelID": "gpt-3.5-turbo-0613"
-  }'
+http POST http://localhost:8080/semantic-cache/set \
+  prompt="What is Go?" \
+  answer="Go is a programming language..." \
+  modelName="gpt-3.5-turbo" \
+  modelID="gpt-3.5-turbo-0613"
 ```
 
 #### Retrieve a Cache Entry
 ```bash
-curl -X POST http://localhost:8080/get \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "What is Go?"}'
+http POST http://localhost:8080/semantic-cache/get \
+  prompt="What is Go?"
+```
+
+#### Health and Metrics
+```bash
+http GET http://localhost:8080/semantic-cache/health
+http GET http://localhost:8080/semantic-cache/metrics
 ```
 
 #### Similarity Search
 ```bash
-curl -X POST http://localhost:8080/query \
-  -H "Content-Type: application/json" \
-  -d '{"embedding": [0.1, 0.2, 0.3, ...]}'
+http POST http://localhost:8080/semantic-cache/query \
+  embedding:='[0.1, 0.2, 0.3]'
 ```
 
 #### Top-K Similarity Search
 ```bash
-curl -X POST http://localhost:8080/topk \
-  -H "Content-Type: application/json" \
-  -d '{"embedding": [0.1, 0.2, 0.3, ...], "k": 5}'
+http POST http://localhost:8080/semantic-cache/topk \
+  embedding:='[0.1, 0.2, 0.3]' \
+  k:=5
 ```
 
 #### Health Check

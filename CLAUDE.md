@@ -140,3 +140,22 @@ database_url: "host=localhost user=postgres dbname=cache sslmode=disable"
 - K8s deployment uses k3d for local development with no registry complexity
 - All test files follow Go testing conventions with descriptive test names
 - The codebase uses OpenTelemetry for observability with Jaeger integration
+
+## Commit Message Guidelines
+
+- Use conventional commits format (feat:, fix:, refactor:, etc.)
+- Do NOT include "🤖 Generated with Claude Code" or similar AI attribution in commit messages
+- Keep commit messages concise but descriptive
+- Focus on the "why" and "what" of changes
+- Use present tense ("add feature" not "added feature")
+
+## Code Generation Attribution
+
+This repository contains code and documentation generated with assistance from Claude Code (claude.ai/code). The AI assistance includes:
+- Code refactoring and organization
+- Documentation writing and updates
+- Deployment script creation
+- Configuration file generation
+- README and guide creation
+
+All generated content has been reviewed and integrated as part of the normal development process.
