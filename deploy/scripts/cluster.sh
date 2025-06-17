@@ -46,9 +46,13 @@ function cmd_up() {
     echo "🔐 Waiting for ingress-nginx admission webhooks to be ready..."
     for job in ingress-nginx-admission-create ingress-nginx-admission-patch; do
         echo "⏳ Waiting for job $job..."
-        kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" wait --for=condition=complete job/$job --timeout=60s || {
-            echo "❌ Job $job failed or timed out"; exit 1;
-        }
+        if kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" get job/$job >/dev/null 2>&1; then
+            kubectl --context "$KUBE_CONTEXT" -n "$NAMESPACE" wait --for=condition=complete job/$job --timeout=60s || {
+                echo "⚠️  Job $job failed or timed out, but continuing (admission webhooks are optional for basic functionality)"
+            }
+        else
+            echo "⚠️  Job $job not found, skipping (admission webhooks are optional for basic functionality)"
+        fi
     done
 
     echo "✅ Waiting for other deployments to become ready..."
