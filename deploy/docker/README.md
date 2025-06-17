@@ -2,6 +2,27 @@
 
 This directory contains the Docker Compose setup to build and run the semantic cache system with all its dependencies, matching the functionality of the Kubernetes deployment.
 
+## Directory Structure
+
+```
+deploy/docker/
+├── docker-compose.yml          # Main compose configuration
+├── Dockerfile                  # Application container build
+├── dev.sh                     # Development wrapper script
+├── README.md                  # This file
+├── config/                    # Configuration files
+│   ├── nginx/
+│   │   └── nginx.conf         # Static content server config
+│   └── proxy/
+│       └── proxy.conf         # Reverse proxy routing config
+├── database/
+│   └── db_init.sql           # PostgreSQL initialization script
+├── scripts/
+│   └── dev.sh                # Main development script
+└── web/
+    └── index.html            # Static web interface
+```
+
 ## Prerequisites
 
 - Docker (v20.10+)
@@ -16,14 +37,34 @@ This directory contains the Docker Compose setup to build and run the semantic c
   - Automatically initializes vector extension
 - **redis**: Redis 8.0.2 for caching
 - **nginx**: Static web content server
+  - Configuration: `config/nginx/nginx.conf`
+  - Content: `web/index.html`
 - **app**: Go semantic cache server
   - Built from the project root using multi-stage Dockerfile
   - Supports `.env` file configuration
 - **proxy**: Nginx reverse proxy for path-based routing
+  - Configuration: `config/proxy/proxy.conf`
   - Routes `/web/*` to nginx service (static content)
   - Routes `/semantic-cache/*` to app service (API)
 
 ## Configuration
+
+### Organized Structure
+
+The Docker deployment is organized into logical subdirectories:
+
+- **`config/`**: All configuration files
+  - `nginx/`: Static content server configuration
+  - `proxy/`: Reverse proxy routing configuration
+- **`database/`**: Database initialization and scripts
+- **`scripts/`**: Development and utility scripts
+- **`web/`**: Static web content and assets
+
+This structure provides:
+- Clear separation of concerns
+- Easy configuration management
+- Maintainable codebase
+- Consistent organization with enterprise standards
 
 ### Environment Variables
 
@@ -152,3 +193,46 @@ deploy/docker/dev.sh up
 ```bash
 deploy/docker/dev.sh clean
 ```
+
+## Customization
+
+### Modifying Nginx Configuration
+
+**Static Content Server** (`config/nginx/nginx.conf`):
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    # Add custom static content rules here
+}
+```
+
+**Reverse Proxy** (`config/proxy/proxy.conf`):
+```nginx
+# Add new path routes here
+location /api/ {
+    proxy_pass http://app_backend/;
+    # Custom proxy settings
+}
+```
+
+### Adding New Services
+
+1. Add service definition to `docker-compose.yml`
+2. Update proxy routing in `config/proxy/proxy.conf`
+3. Update documentation and scripts as needed
+
+### Database Customization
+
+Modify `database/db_init.sql` to:
+- Add custom tables or schemas
+- Configure additional extensions
+- Set up custom indexes or functions
+
+### Web Interface Customization
+
+Edit `web/index.html` and add assets to `web/` directory:
+- Custom CSS styling
+- JavaScript functionality
+- Additional static resources
