@@ -1,15 +1,9 @@
 version: '3'
 
-# =====================================
-# 🚀 SEMANTIC CACHE ROOT TASKFILE
-# =====================================
-# Delegates to deploy/Taskfile.yaml for deployment operations
-
 vars:
   DEPLOY_DIR: ./deploy
 
 tasks:
-  # === DEFAULT HELP ===
   default:
     desc: Show available tasks for Semantic Cache project
     cmds:
@@ -44,7 +38,7 @@ tasks:
         echo "📁 Deploy-specific tasks: task -C deploy --list"
     silent: true
 
-  # === CORE WORKFLOWS ===
+  # Core Workflows
   full:
     desc: Complete production workflow (setup → build → deploy → test)
     dir: "{{.DEPLOY_DIR}}"
@@ -63,7 +57,7 @@ tasks:
     cmds:
       - task: reset
 
-  # === INDIVIDUAL STEPS ===
+  # Individual Steps
   setup:
     desc: Create k3d cluster and deploy infrastructure
     dir: "{{.DEPLOY_DIR}}"
@@ -88,7 +82,7 @@ tasks:
     cmds:
       - task: test
 
-  # === MONITORING ===
+  # Monitoring
   status:
     desc: Show current deployment status
     dir: "{{.DEPLOY_DIR}}"
@@ -113,7 +107,7 @@ tasks:
     cmds:
       - task: metrics
 
-  # === DEVELOPMENT ===
+  # Development
   dev:
     desc: Development cycle (build → deploy → quick-test)
     dir: "{{.DEPLOY_DIR}}"
@@ -132,7 +126,7 @@ tasks:
     cmds:
       - task: restart
 
-  # === TESTING SUITES ===
+  # Testing Suites
   test:api:
     desc: Test API endpoints only
     dir: "{{.DEPLOY_DIR}}"
@@ -157,7 +151,7 @@ tasks:
     cmds:
       - task: test:quick
 
-  # === DEBUGGING ===
+  # Debugging
   debug:
     desc: Debug deployment issues
     dir: "{{.DEPLOY_DIR}}"
@@ -176,7 +170,7 @@ tasks:
     cmds:
       - task: debug:network
 
-  # === SCALING ===
+  # Scaling
   scale:up:
     desc: Scale application to 2 replicas
     dir: "{{.DEPLOY_DIR}}"
@@ -184,12 +178,12 @@ tasks:
       - task: scale:up
 
   scale:down:
-    desc: Scale application to 1 replica  
+    desc: Scale application to 1 replica
     dir: "{{.DEPLOY_DIR}}"
     cmds:
       - task: scale:down
 
-  # === VERIFICATION ===
+  # Verification
   verify:
     desc: Verify deployment is working correctly
     dir: "{{.DEPLOY_DIR}}"
@@ -202,7 +196,7 @@ tasks:
     cmds:
       - task: validate
 
-  # === CLEANUP ===
+  # Cleanup
   cleanup:
     desc: Destroy cluster and cleanup all resources
     dir: "{{.DEPLOY_DIR}}"
@@ -214,7 +208,7 @@ tasks:
     cmds:
       - task: cleanup
 
-  # === ADVANCED WORKFLOWS ===
+  # Advanced Workflows
   production-ready:
     desc: Full production readiness validation
     dir: "{{.DEPLOY_DIR}}"
@@ -233,7 +227,7 @@ tasks:
     cmds:
       - task: ci:test
 
-  # === PORT FORWARDING ===
+  # Port Forwarding
   port-forward:api:
     desc: Port forward to API service (localhost:8080)
     dir: "{{.DEPLOY_DIR}}"
@@ -246,7 +240,7 @@ tasks:
     cmds:
       - task: port-forward:postgres
 
-  # === PROJECT OPERATIONS ===
+  # Project Operations
   lint:
     desc: Run code linting (if available)
     cmds:
@@ -275,37 +269,38 @@ tasks:
   docs:
     desc: Show project documentation
     cmds:
-      - echo "📚 Semantic Cache Documentation:"
-      - echo "Main README: ./README.md"
-      - echo "Deploy README: ./deploy/README.md"
-      - echo "Test README: ./deploy/tests/README.md"
-      - echo ""
-      - echo "Quick links:"
-      - echo "  API: http://localhost:8080/semantic-cache/"
-      - echo "  Web: http://localhost:8080/web/"
-      - echo ""
-      - echo "Common commands:"
-      - echo "  task full      # Complete workflow"
-      - echo "  task status    # Check status"
-      - echo "  task logs      # View logs"
+      - |
+        echo "📚 Semantic Cache Documentation:"
+        echo "Main README: ./README.md"
+        echo "Deploy README: ./deploy/README.md"
+        echo "Test README: ./deploy/tests/README.md"
+        echo ""
+        echo "Quick links:"
+        echo "  API: http://localhost:8080/semantic-cache/"
+        echo "  Web: http://localhost:8080/web/"
+        echo ""
+        echo "Common commands:"
+        echo "  task full      # Complete workflow"
+        echo "  task status    # Check status"
+        echo "  task logs      # View logs"
 
-  # === INFO COMMANDS ===
   info:
     desc: Show project and deployment information
     cmds:
-      - echo "🚀 Semantic Cache Project Information"
-      - echo "====================================="
-      - echo "Project Root: $(pwd)"
-      - echo "Deploy Directory: {{.DEPLOY_DIR}}"
-      - echo ""
-      - echo "Available workflows:"
-      - echo "  task full           # Complete production workflow"
-      - echo "  task quick          # Quick development cycle"
-      - echo "  task production-ready # Full validation"
-      - echo ""
-      - echo "Monitoring:"
-      - echo "  task status         # Deployment status"
-      - echo "  task health         # Health checks"
-      - echo "  task logs           # Application logs"
-      - echo ""
-      - echo "For detailed help: task --list"
+      - |
+        echo "🚀 Semantic Cache Project Information"
+        echo "====================================="
+        echo "Project Root: $(pwd)"
+        echo "Deploy Directory: {{.DEPLOY_DIR}}"
+        echo ""
+        echo "Available workflows:"
+        echo "  task full           # Complete production workflow"
+        echo "  task quick          # Quick development cycle"
+        echo "  task production-ready  # Full validation"
+        echo ""
+        echo "Monitoring:"
+        echo "  task status         # Deployment status"
+        echo "  task health         # Health checks"
+        echo "  task logs           # Application logs"
+        echo ""
+        echo "For detailed help: task --list"
