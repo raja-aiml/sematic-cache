@@ -102,6 +102,24 @@ deploy/cluster.sh up
 kubectl apply -k deploy/
 ```
 
+### Production-Ready E2E Workflow
+```bash
+# Complete automated workflow
+make full
+
+# Quick development workflow  
+make quick
+
+# Step-by-step workflow
+make setup build deploy test
+
+# Individual commands
+make status        # Check deployment
+make logs         # View logs
+make health       # Quick health check
+make cleanup      # Remove everything
+```
+
 This will:
 - Create a k3d cluster named `sematic-cache`
 - Deploy PostgreSQL with pgvector extension
