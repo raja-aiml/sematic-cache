@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/raja-aiml/sematic-cache/core"
@@ -140,7 +141,11 @@ func New(cache core.CacheBackend) *gin.Engine {
 	})
 
 	r.GET("/health", func(c *gin.Context) {
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "OK",
+			"service":   "semantic-cache",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
 	})
 
 	r.GET("/metrics", func(c *gin.Context) {

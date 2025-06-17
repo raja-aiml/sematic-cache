@@ -5,8 +5,14 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/default-backend: web
 spec:
   ingressClassName: nginx
+  defaultBackend:
+    service:
+      name: web
+      port:
+        number: 80
   rules:
     - host: sematic.127.0.0.1.nip.io
       http:
@@ -28,6 +34,13 @@ spec:
     - host: localhost
       http:
         paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
           - path: /web(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
