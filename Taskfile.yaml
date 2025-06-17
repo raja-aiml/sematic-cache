@@ -41,204 +41,173 @@ tasks:
   # Core Workflows
   full:
     desc: Complete production workflow (setup → build → deploy → test)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: full
+      - task -C {{.DEPLOY_DIR}} full
 
   quick:
     desc: Quick development workflow with essential tests
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: quick
+      - task -C {{.DEPLOY_DIR}} quick
 
   reset:
     desc: Complete reset (cleanup → setup → build → deploy)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: reset
+      - task -C {{.DEPLOY_DIR}} reset
 
   # Individual Steps
   setup:
     desc: Create k3d cluster and deploy infrastructure
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: setup
+      - task -C {{.DEPLOY_DIR}} setup
 
   build:
     desc: Build Docker image and import to cluster
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: build
+      - task -C {{.DEPLOY_DIR}} build
 
   deploy:
     desc: Deploy application to cluster
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: deploy
+      - task -C {{.DEPLOY_DIR}} deploy
 
   test:
     desc: Run comprehensive end-to-end tests
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: test
+      - task -C {{.DEPLOY_DIR}} test
 
   # Monitoring
   status:
     desc: Show current deployment status
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: status
+      - task -C {{.DEPLOY_DIR}} status
 
   logs:
     desc: Show application logs
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: logs
+      - task -C {{.DEPLOY_DIR}} logs
 
   health:
     desc: Quick health check of all services
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: health
+      - task -C {{.DEPLOY_DIR}} health
 
   metrics:
     desc: Show API metrics
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: metrics
+      - task -C {{.DEPLOY_DIR}} metrics
 
   # Development
   dev:
     desc: Development cycle (build → deploy → quick-test)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: dev
+      - task -C {{.DEPLOY_DIR}} dev
 
   redeploy:
     desc: Quick redeploy (build → deploy)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: redeploy
+      - task -C {{.DEPLOY_DIR}} redeploy
 
   restart:
     desc: Restart application deployment
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: restart
+      - task -C {{.DEPLOY_DIR}} restart
 
   # Testing Suites
   test:api:
     desc: Test API endpoints only
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: test:api
+      - task -C {{.DEPLOY_DIR}} test:api
 
   test:perf:
     desc: Test performance and load handling
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: test:performance
+      - task -C {{.DEPLOY_DIR}} test:performance
 
   test:infra:
     desc: Test infrastructure components only
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: test:infrastructure
+      - task -C {{.DEPLOY_DIR}} test:infrastructure
 
   test:quick:
     desc: Run essential tests only (faster)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: test:quick
+      - task -C {{.DEPLOY_DIR}} test:quick
 
   # Debugging
   debug:
     desc: Debug deployment issues
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: debug
+      - task -C {{.DEPLOY_DIR}} debug
 
   debug:pods:
     desc: Debug pod issues
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: debug:pods
+      - task -C {{.DEPLOY_DIR}} debug:pods
 
   debug:network:
     desc: Debug network connectivity
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: debug:network
+      - task -C {{.DEPLOY_DIR}} debug:network
 
   # Scaling
   scale:up:
     desc: Scale application to 2 replicas
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: scale:up
+      - task -C {{.DEPLOY_DIR}} scale:up
 
   scale:down:
     desc: Scale application to 1 replica
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: scale:down
+      - task -C {{.DEPLOY_DIR}} scale:down
 
   # Verification
   verify:
     desc: Verify deployment is working correctly
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: verify
+      - task -C {{.DEPLOY_DIR}} verify
 
   validate:
     desc: Validate configuration files
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: validate
+      - task -C {{.DEPLOY_DIR}} validate
 
   # Cleanup
   cleanup:
     desc: Destroy cluster and cleanup all resources
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: cleanup
+      - task -C {{.DEPLOY_DIR}} cleanup
 
   clean:
     desc: Alias for cleanup
     cmds:
-      - task: cleanup
+      - task cleanup
 
   # Advanced Workflows
   production-ready:
     desc: Full production readiness validation
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: production-ready
+      - task -C {{.DEPLOY_DIR}} production-ready
 
   quick-start:
     desc: Quick start for new deployments
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: quick-start
+      - task -C {{.DEPLOY_DIR}} quick-start
 
   ci:test:
     desc: Run CI-friendly tests (no interactive prompts)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: ci:test
+      - task -C {{.DEPLOY_DIR}} ci:test
 
   # Port Forwarding
   port-forward:api:
     desc: Port forward to API service (localhost:8080)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: port-forward:api
+      - task -C {{.DEPLOY_DIR}} port-forward:api
 
   port-forward:postgres:
     desc: Port forward to PostgreSQL (localhost:5432)
-    dir: "{{.DEPLOY_DIR}}"
     cmds:
-      - task: port-forward:postgres
+      - task -C {{.DEPLOY_DIR}} port-forward:postgres
 
   # Project Operations
   lint:
