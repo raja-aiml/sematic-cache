@@ -140,6 +140,7 @@ database_url: "host=localhost user=postgres dbname=cache sslmode=disable"
 - Keep commit messages concise but descriptive
 - Focus on the "why" and "what" of changes
 - Use present tense ("add feature" not "added feature")
+- DO NOT PUT Generated with Claude Code and Co-Authored-By: Claude 
 
 ## Code Generation Attribution
 
