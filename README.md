@@ -188,10 +188,9 @@ Access URLs:
 ├── core/                   # Core cache and agent logic
 ├── config/                 # Configuration management
 ├── deploy/                 # Kubernetes deployment
+│   ├── app/                # Application deployments and services
 │   ├── build/              # Dockerfile and build artifacts
-│   ├── config/             # Kubernetes manifests
-│   │   ├── app/            # Application deployments and services
-│   │   └── infra/          # Infrastructure components
+│   ├── infra/              # Infrastructure components
 │   ├── scripts/            # Development and utility scripts
 │   └── web/                # Static web content
 ├── storage/                # Storage backend implementations

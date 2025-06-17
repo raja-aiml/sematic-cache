@@ -7,7 +7,7 @@ set -eo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 DEPLOY_DIR="$REPO_ROOT/deploy"
 DOCKERFILE="$DEPLOY_DIR/build/Dockerfile"
-APP_MANIFEST="$DEPLOY_DIR/config/app/sematic-cache.yaml"
+APP_MANIFEST="$DEPLOY_DIR/app/sematic-cache.yaml"
 ENV_FILE="$REPO_ROOT/.env"
 
 CLUSTER_NAME="sematic-cache"

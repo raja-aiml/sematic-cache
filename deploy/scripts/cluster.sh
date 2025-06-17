@@ -5,7 +5,7 @@ CLUSTER_NAME="sematic-cache"
 KUBE_CONTEXT="k3d-${CLUSTER_NAME}"
 NAMESPACE="infra"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INFRA_DIR="${ROOT_DIR}/config/infra"
+INFRA_DIR="${ROOT_DIR}/infra"
 
 function usage() {
     cat <<EOM

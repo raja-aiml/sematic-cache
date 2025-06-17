@@ -11,18 +11,17 @@ deploy/
 ├── README.md                # This file
 ├── build/                   # Build artifacts and Dockerfile
 │   └── Dockerfile           # Application container build definition
-├── config/                  # Kubernetes configuration files
-│   ├── app/
-│   │   ├── kustomization.yaml    # App kustomization
-│   │   └── sematic-cache.yaml    # App deployment, service, ingress
-│   └── infra/
-│       ├── kustomization.yaml    # Infrastructure kustomization
-│       ├── postgres.yaml         # PostgreSQL with pgvector
-│       ├── redis.yaml            # Redis cache
-│       └── ingress-nginx/
-│           ├── kustomization.yaml
-│           ├── nginx-web.yaml
-│           └── test-ingress-nginx.yaml
+├── app/                     # Application components
+│   ├── kustomization.yaml        # App kustomization
+│   └── sematic-cache.yaml        # App deployment, service, ingress
+├── infra/                   # Infrastructure components
+│   ├── kustomization.yaml        # Infrastructure kustomization
+│   ├── postgres.yaml             # PostgreSQL with pgvector
+│   ├── redis.yaml                # Redis cache
+│   └── ingress-nginx/
+│       ├── kustomization.yaml
+│       ├── nginx-web.yaml
+│       └── test-ingress-nginx.yaml
 ├── scripts/                 # Development and utility scripts
 │   ├── cluster.sh          # Cluster infrastructure management
 │   ├── dev.sh              # Application development workflow
@@ -42,19 +41,18 @@ deploy/
 
 The deployment follows enterprise-standard organization:
 
+- **`app/`**: Application deployments, services, and ingress
 - **`build/`**: Container build artifacts and Dockerfile
-- **`config/`**: Kubernetes manifests organized by component
-  - `app/`: Application deployments, services, and ingress
-  - `infra/`: Infrastructure components (database, cache, ingress controller)
+- **`infra/`**: Infrastructure components (database, cache, ingress controller)
 - **`scripts/`**: Development and utility scripts
 - **`web/`**: Static web content served via ingress
 
 This structure provides:
-- Clear separation between infrastructure and application concerns
-- Scalable organization for complex deployments
-- Easy maintenance and configuration management
-- Single deployment target eliminates complexity
-- Production-ready with development-friendly tooling
+- **Component-based organization**: Each directory contains related manifests
+- **Clear separation**: Infrastructure vs application concerns
+- **No configuration confusion**: Configs live with their components
+- **Scalable structure**: Easy to add new components or applications
+- **Intuitive navigation**: Find what you need where you expect it
 
 ## Project Structure
 

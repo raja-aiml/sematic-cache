@@ -140,5 +140,5 @@ dmypy.json
 docs/references/*
 !docs/references/index.rstsecrets.yaml
 *.secret
-!deploy/k8s/build
+!deploy/build
 
