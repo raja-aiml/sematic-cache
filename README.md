@@ -190,7 +190,8 @@ Access URLs:
 ├── config/                 # Configuration management
 ├── deploy/                 # Kubernetes deployment
 │   ├── app/                # Application deployments and services
-│   │   └── sematic-cache/  # Sematic Cache service with web content
+│   │   ├── sematic-cache/  # Sematic Cache API service
+│   │   └── web/            # Static web service
 │   ├── infra/              # Infrastructure components
 │   │   ├── postgres/       # PostgreSQL service
 │   │   ├── redis/          # Redis service

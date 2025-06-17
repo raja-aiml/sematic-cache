@@ -5,8 +5,13 @@ resources:
   - deployment.yaml
   - service.yaml
 
+configMapGenerator:
+  - name: web-content
+    files:
+      - content/index.html
+
 namespace: app
 
 labels:
   - pairs:
-      app: sematic-cache
+      app: web

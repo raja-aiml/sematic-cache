@@ -11,13 +11,17 @@ deploy/
 ├── README.md                # This file
 ├── app/                     # Application components
 │   ├── kustomization.yaml        # App kustomization
-│   └── sematic-cache/            # Sematic Cache service
-│       ├── deployment.yaml       # App deployment
-│       ├── service.yaml          # App service
-│       ├── ingress.yaml          # App ingress
-│       ├── kustomization.yaml    # Service kustomization
-│       └── web/                  # Static web content
-│           └── index.html        # Kubernetes deployment web interface
+│   ├── ingress.yaml              # Shared app ingress
+│   ├── sematic-cache/            # Sematic Cache API service
+│   │   ├── deployment.yaml       # API deployment
+│   │   ├── service.yaml          # API service
+│   │   └── kustomization.yaml    # Service kustomization
+│   └── web/                      # Static web service
+│       ├── deployment.yaml       # Web deployment (nginx)
+│       ├── service.yaml          # Web service
+│       ├── kustomization.yaml    # Service kustomization with configMapGenerator
+│       └── content/               # Web content
+│           └── index.html         # Static HTML content
 ├── infra/                   # Infrastructure components
 │   ├── kustomization.yaml        # Infrastructure kustomization
 │   ├── postgres/                 # PostgreSQL service
@@ -71,7 +75,9 @@ deploy/
 │   ├── ingress-nginx/   # Ingress controller
 │   └── kustomization.yaml
 ├── app/                 # Application layer
-│   ├── sematic-cache/   # Sematic Cache service
+│   ├── sematic-cache/   # Sematic Cache API service
+│   ├── web/             # Static web service
+│   ├── ingress.yaml     # Shared app ingress
 │   └── kustomization.yaml
 └── README.md
 ```
