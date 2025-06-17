@@ -1,0 +1,311 @@
+version: '3'
+
+# =====================================
+# 🚀 SEMANTIC CACHE ROOT TASKFILE
+# =====================================
+# Delegates to deploy/Taskfile.yaml for deployment operations
+
+vars:
+  DEPLOY_DIR: ./deploy
+
+tasks:
+  # === DEFAULT HELP ===
+  default:
+    desc: Show available tasks for Semantic Cache project
+    cmds:
+      - |
+        echo "🚀 Semantic Cache - Root Task Runner"
+        echo "===================================="
+        echo ""
+        echo "🎯 Quick Commands (from project root):"
+        echo "  task full          # Complete production workflow"
+        echo "  task quick         # Quick development workflow"
+        echo "  task status        # Check deployment status"
+        echo "  task test          # Run comprehensive tests"
+        echo "  task cleanup       # Clean up resources"
+        echo ""
+        echo "🔧 Development Commands:"
+        echo "  task dev           # Development cycle"
+        echo "  task build         # Build application"
+        echo "  task deploy        # Deploy to cluster"
+        echo "  task logs          # View logs"
+        echo ""
+        echo "🧪 Testing Commands:"
+        echo "  task test:api      # Test API endpoints"
+        echo "  task test:perf     # Performance tests"
+        echo "  task verify        # Verify deployment"
+        echo ""
+        echo "🐛 Debug Commands:"
+        echo "  task debug         # Debug deployment"
+        echo "  task health        # Health checks"
+        echo "  task restart       # Restart services"
+        echo ""
+        echo "📚 For all available tasks: task --list"
+        echo "📁 Deploy-specific tasks: task -C deploy --list"
+    silent: true
+
+  # === CORE WORKFLOWS ===
+  full:
+    desc: Complete production workflow (setup → build → deploy → test)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: full
+
+  quick:
+    desc: Quick development workflow with essential tests
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: quick
+
+  reset:
+    desc: Complete reset (cleanup → setup → build → deploy)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: reset
+
+  # === INDIVIDUAL STEPS ===
+  setup:
+    desc: Create k3d cluster and deploy infrastructure
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: setup
+
+  build:
+    desc: Build Docker image and import to cluster
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: build
+
+  deploy:
+    desc: Deploy application to cluster
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: deploy
+
+  test:
+    desc: Run comprehensive end-to-end tests
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: test
+
+  # === MONITORING ===
+  status:
+    desc: Show current deployment status
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: status
+
+  logs:
+    desc: Show application logs
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: logs
+
+  health:
+    desc: Quick health check of all services
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: health
+
+  metrics:
+    desc: Show API metrics
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: metrics
+
+  # === DEVELOPMENT ===
+  dev:
+    desc: Development cycle (build → deploy → quick-test)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: dev
+
+  redeploy:
+    desc: Quick redeploy (build → deploy)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: redeploy
+
+  restart:
+    desc: Restart application deployment
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: restart
+
+  # === TESTING SUITES ===
+  test:api:
+    desc: Test API endpoints only
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: test:api
+
+  test:perf:
+    desc: Test performance and load handling
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: test:performance
+
+  test:infra:
+    desc: Test infrastructure components only
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: test:infrastructure
+
+  test:quick:
+    desc: Run essential tests only (faster)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: test:quick
+
+  # === DEBUGGING ===
+  debug:
+    desc: Debug deployment issues
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: debug
+
+  debug:pods:
+    desc: Debug pod issues
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: debug:pods
+
+  debug:network:
+    desc: Debug network connectivity
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: debug:network
+
+  # === SCALING ===
+  scale:up:
+    desc: Scale application to 2 replicas
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: scale:up
+
+  scale:down:
+    desc: Scale application to 1 replica  
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: scale:down
+
+  # === VERIFICATION ===
+  verify:
+    desc: Verify deployment is working correctly
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: verify
+
+  validate:
+    desc: Validate configuration files
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: validate
+
+  # === CLEANUP ===
+  cleanup:
+    desc: Destroy cluster and cleanup all resources
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: cleanup
+
+  clean:
+    desc: Alias for cleanup
+    cmds:
+      - task: cleanup
+
+  # === ADVANCED WORKFLOWS ===
+  production-ready:
+    desc: Full production readiness validation
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: production-ready
+
+  quick-start:
+    desc: Quick start for new deployments
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: quick-start
+
+  ci:test:
+    desc: Run CI-friendly tests (no interactive prompts)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: ci:test
+
+  # === PORT FORWARDING ===
+  port-forward:api:
+    desc: Port forward to API service (localhost:8080)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: port-forward:api
+
+  port-forward:postgres:
+    desc: Port forward to PostgreSQL (localhost:5432)
+    dir: "{{.DEPLOY_DIR}}"
+    cmds:
+      - task: port-forward:postgres
+
+  # === PROJECT OPERATIONS ===
+  lint:
+    desc: Run code linting (if available)
+    cmds:
+      - echo "🔍 Running code linting..."
+      - |
+        if [ -f "go.mod" ]; then
+          echo "Running Go linting..."
+          go fmt ./...
+          go vet ./...
+        else
+          echo "No Go module found, skipping Go linting"
+        fi
+
+  test:unit:
+    desc: Run unit tests (if available)
+    cmds:
+      - echo "🧪 Running unit tests..."
+      - |
+        if [ -f "go.mod" ]; then
+          echo "Running Go unit tests..."
+          go test ./... -v
+        else
+          echo "No Go module found, skipping unit tests"
+        fi
+
+  docs:
+    desc: Show project documentation
+    cmds:
+      - echo "📚 Semantic Cache Documentation:"
+      - echo "Main README: ./README.md"
+      - echo "Deploy README: ./deploy/README.md"
+      - echo "Test README: ./deploy/tests/README.md"
+      - echo ""
+      - echo "Quick links:"
+      - echo "  API: http://localhost:8080/semantic-cache/"
+      - echo "  Web: http://localhost:8080/web/"
+      - echo ""
+      - echo "Common commands:"
+      - echo "  task full      # Complete workflow"
+      - echo "  task status    # Check status"
+      - echo "  task logs      # View logs"
+
+  # === INFO COMMANDS ===
+  info:
+    desc: Show project and deployment information
+    cmds:
+      - echo "🚀 Semantic Cache Project Information"
+      - echo "====================================="
+      - echo "Project Root: $(pwd)"
+      - echo "Deploy Directory: {{.DEPLOY_DIR}}"
+      - echo ""
+      - echo "Available workflows:"
+      - echo "  task full           # Complete production workflow"
+      - echo "  task quick          # Quick development cycle"
+      - echo "  task production-ready # Full validation"
+      - echo ""
+      - echo "Monitoring:"
+      - echo "  task status         # Deployment status"
+      - echo "  task health         # Health checks"
+      - echo "  task logs           # Application logs"
+      - echo ""
+      - echo "For detailed help: task --list"

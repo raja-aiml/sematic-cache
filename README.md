@@ -174,7 +174,9 @@ deploy/dev.sh deploy
 kubectl apply -k deploy/
 
 # Production-ready automated workflow
-task -C deploy full
+task full                    # From project root
+# OR
+task -C deploy full         # Explicit deploy directory
 
 # Test the deployment
 deploy/cluster.sh test
