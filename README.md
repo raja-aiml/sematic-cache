@@ -170,6 +170,9 @@ deploy/cluster.sh up
 deploy/dev.sh build
 deploy/dev.sh deploy
 
+# Alternative: Deploy entire stack at once
+kubectl apply -k deploy/
+
 # Test the deployment
 deploy/cluster.sh test
 
@@ -206,12 +209,14 @@ Access URLs:
 ### Deployment Organization
 
 The Kubernetes deployment follows enterprise-standard patterns:
+- **Root orchestration** enables single-command deployment with proper dependencies
 - **Service-based organization** with each service in its own directory
 - **Clean separation** between infrastructure and application concerns
 - **Comprehensive scripting interface** for development workflow
 - **Single deployment target** eliminates complexity and overhead
 - **Enterprise-ready** with production-grade capabilities
 - **Optimal maintainability** through component-based organization
+- **No redundancy** - clean, focused components without duplication
 
 ### API Endpoints
 
