@@ -173,6 +173,9 @@ deploy/dev.sh deploy
 # Alternative: Deploy entire stack at once
 kubectl apply -k deploy/
 
+# Production-ready automated workflow
+make -C deploy full
+
 # Test the deployment
 deploy/cluster.sh test
 
