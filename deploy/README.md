@@ -105,19 +105,25 @@ kubectl apply -k deploy/
 ### Production-Ready E2E Workflow
 ```bash
 # Complete automated workflow
-make full
+task full
 
 # Quick development workflow  
-make quick
+task quick
 
 # Step-by-step workflow
-make setup build deploy test
+task setup build deploy test
 
 # Individual commands
-make status        # Check deployment
-make logs         # View logs
-make health       # Quick health check
-make cleanup      # Remove everything
+task status        # Check deployment
+task logs         # View logs
+task health       # Quick health check
+task cleanup      # Remove everything
+
+# Advanced operations
+task test:api      # Test specific components
+task debug        # Debug deployment issues
+task scale:up     # Scale application
+task verify       # Verify everything works
 ```
 
 This will:

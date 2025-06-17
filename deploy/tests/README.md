@@ -31,34 +31,46 @@ deploy/tests/
 
 ## 🚀 Quick Start
 
-### Complete Workflow
+### Complete Workflow with Task
 ```bash
 # 1. Create cluster and infrastructure
-deploy/cluster.sh up
+task setup
 
 # 2. Build and deploy application  
-deploy/dev.sh build
-deploy/dev.sh deploy
+task build deploy
 
 # 3. Run comprehensive tests
-deploy/tests/e2e.sh all
+task test
 
 # 4. Cleanup (optional)
-deploy/cluster.sh down
+task cleanup
 ```
 
-### Selective Testing
+### One-Command Workflows
+```bash
+# Complete production workflow
+task full
+
+# Quick development cycle
+task quick
+
+# Production readiness validation
+task production-ready
+```
+
+### Selective Testing with Task
 ```bash
 # Test specific components
-deploy/tests/e2e.sh infrastructure
-deploy/tests/e2e.sh application api
-deploy/tests/e2e.sh performance
+task test:infrastructure
+task test:application
+task test:api
+task test:performance
 
 # Quick essential tests only
-deploy/tests/e2e.sh --quick all
+task test:quick
 
-# Custom timeout and verbose output
-deploy/tests/e2e.sh --timeout 600 --verbose all
+# Custom testing combinations
+task test:infrastructure test:api
 ```
 
 ## 📋 Test Suites
@@ -98,7 +110,54 @@ deploy/tests/e2e.sh --timeout 600 --verbose all
 - **Events**: Kubernetes event monitoring
 - **Network**: Inter-pod connectivity
 
-## ⚙️ Configuration
+## ⚙️ Task Integration
+
+### Core Testing Tasks
+```bash
+# Individual test suites
+task test:infrastructure    # Test cluster and infrastructure
+task test:application      # Test deployments and services
+task test:api             # Test API endpoints
+task test:performance     # Test performance and load
+task test:monitoring      # Test logging and observability
+
+# Combined workflows
+task test                 # Run all comprehensive tests
+task test:quick          # Run essential tests only
+task verify              # Quick verification of deployment
+```
+
+### Development Tasks
+```bash
+# Development cycle
+task dev                 # build → deploy → quick-test
+task redeploy           # build → deploy
+task quick-start        # setup → build → deploy
+
+# Monitoring and debugging
+task status             # Deployment status
+task logs              # Application logs
+task health            # Quick health check
+task debug             # Comprehensive debug info
+task debug:pods        # Pod-specific debugging
+task debug:network     # Network connectivity debugging
+```
+
+### Advanced Operations
+```bash
+# Scaling operations
+task scale:up          # Scale to 2 replicas
+task scale:down        # Scale to 1 replica
+task restart           # Restart deployment
+
+# Validation and maintenance
+task validate          # Validate configurations
+task ci:test          # CI-friendly testing
+task backup:config    # Backup current config
+task update:images    # Update application images
+```
+
+## 🔧 Configuration
 
 ### Environment Variables
 ```bash
@@ -108,6 +167,15 @@ export TEST_TIMEOUT=600
 export HEALTH_CHECK_RETRIES=50
 ```
 
+### Task Variables
+Edit `Taskfile.yaml` to modify:
+```yaml
+vars:
+  CLUSTER_NAME: sematic-cache
+  API_URL: http://localhost:8080/semantic-cache
+  WEB_URL: http://localhost:8080/web
+```
+
 ### Test Configuration
 Edit `lib/config.sh` to modify:
 - Cluster and namespace names
@@ -115,152 +183,143 @@ Edit `lib/config.sh` to modify:
 - Timeout and retry settings
 - Output colors and formatting
 
-## 🔧 Customization
+## 🎯 Usage Patterns
 
-### Adding New Tests
-1. **Create test function** in appropriate suite file:
+### Development Workflow
 ```bash
-test_my_feature() {
-    log "🔧 Testing my feature..."
-    
-    # Your test logic here
-    if my_test_condition; then
-        success "My feature works correctly"
-    else
-        error "My feature failed"
-    fi
-}
+# Quick development cycle
+task quick-start          # Initial setup
+task dev                 # Iterative development
+task test:api           # Test changes
+task logs               # Debug issues
 ```
 
-2. **Export function** at bottom of suite file:
+### Pre-Production Validation
 ```bash
-export -f test_my_feature
+# Full comprehensive testing
+task production-ready
+
+# Focus on critical paths
+task test:infrastructure test:application test:api
+
+# Performance validation
+task test:performance task:monitoring
 ```
 
-3. **Add to test suite** in `e2e.sh`:
+### Continuous Integration
 ```bash
-run_test_suite "My Suite" \
-    test_my_feature \
-    test_other_features
+# Automated pipeline testing
+task ci:test
+task validate
 ```
 
-### Creating New Test Suite
-1. **Create new suite file**: `suites/mysuite.sh`
-2. **Source framework**: `source "$SCRIPT_DIR/../lib/test-framework.sh"`
-3. **Implement test functions** with proper exports
-4. **Add suite to main orchestrator** in `e2e.sh`
+### Debugging and Troubleshooting
+```bash
+# General debugging
+task debug
+task status
+task logs
 
-## 📊 Test Results
-
-### Success Indicators
-- ✅ **Green checkmarks**: Tests passed
-- **Response times**: Under acceptable thresholds
-- **Resource usage**: Within configured limits
-- **Zero failures**: All components healthy
-
-### Warning Indicators  
-- ⚠️ **Yellow warnings**: Non-critical issues
-- **Slow responses**: Performance concerns
-- **Missing features**: Optional components unavailable
-
-### Failure Indicators
-- ❌ **Red errors**: Critical test failures
-- **Connection failures**: Infrastructure issues
-- **API errors**: Application problems
-- **Resource exhaustion**: Capacity issues
-
-### Summary Report
-```
-==================================
-📊 TEST SUMMARY
-==================================
-✅ Passed: 45
-❌ Failed: 2
-📊 Total:  47
-
-❌ Failed tests:
-   - PostgreSQL connection failed
-   - Cache retrieval performance: 1200ms average
-
-🚨 Some tests failed. Check the output above for details.
+# Specific issue debugging
+task debug:pods         # Pod issues
+task debug:network     # Network issues
+task verify            # Overall health
 ```
 
-## 🐛 Troubleshooting
+## 📊 Task Dependencies
 
-### Common Issues
+### Workflow Dependencies
+```yaml
+# Automatic dependency resolution
+quick-start:
+  deps: [setup, build, deploy]
+
+full-cycle:
+  deps: [build, deploy, test:quick]
+
+production-ready:
+  deps: [setup, build, deploy, test, verify]
+```
+
+### Parallel Execution
+```bash
+# Tasks can run in parallel when safe
+task test:infrastructure test:performance  # Parallel execution
+task build deploy                         # Sequential (deploy depends on build)
+```
+
+## 🐛 Troubleshooting with Task
+
+### Common Issues and Solutions
 
 **Cluster Not Found**
 ```bash
-# Verify cluster exists
-k3d cluster list
-
-# Create if missing
-deploy/cluster.sh up
+task cluster:info       # Check cluster status
+task setup             # Create if missing
 ```
 
 **Connection Timeouts**
 ```bash
-# Increase timeout
-deploy/tests/e2e.sh --timeout 600 all
-
-# Check cluster health
-kubectl cluster-info
+task verify            # Quick verification
+task debug:network     # Network diagnostics
 ```
 
 **Pod Not Ready**
 ```bash
-# Check pod status
-kubectl get pods -A
-
-# View pod logs
-kubectl logs -n app deployment/sematic-cache
+task debug:pods        # Pod-specific debug
+task logs              # Check application logs
+task restart           # Restart if needed
 ```
 
 **API Not Responding**
 ```bash
-# Check service status
-kubectl get svc -n app
-
-# Test port forwarding
-kubectl port-forward -n app svc/sematic-cache 8080:8080
+task health            # Quick health check
+task port-forward:api  # Direct port forwarding
+task debug             # Comprehensive debug
 ```
 
-### Debug Mode
+### Debug Tasks
 ```bash
-# Enable verbose output
-deploy/tests/e2e.sh --verbose api
-
-# Check specific component
-kubectl describe pod -n app -l app=sematic-cache
+# Progressive debugging
+task verify            # Quick overall check
+task status           # Detailed status
+task debug            # Comprehensive debug info
+task debug:pods       # Pod-specific details
+task debug:network    # Network connectivity
 ```
 
-## 🏆 Best Practices
+## 🏆 Best Practices with Task
 
-### Test Development
-- **Small, focused tests**: Single responsibility per function
-- **Clear naming**: Descriptive function and variable names
-- **Proper error handling**: Meaningful error messages
-- **Resource cleanup**: Reset state between tests
+### Task Development
+- **Descriptive names**: Use clear, hierarchical task names
+- **Proper dependencies**: Define task dependencies correctly
+- **Error handling**: Tasks fail fast with meaningful messages
+- **Documentation**: Each task has a clear description
+
+### Workflow Optimization
+```bash
+# Use task dependencies for complex workflows
+task production-ready  # Runs: setup → build → deploy → test → verify
+
+# Combine tasks for efficiency
+task test:infrastructure test:api  # Run multiple suites
+
+# Use variables for consistency
+{{.API_URL}}/health    # Consistent URL usage
+```
 
 ### CI/CD Integration
 ```yaml
 # GitHub Actions example
 - name: Run E2E Tests
   run: |
-    deploy/cluster.sh up
-    deploy/dev.sh build
-    deploy/dev.sh deploy
-    deploy/tests/e2e.sh --quick all
-    deploy/cluster.sh down
+    task setup
+    task build deploy
+    task ci:test
+    task cleanup
 ```
 
-### Performance Baselines
-- **Response time**: < 1000ms for API calls
-- **Memory usage**: < 512Mi per pod
-- **CPU usage**: < 500m per pod  
-- **Success rate**: > 95% under load
-
-## 📈 Metrics and Monitoring
+## 📈 Performance Baselines
 
 ### Key Performance Indicators
 - **API availability**: 99.9% uptime target
@@ -268,44 +327,42 @@ kubectl describe pod -n app -l app=sematic-cache
 - **Error rate**: < 1% of requests
 - **Resource efficiency**: Optimal CPU/memory usage
 
-### Observability
-- **Structured logging**: JSON format with log levels
-- **Metrics collection**: Prometheus-compatible endpoints
-- **Health checks**: Kubernetes readiness/liveness probes
-- **Distributed tracing**: Request correlation IDs
-
----
-
-## 💡 Usage Examples
-
-### Development Workflow
+### Task-based Monitoring
 ```bash
-# Quick development cycle
-deploy/cluster.sh up
-deploy/dev.sh build && deploy/dev.sh deploy
-deploy/tests/e2e.sh --quick api
-
-# Make changes, then:
-deploy/dev.sh build && deploy/dev.sh deploy
-deploy/tests/e2e.sh api
+# Regular monitoring tasks
+task health            # Quick health check
+task metrics          # Performance metrics
+task resources        # Resource usage
+task api:benchmark    # Performance benchmark
 ```
 
-### Pre-Production Validation
+## 💡 Advanced Task Usage
+
+### Custom Task Combinations
 ```bash
-# Full comprehensive testing
-deploy/tests/e2e.sh all
+# Create custom workflows
+task setup build deploy test:api verify
 
-# Focus on critical paths
-deploy/tests/e2e.sh infrastructure application api
-
-# Performance validation
-deploy/tests/e2e.sh performance monitoring
+# Environment-specific testing
+task test:infrastructure --verbose
+task test:performance --timeout 1200
 ```
 
-### Continuous Integration
+### Task Aliases and Shortcuts
 ```bash
-# Automated pipeline testing
-deploy/tests/e2e.sh --timeout 1200 --quick all
+# Common shortcuts defined in Taskfile.yaml
+task clean            # Alias for cleanup
+task dev              # Development cycle
+task ci:test         # CI-friendly testing
 ```
 
-This testing framework ensures your Semantic Cache deployment is production-ready with comprehensive validation across all components! 🚀
+### Conditional Tasks
+Tasks can include conditions and error handling:
+```yaml
+verify:
+  cmds:
+    - k3d cluster list | grep {{.CLUSTER_NAME}} && echo "✅ Cluster exists" || echo "❌ Cluster missing"
+    - curl -s --max-time 5 {{.API_URL}}/health >/dev/null && echo "✅ API responding" || echo "❌ API not responding"
+```
+
+This Task-based testing framework provides a modern, efficient way to manage your deployment workflow with clear dependencies, parallel execution, and comprehensive testing coverage! 🚀
