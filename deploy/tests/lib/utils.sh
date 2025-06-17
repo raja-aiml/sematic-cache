@@ -4,8 +4,8 @@
 # =====================================
 
 # Source configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/config.sh"
+UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$UTILS_DIR/config.sh"
 
 log() {
     echo -e "${BLUE}[$(date +'%H:%M:%S')]${NC} $1"
