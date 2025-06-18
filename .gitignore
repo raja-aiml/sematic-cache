@@ -142,4 +142,6 @@ docs/references/*
 *.secret
 !deploy/build
 !/deploy/tests/lib
+bin
+
 

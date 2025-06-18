@@ -4,6 +4,7 @@ package core
 
 import (
 	"container/list"
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -11,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/raja-aiml/sematic-cache/core/reduction"
 )
 
 // Eviction policy constants for in-memory cache
@@ -64,7 +67,17 @@ type entry struct {
 	accessCount  int   // number of times this entry was retrieved
 	lastAccessed int64 // UnixNano timestamp of last access
 	timestamp    int64 // UnixNano timestamp when stored
+	// dimension reduction
+	reducedEmb []float32 // cached reduced embedding
 	// future: contextChain, expertID, etc.
+}
+
+// reducedEmbedding returns the reduced embedding if available
+func (e *entry) reducedEmbedding() ([]float32, bool) {
+	if len(e.reducedEmb) > 0 {
+		return e.reducedEmb, true
+	}
+	return nil, false
 }
 
 // Stats returns the number of cache hits, misses, and the hit rate.
@@ -76,6 +89,71 @@ func (c *Cache) Stats() (hits, misses uint64, hitRate float64) {
 		hitRate = float64(hits) / float64(total)
 	}
 	return
+}
+
+// TrainDimensionReducer trains the dimension reducer on current cache embeddings.
+// This should be called after populating the cache with representative data.
+func (c *Cache) TrainDimensionReducer(ctx context.Context) error {
+	if c.dimensionReducer == nil {
+		return fmt.Errorf("no dimension reducer configured")
+	}
+
+	c.mu.RLock()
+	// Collect all embeddings
+	embeddings := make([][]float32, 0, len(c.entries))
+	for _, el := range c.entries {
+		ent := el.Value.(*entry)
+		if len(ent.embedding) > 0 {
+			embeddings = append(embeddings, ent.embedding)
+		}
+	}
+	c.mu.RUnlock()
+
+	if len(embeddings) == 0 {
+		return fmt.Errorf("no embeddings in cache to train on")
+	}
+
+	// Train the reducer
+	if err := c.dimensionReducer.Learn(ctx, embeddings); err != nil {
+		return fmt.Errorf("failed to train dimension reducer: %w", err)
+	}
+
+	// Update existing entries with reduced embeddings
+	c.mu.Lock()
+	for _, el := range c.entries {
+		ent := el.Value.(*entry)
+		if len(ent.embedding) > 0 {
+			if reduced, err := c.dimensionReducer.ReduceForSearch(ctx, ent.embedding); err == nil {
+				ent.reducedEmb = reduced
+			}
+		}
+	}
+	c.mu.Unlock()
+
+	return nil
+}
+
+// GetDimensionReductionMetrics returns quality metrics for dimension reduction
+func (c *Cache) GetDimensionReductionMetrics() *reduction.QualityMetrics {
+	if c.dimensionReducer == nil {
+		return nil
+	}
+	metrics := c.dimensionReducer.GetMetrics()
+	return &metrics
+}
+
+// StartABTest starts an A/B test for dimension reduction strategies
+func (c *Cache) StartABTest(config reduction.ABTestConfig, strategies []reduction.Strategy, allocation []float64) error {
+	if c.abTestManager == nil {
+		return fmt.Errorf("no A/B test manager configured")
+	}
+
+	test, err := c.abTestManager.CreateTest(config, strategies, allocation)
+	if err != nil {
+		return fmt.Errorf("failed to create A/B test: %w", err)
+	}
+
+	return c.abTestManager.StartTest(test.ID)
 }
 
 // SetBatch inserts multiple entries into the cache (no model metadata).
@@ -102,6 +180,77 @@ func (c *Cache) GetBatch(prompts []string) map[string]string {
 		}
 	}
 	return results
+}
+
+// UpdateReductionHitRates updates hit rate metrics for A/B testing
+func (c *Cache) UpdateReductionHitRates(beforeReduction, afterReduction float64) {
+	if c.dimensionReducer != nil {
+		c.dimensionReducer.UpdateHitRates(beforeReduction, afterReduction)
+	}
+}
+
+// EnsureReducedEmbeddings ensures all entries have reduced embeddings if reducer is available.
+// This is useful after adding a dimension reducer to an existing cache.
+func (c *Cache) EnsureReducedEmbeddings(ctx context.Context) error {
+	if c.dimensionReducer == nil {
+		return fmt.Errorf("no dimension reducer configured")
+	}
+
+	// Check if reducer is trained
+	if !c.dimensionReducer.GetReductionInfo().IsLearned {
+		// Auto-train if we have enough embeddings
+		c.mu.RLock()
+		count := len(c.entries)
+		c.mu.RUnlock()
+
+		if count < 10 {
+			return fmt.Errorf("not enough embeddings to train reducer (need at least 10, have %d)", count)
+		}
+
+		if err := c.TrainDimensionReducer(ctx); err != nil {
+			return fmt.Errorf("failed to auto-train reducer: %w", err)
+		}
+	}
+
+	// Update all entries that don't have reduced embeddings
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	updated := 0
+	errors := 0
+
+	for _, el := range c.entries {
+		ent := el.Value.(*entry)
+
+		// Skip if already has reduced embedding
+		if len(ent.reducedEmb) > 0 {
+			continue
+		}
+
+		// Generate reduced embedding
+		if len(ent.embedding) > 0 {
+			if reduced, err := c.dimensionReducer.ReduceForSearch(ctx, ent.embedding); err == nil {
+				ent.reducedEmb = reduced
+				updated++
+			} else {
+				errors++
+			}
+		}
+	}
+
+	if errors > 0 {
+		return fmt.Errorf("updated %d entries but encountered %d errors", updated, errors)
+	}
+
+	return nil
+}
+
+// HasDimensionReduction returns true if dimension reduction is configured and trained
+func (c *Cache) HasDimensionReduction() bool {
+	if c.dimensionReducer == nil {
+		return false
+	}
+	return c.dimensionReducer.GetReductionInfo().IsLearned
 }
 
 // nowUnix returns the current Unix timestamp in nanoseconds.
@@ -160,6 +309,12 @@ type Cache struct {
 	// metrics
 	hitCount  uint64 // number of cache hits
 	missCount uint64 // number of cache misses
+	// dimensionReducer handles dimension reduction for faster searches
+	dimensionReducer *reduction.DimensionReducer
+	// abTestManager manages A/B testing for reduction strategies
+	abTestManager *reduction.ABTestManager
+	// ensureDualEmbeddings ensures both full and reduced embeddings are always stored
+	ensureDualEmbeddings bool
 }
 
 // EmbeddingFunc converts a prompt into an embedding vector.
@@ -240,6 +395,21 @@ func WithPostProcessor(fn func(string) string) Option {
 	return func(c *Cache) { c.postProcess = fn }
 }
 
+// WithDimensionReduction enables dimension reduction for faster similarity searches.
+// The reducer should be pre-trained on sample embeddings.
+func WithDimensionReduction(reducer *reduction.DimensionReducer) Option {
+	return func(c *Cache) {
+		c.dimensionReducer = reducer
+		// Enable automatic dual embedding generation
+		c.ensureDualEmbeddings = true
+	}
+}
+
+// WithABTestManager enables A/B testing for dimension reduction strategies.
+func WithABTestManager(manager *reduction.ABTestManager) Option {
+	return func(c *Cache) { c.abTestManager = manager }
+}
+
 // WithEvaluationFunc adds a function to post-filter TopK results (after threshold and sort).
 func WithEvaluationFunc(fn func([]QueryResult) []QueryResult) Option {
 	return func(c *Cache) { c.evaluators = append(c.evaluators, fn) }
@@ -314,6 +484,23 @@ func (c *Cache) SetWithModel(prompt string, embedding []float32, answer, modelNa
 		lastAccessed: now,
 		accessCount:  1,
 	}
+
+	// Generate reduced embedding if reducer is available and trained
+	// Store both embeddings to support hybrid search
+	if c.dimensionReducer != nil {
+		// Check if reducer is trained
+		if c.dimensionReducer.GetReductionInfo().IsLearned {
+			ctx := context.Background()
+			if reduced, err := c.dimensionReducer.ReduceForSearch(ctx, embedding); err == nil {
+				ent.reducedEmb = reduced
+			}
+		} else {
+			// Mark for later reduction when reducer is trained
+			// The reduced embedding will be generated by EnsureReducedEmbeddings()
+			ent.reducedEmb = nil
+		}
+	}
+
 	c.insertEntry(ent)
 	// add to ANN index if configured
 	if c.annIndex != nil {
@@ -513,11 +700,17 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
 }
 
 // GetTopKByEmbedding returns up to k answers whose embeddings are most similar to the query.
-// It supports ANN-based search and adaptive thresholding.
+// It supports ANN-based search, dimension reduction, and adaptive thresholding.
 func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
 	if len(embed) == 0 || k <= 0 {
 		return nil
 	}
+
+	// Use dimension reduction with hybrid search if available
+	if c.dimensionReducer != nil && c.dimensionReducer.ShouldUseReduction() {
+		return c.hybridSearch(embed, k)
+	}
+
 	// Try ANN index if configured
 	if c.annIndex != nil {
 		if keys, err := c.annIndex.Search(embed, k); err == nil && len(keys) > 0 {
@@ -636,6 +829,164 @@ func (c *Cache) GetTopKByEmbedding(embed []float32, k int) []QueryResult {
 			results[i] = r
 		}
 	}
+	return results
+}
+
+// hybridSearch performs fast search with reduced dimensions then re-ranks with full dimensions
+func (c *Cache) hybridSearch(embed []float32, k int) []QueryResult {
+	ctx := context.Background()
+
+	// Get strategy from A/B test manager if available
+	var strategy reduction.Strategy
+	if c.abTestManager != nil {
+		// Use a unique request ID for consistent assignment
+		requestID := fmt.Sprintf("search_%d_%d", time.Now().UnixNano(), rand.Int31())
+		strategy = c.abTestManager.GetStrategy(ctx, requestID)
+	}
+
+	// Convert entries to search candidates
+	c.mu.RLock()
+	candidates := make([]reduction.SearchCandidate, 0, len(c.entries))
+	for key, el := range c.entries {
+		ent := el.Value.(*entry)
+		if c.isExpired(ent) || len(ent.embedding) != len(embed) {
+			continue
+		}
+
+		candidate := reduction.SearchCandidate{
+			ID:        key,
+			Embedding: ent.embedding,
+			Metadata: map[string]interface{}{
+				"answer":    ent.answer,
+				"modelName": ent.ModelName,
+				"modelID":   ent.ModelID,
+			},
+		}
+
+		// Add reduced embedding if available
+		if reducedEmb, ok := ent.reducedEmbedding(); ok {
+			candidate.ReducedEmbedding = reducedEmb
+		}
+
+		candidates = append(candidates, candidate)
+	}
+	c.mu.RUnlock()
+
+	// Perform hybrid search
+	startTime := time.Now()
+	searchResults, err := c.dimensionReducer.HybridSearch(ctx, embed, candidates, k, c.simFunc)
+	if err != nil {
+		// Fall back to regular search
+		return c.regularSearch(embed, k)
+	}
+	latencyMs := time.Since(startTime).Milliseconds()
+
+	// Convert search results to query results
+	results := make([]QueryResult, 0, len(searchResults))
+	for _, sr := range searchResults {
+		if sr.Similarity < c.minSimilarity {
+			continue
+		}
+
+		metadata := sr.Candidate.Metadata
+		result := QueryResult{
+			Prompt:     sr.Candidate.ID,
+			Answer:     metadata["answer"].(string),
+			Similarity: sr.Similarity,
+		}
+
+		if modelName, ok := metadata["modelName"].(string); ok {
+			result.ModelName = modelName
+		}
+		if modelID, ok := metadata["modelID"].(string); ok {
+			result.ModelID = modelID
+		}
+
+		results = append(results, result)
+	}
+
+	// Record metrics for A/B testing
+	if c.abTestManager != nil && strategy.ID != "" {
+		metrics := reduction.ImpressionMetrics{
+			CacheHit:        len(results) > 0,
+			LatencyMs:       latencyMs,
+			SearchLatencyMs: latencyMs,
+			SimilarityScore: 0.0,
+		}
+
+		if len(results) > 0 {
+			metrics.SimilarityScore = results[0].Similarity
+		}
+
+		c.abTestManager.RecordImpression(ctx, strategy.ID, metrics)
+	}
+
+	// Apply adaptive threshold if configured
+	if c.adaptiveThreshold != nil && len(results) > 0 {
+		sims := make([]float64, len(results))
+		for i, r := range results {
+			sims[i] = r.Similarity
+		}
+		thr := c.adaptiveThreshold(sims)
+		filtered := results[:0]
+		for _, r := range results {
+			if r.Similarity >= thr {
+				filtered = append(filtered, r)
+			}
+		}
+		results = filtered
+	}
+
+	// Apply evaluation pipeline
+	for _, eval := range c.evaluators {
+		results = eval(results)
+	}
+
+	// Apply post-processing
+	if c.postProcess != nil {
+		for i, r := range results {
+			r.Answer = c.postProcess(r.Answer)
+			results[i] = r
+		}
+	}
+
+	return results
+}
+
+// regularSearch performs the standard brute-force search
+func (c *Cache) regularSearch(embed []float32, k int) []QueryResult {
+	c.mu.RLock()
+	var results []QueryResult
+	for key, el := range c.entries {
+		ent := el.Value.(*entry)
+		if c.isExpired(ent) {
+			continue
+		}
+		if len(ent.embedding) != len(embed) {
+			continue
+		}
+		sim := c.simFunc(ent.embedding, embed)
+		if sim < c.minSimilarity {
+			continue
+		}
+		results = append(results, QueryResult{
+			Prompt:     key,
+			Answer:     ent.answer,
+			Similarity: sim,
+			ModelName:  ent.ModelName,
+			ModelID:    ent.ModelID,
+		})
+	}
+	c.mu.RUnlock()
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
+
+	if len(results) > k {
+		results = results[:k]
+	}
+
 	return results
 }
 
