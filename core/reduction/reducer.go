@@ -3,7 +3,9 @@ package reduction
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,17 +27,35 @@ type QualityMetrics struct {
 	totalQueries           int64
 	reducedDimQueries      int64
 	fullDimReranks         int64
-	avgReductionTimeMs     float64
-	avgRerankTimeMs        float64
-	hitRateBeforeReduction float64
-	hitRateAfterReduction  float64
-	accuracyScore          float64
-	varianceExplained      float64
-	memorySavedMB          float64
+	avgReductionTimeMs     uint64 // Stored as uint64 for atomic operations
+	avgRerankTimeMs        uint64 // Stored as uint64 for atomic operations
+	hitRateBeforeReduction uint64 // Stored as uint64 for atomic operations
+	hitRateAfterReduction  uint64 // Stored as uint64 for atomic operations
+	accuracyScore          uint64 // Stored as uint64 for atomic operations
+	varianceExplained      uint64 // Stored as uint64 for atomic operations
+	memorySavedMB          uint64 // Stored as uint64 for atomic operations
+}
+
+// MetricsSnapshot is a thread-safe snapshot of quality metrics
+type MetricsSnapshot struct {
+	TotalQueries           int64
+	ReducedDimQueries      int64
+	FullDimReranks         int64
+	AvgReductionTimeMs     float64
+	AvgRerankTimeMs        float64
+	HitRateBeforeReduction float64
+	HitRateAfterReduction  float64
+	AccuracyScore          float64
+	VarianceExplained      float64
+	MemorySavedMB          float64
 }
 
 // NewDimensionReducer creates a new dimension reducer with monitoring
 func NewDimensionReducer(config *Config) (*DimensionReducer, error) {
+	if config == nil {
+		return nil, fmt.Errorf("config cannot be nil")
+	}
+
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
@@ -49,11 +69,16 @@ func NewDimensionReducer(config *Config) (*DimensionReducer, error) {
 
 // Learn trains the reducer on sample embeddings with quality tracking
 func (dr *DimensionReducer) Learn(ctx context.Context, embeddings [][]float32) error {
+	if dr == nil {
+		return fmt.Errorf("DimensionReducer is nil")
+	}
+
 	dr.mu.Lock()
 	defer dr.mu.Unlock()
 
-	if len(embeddings) == 0 {
-		return fmt.Errorf("no embeddings provided")
+	// Validate embeddings
+	if err := dr.validateEmbeddings(embeddings); err != nil {
+		return fmt.Errorf("Learn: %w", err)
 	}
 
 	startTime := time.Now()
@@ -76,10 +101,28 @@ func (dr *DimensionReducer) Learn(ctx context.Context, embeddings [][]float32) e
 
 // ReduceForSearch reduces embeddings for fast initial search
 func (dr *DimensionReducer) ReduceForSearch(ctx context.Context, embedding []float32) ([]float32, error) {
+	if dr == nil {
+		return nil, fmt.Errorf("DimensionReducer is nil")
+	}
+
+	if embedding == nil {
+		return nil, fmt.Errorf("embedding cannot be nil")
+	}
+
+	if len(embedding) == 0 {
+		return nil, fmt.Errorf("embedding cannot be empty")
+	}
+
 	dr.mu.RLock()
 	if !dr.isLearned {
 		dr.mu.RUnlock()
 		return nil, fmt.Errorf("reducer not learned yet")
+	}
+
+	// Validate embedding dimension
+	if len(embedding) != dr.originalDim {
+		dr.mu.RUnlock()
+		return nil, fmt.Errorf("embedding dimension mismatch: expected %d, got %d", dr.originalDim, len(embedding))
 	}
 	dr.mu.RUnlock()
 
@@ -101,6 +144,14 @@ func (dr *DimensionReducer) HybridSearch(
 	topK int,
 	similarityFunc func(a, b []float32) float64,
 ) ([]SearchResult, error) {
+	if dr == nil {
+		return nil, fmt.Errorf("DimensionReducer is nil")
+	}
+
+	// Validate inputs
+	if err := dr.validateSearchInputs(queryEmbedding, candidates, topK, similarityFunc); err != nil {
+		return nil, fmt.Errorf("HybridSearch: %w", err)
+	}
 
 	if !dr.isLearned {
 		// Fallback to full dimension search
@@ -165,12 +216,20 @@ func (dr *DimensionReducer) searchReduced(
 	topK int,
 	similarityFunc func(a, b []float32) float64,
 ) []SearchCandidate {
+	if queryReduced == nil || len(queryReduced) == 0 {
+		return []SearchCandidate{}
+	}
 
 	scored := make([]scoredCandidate, 0, len(candidates))
 
 	for _, candidate := range candidates {
 		if len(candidate.ReducedEmbedding) == 0 {
 			continue
+		}
+
+		// Validate reduced embedding dimension
+		if len(candidate.ReducedEmbedding) != len(queryReduced) {
+			continue // Skip mismatched dimensions
 		}
 
 		sim := similarityFunc(queryReduced, candidate.ReducedEmbedding)
@@ -203,10 +262,18 @@ func (dr *DimensionReducer) rerankWithFullDims(
 	topK int,
 	similarityFunc func(a, b []float32) float64,
 ) []SearchResult {
+	if queryFull == nil || len(queryFull) == 0 {
+		return []SearchResult{}
+	}
 
 	scored := make([]scoredResult, 0, len(candidates))
 
 	for _, candidate := range candidates {
+		// Validate embedding dimension
+		if len(candidate.Embedding) != len(queryFull) {
+			continue // Skip mismatched dimensions
+		}
+
 		sim := similarityFunc(queryFull, candidate.Embedding)
 		scored = append(scored, scoredResult{
 			result: SearchResult{
@@ -241,10 +308,18 @@ func (dr *DimensionReducer) fullDimensionSearch(
 	topK int,
 	similarityFunc func(a, b []float32) float64,
 ) []SearchResult {
+	if queryFull == nil || len(queryFull) == 0 {
+		return []SearchResult{}
+	}
 
 	scored := make([]scoredResult, 0, len(candidates))
 
 	for _, candidate := range candidates {
+		// Validate embedding dimension
+		if len(candidate.Embedding) != len(queryFull) {
+			continue // Skip mismatched dimensions
+		}
+
 		sim := similarityFunc(queryFull, candidate.Embedding)
 		scored = append(scored, scoredResult{
 			result: SearchResult{
@@ -273,27 +348,31 @@ func (dr *DimensionReducer) fullDimensionSearch(
 }
 
 // GetMetrics returns current quality metrics
-func (dr *DimensionReducer) GetMetrics() QualityMetrics {
-	dr.metrics.mu.RLock()
-	defer dr.metrics.mu.RUnlock()
-
-	// Create a copy without the mutex
-	return QualityMetrics{
-		totalQueries:           dr.metrics.totalQueries,
-		reducedDimQueries:      dr.metrics.reducedDimQueries,
-		fullDimReranks:         dr.metrics.fullDimReranks,
-		avgReductionTimeMs:     dr.metrics.avgReductionTimeMs,
-		avgRerankTimeMs:        dr.metrics.avgRerankTimeMs,
-		hitRateBeforeReduction: dr.metrics.hitRateBeforeReduction,
-		hitRateAfterReduction:  dr.metrics.hitRateAfterReduction,
-		accuracyScore:          dr.metrics.accuracyScore,
-		varianceExplained:      dr.metrics.varianceExplained,
-		memorySavedMB:          dr.metrics.memorySavedMB,
+func (dr *DimensionReducer) GetMetrics() MetricsSnapshot {
+	if dr == nil || dr.metrics == nil {
+		return MetricsSnapshot{}
+	}
+	// Read all atomic values
+	return MetricsSnapshot{
+		TotalQueries:           atomic.LoadInt64(&dr.metrics.totalQueries),
+		ReducedDimQueries:      atomic.LoadInt64(&dr.metrics.reducedDimQueries),
+		FullDimReranks:         atomic.LoadInt64(&dr.metrics.fullDimReranks),
+		AvgReductionTimeMs:     math.Float64frombits(atomic.LoadUint64(&dr.metrics.avgReductionTimeMs)),
+		AvgRerankTimeMs:        math.Float64frombits(atomic.LoadUint64(&dr.metrics.avgRerankTimeMs)),
+		HitRateBeforeReduction: math.Float64frombits(atomic.LoadUint64(&dr.metrics.hitRateBeforeReduction)),
+		HitRateAfterReduction:  math.Float64frombits(atomic.LoadUint64(&dr.metrics.hitRateAfterReduction)),
+		AccuracyScore:          math.Float64frombits(atomic.LoadUint64(&dr.metrics.accuracyScore)),
+		VarianceExplained:      math.Float64frombits(atomic.LoadUint64(&dr.metrics.varianceExplained)),
+		MemorySavedMB:          math.Float64frombits(atomic.LoadUint64(&dr.metrics.memorySavedMB)),
 	}
 }
 
 // GetReductionInfo returns dimension reduction information
 func (dr *DimensionReducer) GetReductionInfo() ReductionInfo {
+	if dr == nil {
+		return ReductionInfo{}
+	}
+
 	dr.mu.RLock()
 	defer dr.mu.RUnlock()
 
@@ -317,40 +396,48 @@ type ReductionInfo struct {
 
 // Helper functions for metrics updates
 func (dr *DimensionReducer) updateLearnMetrics(embeddings [][]float32, duration time.Duration) {
-	dr.metrics.mu.Lock()
-	defer dr.metrics.mu.Unlock()
-
 	totalVariance := dr.calculateTotalVariance()
-	dr.metrics.varianceExplained = totalVariance
+	atomic.StoreUint64(&dr.metrics.varianceExplained, math.Float64bits(totalVariance))
 
 	// Calculate memory saved
 	originalSize := len(embeddings) * dr.originalDim * 4 // float32 = 4 bytes
 	reducedSize := len(embeddings) * dr.reducedDim * 4
-	dr.metrics.memorySavedMB = float64(originalSize-reducedSize) / (1024 * 1024)
+	memorySaved := float64(originalSize-reducedSize) / (1024 * 1024)
+	atomic.StoreUint64(&dr.metrics.memorySavedMB, math.Float64bits(memorySaved))
 }
 
 func (dr *DimensionReducer) updateReductionMetrics(duration time.Duration) {
-	dr.metrics.mu.Lock()
-	defer dr.metrics.mu.Unlock()
+	// Increment queries atomically
+	newCount := atomic.AddInt64(&dr.metrics.reducedDimQueries, 1)
 
-	dr.metrics.reducedDimQueries++
-
-	// Update rolling average
-	n := float64(dr.metrics.reducedDimQueries)
-	dr.metrics.avgReductionTimeMs = (dr.metrics.avgReductionTimeMs*(n-1) + float64(duration.Milliseconds())) / n
+	// Update rolling average atomically
+	for {
+		oldAvg := atomic.LoadUint64(&dr.metrics.avgReductionTimeMs)
+		oldAvgFloat := math.Float64frombits(oldAvg)
+		newAvgFloat := (oldAvgFloat*float64(newCount-1) + float64(duration.Milliseconds())) / float64(newCount)
+		newAvg := math.Float64bits(newAvgFloat)
+		if atomic.CompareAndSwapUint64(&dr.metrics.avgReductionTimeMs, oldAvg, newAvg) {
+			break
+		}
+	}
 }
 
 func (dr *DimensionReducer) updateSearchMetrics(phase1Time, phase2Time time.Duration, phase1Count, finalCount int) {
-	dr.metrics.mu.Lock()
-	defer dr.metrics.mu.Unlock()
+	// Increment counters atomically
+	atomic.AddInt64(&dr.metrics.totalQueries, 1)
+	newReranks := atomic.AddInt64(&dr.metrics.fullDimReranks, int64(finalCount))
 
-	dr.metrics.totalQueries++
-	dr.metrics.fullDimReranks += int64(finalCount)
-
-	// Update rolling average for rerank time
-	n := float64(dr.metrics.fullDimReranks)
-	if n > 0 {
-		dr.metrics.avgRerankTimeMs = (dr.metrics.avgRerankTimeMs*(n-1) + float64(phase2Time.Milliseconds())) / n
+	// Update rolling average for rerank time atomically
+	if newReranks > 0 {
+		for {
+			oldAvg := atomic.LoadUint64(&dr.metrics.avgRerankTimeMs)
+			oldAvgFloat := math.Float64frombits(oldAvg)
+			newAvgFloat := (oldAvgFloat*float64(newReranks-int64(finalCount)) + float64(phase2Time.Milliseconds())) / float64(newReranks)
+			newAvg := math.Float64bits(newAvgFloat)
+			if atomic.CompareAndSwapUint64(&dr.metrics.avgRerankTimeMs, oldAvg, newAvg) {
+				break
+			}
+		}
 	}
 }
 
@@ -368,12 +455,28 @@ func (dr *DimensionReducer) calculateTotalVariance() float64 {
 
 // UpdateHitRates updates cache hit rate metrics for A/B testing
 func (dr *DimensionReducer) UpdateHitRates(beforeReduction, afterReduction float64) {
-	dr.metrics.mu.Lock()
-	defer dr.metrics.mu.Unlock()
+	if dr == nil || dr.metrics == nil {
+		return
+	}
 
-	dr.metrics.hitRateBeforeReduction = beforeReduction
-	dr.metrics.hitRateAfterReduction = afterReduction
-	dr.metrics.accuracyScore = afterReduction / beforeReduction
+	// Validate input rates
+	if beforeReduction < 0 || beforeReduction > 1 {
+		return // Invalid hit rate
+	}
+	if afterReduction < 0 || afterReduction > 1 {
+		return // Invalid hit rate
+	}
+
+	// Update hit rates atomically
+	atomic.StoreUint64(&dr.metrics.hitRateBeforeReduction, math.Float64bits(beforeReduction))
+	atomic.StoreUint64(&dr.metrics.hitRateAfterReduction, math.Float64bits(afterReduction))
+	
+	// Calculate and store accuracy score
+	accuracy := 0.0
+	if beforeReduction > 0 {
+		accuracy = afterReduction / beforeReduction
+	}
+	atomic.StoreUint64(&dr.metrics.accuracyScore, math.Float64bits(accuracy))
 }
 
 // Helper sorting functions
@@ -400,6 +503,14 @@ func sortResultsBySimilarity(results []scoredResult) {
 
 // ReduceBatch reduces multiple embeddings efficiently
 func (dr *DimensionReducer) ReduceBatch(ctx context.Context, embeddings [][]float32) ([][]float32, error) {
+	if dr == nil {
+		return nil, fmt.Errorf("DimensionReducer is nil")
+	}
+
+	if err := dr.validateEmbeddings(embeddings); err != nil {
+		return nil, fmt.Errorf("ReduceBatch: %w", err)
+	}
+
 	dr.mu.RLock()
 	if !dr.isLearned {
 		dr.mu.RUnlock()
@@ -412,8 +523,12 @@ func (dr *DimensionReducer) ReduceBatch(ctx context.Context, embeddings [][]floa
 
 // ShouldUseReduction determines if reduction should be used based on metrics
 func (dr *DimensionReducer) ShouldUseReduction() bool {
-	metrics := dr.GetMetrics()
+	if dr == nil || dr.metrics == nil {
+		return false
+	}
+
 	info := dr.GetReductionInfo()
+	accuracyScore := math.Float64frombits(atomic.LoadUint64(&dr.metrics.accuracyScore))
 
 	// Use reduction if:
 	// 1. Reducer is learned
@@ -422,12 +537,16 @@ func (dr *DimensionReducer) ShouldUseReduction() bool {
 	// 4. Significant compression ratio (< 0.5)
 	return info.IsLearned &&
 		info.VarianceExplained >= 0.95 &&
-		(metrics.accuracyScore >= 0.9 || metrics.accuracyScore == 0) &&
+		(accuracyScore >= 0.9 || accuracyScore == 0) &&
 		info.CompressionRatio <= 0.5
 }
 
 // EstimateSearchSpeedup estimates the speedup from dimension reduction
 func (dr *DimensionReducer) EstimateSearchSpeedup() float64 {
+	if dr == nil {
+		return 1.0
+	}
+
 	info := dr.GetReductionInfo()
 	if !info.IsLearned || info.CompressionRatio == 0 {
 		return 1.0
@@ -439,4 +558,78 @@ func (dr *DimensionReducer) EstimateSearchSpeedup() float64 {
 	rerankOverhead := 0.3
 
 	return baseSpeedup*(1-rerankOverhead) + rerankOverhead
+}
+
+// validateEmbeddings validates embeddings slice
+func (dr *DimensionReducer) validateEmbeddings(embeddings [][]float32) error {
+	if embeddings == nil {
+		return fmt.Errorf("embeddings cannot be nil")
+	}
+
+	if len(embeddings) == 0 {
+		return fmt.Errorf("no embeddings provided")
+	}
+
+	// Check first embedding
+	if embeddings[0] == nil || len(embeddings[0]) == 0 {
+		return fmt.Errorf("first embedding is empty")
+	}
+
+	dim := len(embeddings[0])
+
+	// Validate all embeddings have same dimension
+	for i, emb := range embeddings {
+		if emb == nil {
+			return fmt.Errorf("embedding %d is nil", i)
+		}
+		if len(emb) != dim {
+			return fmt.Errorf("inconsistent dimensions: embedding %d has %d dimensions, expected %d", i, len(emb), dim)
+		}
+
+		// Check for invalid values
+		for j, val := range emb {
+			if math.IsNaN(float64(val)) || math.IsInf(float64(val), 0) {
+				return fmt.Errorf("embedding %d contains invalid value at index %d: %v", i, j, val)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateSearchInputs validates inputs for search operations
+func (dr *DimensionReducer) validateSearchInputs(
+	queryEmbedding []float32,
+	candidates []SearchCandidate,
+	topK int,
+	similarityFunc func(a, b []float32) float64,
+) error {
+	if queryEmbedding == nil {
+		return fmt.Errorf("query embedding cannot be nil")
+	}
+
+	if len(queryEmbedding) == 0 {
+		return fmt.Errorf("query embedding cannot be empty")
+	}
+
+	// Check for invalid values in query
+	for i, val := range queryEmbedding {
+		if math.IsNaN(float64(val)) || math.IsInf(float64(val), 0) {
+			return fmt.Errorf("query embedding contains invalid value at index %d: %v", i, val)
+		}
+	}
+
+	if candidates == nil {
+		return fmt.Errorf("candidates cannot be nil")
+	}
+
+	if topK <= 0 {
+		return fmt.Errorf("topK must be positive, got %d", topK)
+	}
+
+	if similarityFunc == nil {
+		return fmt.Errorf("similarity function cannot be nil")
+	}
+
+	return nil
 }

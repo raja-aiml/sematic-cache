@@ -60,12 +60,12 @@ type TestResults struct {
 	CacheMisses     int64
 	TotalLatencyMs  int64
 	SearchLatencyMs int64
-	MemoryUsedMB    float64
+	MemoryUsedMB    uint64 // Stored as uint64 for atomic operations (convert from/to float64)
 	Errors          int64
 
-	// Quality metrics
-	AvgSimilarityScore   float64
-	SimilarityScoreSum   float64
+	// Quality metrics - stored as atomic uint64, converted from/to float64
+	AvgSimilarityScore   uint64 // Use math.Float64bits/Float64frombits for conversion
+	SimilarityScoreSum   uint64 // Use math.Float64bits/Float64frombits for conversion
 	SimilarityScoreCount int64
 
 	// User satisfaction metrics
@@ -227,12 +227,21 @@ func (m *ABTestManager) RecordImpression(ctx context.Context, strategyID string,
 		atomic.AddInt64(&results.SuccessfulQueries, 1)
 	}
 
-	// Update similarity score (needs lock for float operations)
-	test.mu.Lock()
-	results.SimilarityScoreSum += metrics.SimilarityScore
-	results.SimilarityScoreCount++
-	results.AvgSimilarityScore = results.SimilarityScoreSum / float64(results.SimilarityScoreCount)
-	test.mu.Unlock()
+	// Update similarity score atomically
+	for {
+		oldSum := atomic.LoadUint64(&results.SimilarityScoreSum)
+		oldSumFloat := math.Float64frombits(oldSum)
+		newSumFloat := oldSumFloat + metrics.SimilarityScore
+		newSum := math.Float64bits(newSumFloat)
+		if atomic.CompareAndSwapUint64(&results.SimilarityScoreSum, oldSum, newSum) {
+			// Successfully updated sum, now update count
+			newCount := atomic.AddInt64(&results.SimilarityScoreCount, 1)
+			// Update average
+			avg := newSumFloat / float64(newCount)
+			atomic.StoreUint64(&results.AvgSimilarityScore, math.Float64bits(avg))
+			break
+		}
+	}
 }
 
 // ImpressionMetrics contains metrics for a single impression
@@ -331,7 +340,7 @@ func (m *ABTestManager) calculateTestSummary(test *ABTest) *TestSummary {
 			HitRate:            float64(hits) / float64(hits+misses),
 			AvgLatencyMs:       float64(totalLatency) / float64(impressions),
 			AvgSearchLatencyMs: float64(searchLatency) / float64(impressions),
-			AvgSimilarityScore: results.AvgSimilarityScore,
+			AvgSimilarityScore: math.Float64frombits(atomic.LoadUint64(&results.AvgSimilarityScore)),
 			ErrorRate:          float64(errors) / float64(impressions),
 		}
 
@@ -470,6 +479,16 @@ func hashString(s string) uint32 {
 func normalCDF(x float64) float64 {
 	// Approximation of normal CDF
 	return 0.5 * (1 + math.Erf(x/math.Sqrt(2)))
+}
+
+// SetMemoryUsedMB atomically sets the memory usage
+func (r *TestResults) SetMemoryUsedMB(mb float64) {
+	atomic.StoreUint64(&r.MemoryUsedMB, math.Float64bits(mb))
+}
+
+// GetMemoryUsedMB atomically gets the memory usage
+func (r *TestResults) GetMemoryUsedMB() float64 {
+	return math.Float64frombits(atomic.LoadUint64(&r.MemoryUsedMB))
 }
 
 // MonitoringDashboard provides real-time test monitoring

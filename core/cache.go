@@ -134,7 +134,7 @@ func (c *Cache) TrainDimensionReducer(ctx context.Context) error {
 }
 
 // GetDimensionReductionMetrics returns quality metrics for dimension reduction
-func (c *Cache) GetDimensionReductionMetrics() *reduction.QualityMetrics {
+func (c *Cache) GetDimensionReductionMetrics() *reduction.MetricsSnapshot {
 	if c.dimensionReducer == nil {
 		return nil
 	}

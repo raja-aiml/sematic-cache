@@ -169,14 +169,14 @@ func TestDimensionReducer_Metrics(t *testing.T) {
 
 	metrics := reducer.GetMetrics()
 
-	if metrics.reducedDimQueries != 10 {
-		t.Errorf("reducedDimQueries = %d, want 10", metrics.reducedDimQueries)
+	if metrics.ReducedDimQueries != 10 {
+		t.Errorf("ReducedDimQueries = %d, want 10", metrics.ReducedDimQueries)
 	}
 
 	// Skip timing check as operations might be too fast to measure
 	// Just ensure it's non-negative
-	if metrics.avgReductionTimeMs < 0 {
-		t.Error("avgReductionTimeMs should be non-negative")
+	if metrics.AvgReductionTimeMs < 0 {
+		t.Error("AvgReductionTimeMs should be non-negative")
 	}
 }
 
