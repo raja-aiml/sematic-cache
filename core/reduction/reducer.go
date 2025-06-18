@@ -239,7 +239,13 @@ func (dr *DimensionReducer) searchReduced(
 		})
 	}
 
-	// Sort by similarity descending
+	// Use heap-based selection for better performance
+	if len(scored) > topK*2 { // Only use heap for larger datasets
+		selector := NewTopKSelector(topK)
+		return selector.SelectTopK(scored)
+	}
+
+	// For small datasets, sorting is fine
 	sortBySimilarity(scored)
 
 	// Return top candidates
@@ -285,7 +291,13 @@ func (dr *DimensionReducer) rerankWithFullDims(
 		})
 	}
 
-	// Sort by similarity descending
+	// Use heap-based selection for better performance
+	if len(scored) > topK*2 { // Only use heap for larger datasets
+		selector := NewTopKSelector(topK)
+		return selector.SelectTopKResults(scored)
+	}
+
+	// For small datasets, sorting is fine
 	sortResultsBySimilarity(scored)
 
 	// Return top K
