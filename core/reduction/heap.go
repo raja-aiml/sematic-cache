@@ -73,24 +73,6 @@ func (h *MinHeap) GetTopK() []HeapItem {
 	return result
 }
 
-// heapifyMax maintains max-heap property for sorting
-func heapifyMax(arr []HeapItem, n, i int) {
-	largest := i
-	left := 2*i + 1
-	right := 2*i + 2
-	
-	if left < n && arr[left].Similarity > arr[largest].Similarity {
-		largest = left
-	}
-	if right < n && arr[right].Similarity > arr[largest].Similarity {
-		largest = right
-	}
-	if largest != i {
-		arr[i], arr[largest] = arr[largest], arr[i]
-		heapifyMax(arr, n, largest)
-	}
-}
-
 // TopKSelector provides efficient top-K selection using a min-heap
 type TopKSelector struct {
 	k int

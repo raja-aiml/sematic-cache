@@ -402,7 +402,7 @@ func (dr *OptimizedDimensionReducer) GetReductionInfo() ReductionInfo {
 }
 
 // Helper methods (reuse from original)
-func (dr *OptimizedDimensionReducer) updateLearnMetrics(embeddings [][]float32, duration time.Duration) {
+func (dr *OptimizedDimensionReducer) updateLearnMetrics(embeddings [][]float32, _ time.Duration) {
 	dr.metrics.mu.Lock()
 	defer dr.metrics.mu.Unlock()
 
@@ -429,7 +429,7 @@ func (dr *OptimizedDimensionReducer) updateReductionMetrics(duration time.Durati
 	setFloat64Atomic(&dr.metrics.avgReductionTimeMs, newAvg)
 }
 
-func (dr *OptimizedDimensionReducer) updateSearchMetrics(phase1Time, phase2Time time.Duration, phase1Count, finalCount int) {
+func (dr *OptimizedDimensionReducer) updateSearchMetrics(_ time.Duration, phase2Time time.Duration, _, finalCount int) {
 	dr.metrics.mu.Lock()
 	defer dr.metrics.mu.Unlock()
 

@@ -2,7 +2,6 @@ package reduction
 
 import (
 	"context"
-	"math"
 	"testing"
 )
 
@@ -372,15 +371,3 @@ func TestPCAReducer_ThreadSafety(t *testing.T) {
 	}
 }
 
-// Helper function to check if float slices are approximately equal
-func approxEqual(a, b []float32, tolerance float64) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if math.Abs(float64(a[i]-b[i])) > tolerance {
-			return false
-		}
-	}
-	return true
-}

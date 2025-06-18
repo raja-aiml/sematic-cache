@@ -388,12 +388,17 @@ func (dr *DimensionReducer) GetReductionInfo() ReductionInfo {
 	dr.mu.RLock()
 	defer dr.mu.RUnlock()
 
+	compressionRatio := 0.0
+	if dr.originalDim > 0 {
+		compressionRatio = float64(dr.reducedDim) / float64(dr.originalDim)
+	}
+
 	return ReductionInfo{
 		OriginalDim:       dr.originalDim,
 		ReducedDim:        dr.reducedDim,
 		VarianceExplained: dr.calculateTotalVariance(),
 		IsLearned:         dr.isLearned,
-		CompressionRatio:  float64(dr.reducedDim) / float64(dr.originalDim),
+		CompressionRatio:  compressionRatio,
 	}
 }
 
@@ -407,7 +412,7 @@ type ReductionInfo struct {
 }
 
 // Helper functions for metrics updates
-func (dr *DimensionReducer) updateLearnMetrics(embeddings [][]float32, duration time.Duration) {
+func (dr *DimensionReducer) updateLearnMetrics(embeddings [][]float32, _ time.Duration) {
 	totalVariance := dr.calculateTotalVariance()
 	atomic.StoreUint64(&dr.metrics.varianceExplained, math.Float64bits(totalVariance))
 
@@ -434,7 +439,7 @@ func (dr *DimensionReducer) updateReductionMetrics(duration time.Duration) {
 	}
 }
 
-func (dr *DimensionReducer) updateSearchMetrics(phase1Time, phase2Time time.Duration, phase1Count, finalCount int) {
+func (dr *DimensionReducer) updateSearchMetrics(_ time.Duration, phase2Time time.Duration, _, finalCount int) {
 	// Increment counters atomically
 	atomic.AddInt64(&dr.metrics.totalQueries, 1)
 	newReranks := atomic.AddInt64(&dr.metrics.fullDimReranks, int64(finalCount))

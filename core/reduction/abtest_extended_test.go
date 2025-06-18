@@ -129,8 +129,8 @@ func TestCheckTestCompletion(t *testing.T) {
 		}
 	}
 	
-	// Wait for minimum duration
-	time.Sleep(10 * time.Millisecond)
+	// Wait for minimum duration (0.0001 hours = 0.36 seconds)
+	time.Sleep(400 * time.Millisecond)
 	
 	// Test 3: Check after sufficient impressions and duration
 	complete, summary = manager.CheckTestCompletion(test.ID)
@@ -547,7 +547,7 @@ func TestCreateTestValidation(t *testing.T) {
 			strategies: []Strategy{{ID: "s1", Name: "S1", TargetDim: 50}},
 			allocation: []float64{1.0},
 			wantError:  true,
-			errorMsg:   "need at least 2 strategies",
+			errorMsg:   "need at least 2 strategies for A/B test",
 		},
 		{
 			name: "allocation mismatch",
@@ -567,7 +567,7 @@ func TestCreateTestValidation(t *testing.T) {
 			},
 			allocation: []float64{0.3, 0.3}, // Sums to 0.6
 			wantError:  true,
-			errorMsg:   "allocation must sum to 1.0",
+			errorMsg:   "allocation must sum to 1.0, got 0.600",
 		},
 		{
 			name: "valid configuration",
