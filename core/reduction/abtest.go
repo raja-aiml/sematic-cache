@@ -47,7 +47,7 @@ type Strategy struct {
 	ID        string
 	Name      string
 	TargetDim int
-	Algorithm string // "pca", "autoencoder", "none"
+	Algorithm string // "pca", "pca_gonum", "incremental_pca", "none" 
 	UseHybrid bool
 	Config    map[string]interface{}
 }

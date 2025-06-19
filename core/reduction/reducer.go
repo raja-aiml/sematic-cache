@@ -12,13 +12,14 @@ import (
 // DimensionReducer manages dimension reduction with quality monitoring
 type DimensionReducer struct {
 	mu            sync.RWMutex
-	pca           *PCAReducer
-	config        *Config
+	reducer       Reducer
+	config        ReducerConfig
 	metrics       *QualityMetrics
 	originalDim   int
 	reducedDim    int
 	varianceRatio []float64
 	isLearned     bool
+	modelLocker   *ModelLocker
 }
 
 // QualityMetrics tracks reduction quality and performance
@@ -51,6 +52,7 @@ type MetricsSnapshot struct {
 }
 
 // NewDimensionReducer creates a new dimension reducer with monitoring
+// Deprecated: Use NewDimensionReducerWithFactory instead
 func NewDimensionReducer(config *Config) (*DimensionReducer, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config cannot be nil")
@@ -60,10 +62,33 @@ func NewDimensionReducer(config *Config) (*DimensionReducer, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
+	// Convert Config to ReducerConfig
+	// Use TargetDim if TargetDimensions is not set (for backward compatibility)
+	targetDim := config.TargetDimensions
+	if targetDim == 0 {
+		targetDim = config.TargetDim
+	}
+	varianceRetained := config.MinVarianceRetained
+	if varianceRetained == 0 {
+		varianceRetained = config.VarianceThreshold
+	}
+	
+	reducerConfig := ReducerConfig{
+		OutputDimensions: targetDim,
+		VarianceRetained: varianceRetained,
+	}
+
+	// Create PCA with Config type
+	pcaConfig := &Config{
+		TargetDim:         reducerConfig.OutputDimensions,
+		VarianceThreshold: reducerConfig.VarianceRetained,
+	}
+
 	return &DimensionReducer{
-		config:  config,
-		metrics: &QualityMetrics{},
-		pca:     NewPCAReducer(config),
+		config:      reducerConfig,
+		metrics:     &QualityMetrics{},
+		reducer:     NewPCAReducer(pcaConfig),
+		modelLocker: NewModelLocker(),
 	}, nil
 }
 
@@ -83,14 +108,14 @@ func (dr *DimensionReducer) Learn(ctx context.Context, embeddings [][]float32) e
 
 	startTime := time.Now()
 
-	// Train PCA
-	if err := dr.pca.Fit(ctx, embeddings); err != nil {
-		return fmt.Errorf("failed to fit PCA: %w", err)
+	// Train reducer
+	if err := dr.reducer.Fit(ctx, embeddings); err != nil {
+		return fmt.Errorf("failed to fit reducer: %w", err)
 	}
 
-	dr.originalDim = dr.pca.OriginalDim()
-	dr.reducedDim = dr.pca.ReducedDim()
-	dr.varianceRatio = dr.pca.ExplainedVarianceRatio()
+	dr.originalDim = dr.reducer.OriginalDim()
+	dr.reducedDim = dr.reducer.ReducedDim()
+	dr.varianceRatio = dr.reducer.ExplainedVarianceRatio()
 	dr.isLearned = true
 
 	// Calculate quality metrics
@@ -127,7 +152,7 @@ func (dr *DimensionReducer) ReduceForSearch(ctx context.Context, embedding []flo
 	dr.mu.RUnlock()
 
 	startTime := time.Now()
-	reduced, err := dr.pca.Transform(ctx, [][]float32{embedding})
+	reduced, err := dr.reducer.Transform(ctx, [][]float32{embedding})
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +560,7 @@ func (dr *DimensionReducer) ReduceBatch(ctx context.Context, embeddings [][]floa
 	}
 	dr.mu.RUnlock()
 
-	return dr.pca.Transform(ctx, embeddings)
+	return dr.reducer.Transform(ctx, embeddings)
 }
 
 // ShouldUseReduction determines if reduction should be used based on metrics

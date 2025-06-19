@@ -12,8 +12,8 @@ import (
 // OptimizedDimensionReducer manages dimension reduction with performance optimizations
 type OptimizedDimensionReducer struct {
 	mu              sync.RWMutex
-	pca             *PCAGonumReducer  // Use Gonum-optimized PCA
-	config          *Config
+	reducer         Reducer            // Use generic Reducer interface
+	config          ReducerConfig
 	metrics         *QualityMetrics
 	originalDim     int
 	reducedDim      int
@@ -24,16 +24,67 @@ type OptimizedDimensionReducer struct {
 }
 
 // NewOptimizedDimensionReducer creates a new optimized dimension reducer
+// Deprecated: Use NewOptimizedDimensionReducerWithFactory instead
 func NewOptimizedDimensionReducer(config *Config) (*OptimizedDimensionReducer, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
+	// Convert Config to ReducerConfig
+	// Use TargetDim if TargetDimensions is not set (for backward compatibility)
+	targetDim := config.TargetDimensions
+	if targetDim == 0 {
+		targetDim = config.TargetDim
+	}
+	varianceRetained := config.MinVarianceRetained
+	if varianceRetained == 0 {
+		varianceRetained = config.VarianceThreshold
+	}
+	
+	reducerConfig := ReducerConfig{
+		OutputDimensions: targetDim,
+		VarianceRetained: varianceRetained,
+	}
+
+	// Create PCA with Config type
+	pcaConfig := &Config{
+		TargetDim:         reducerConfig.OutputDimensions,
+		VarianceThreshold: reducerConfig.VarianceRetained,
+	}
+
 	return &OptimizedDimensionReducer{
-		config:        config,
+		config:        reducerConfig,
 		metrics:       &QualityMetrics{},
-		pca:          NewPCAGonumReducer(config),
-		topKSelector: NewTopKSelector(10), // Default top-K size
+		reducer:       NewPCAGonumReducer(pcaConfig),
+		topKSelector:  NewTopKSelector(10), // Default top-K size
+		useObjectPool: true,
+	}, nil
+}
+
+// NewOptimizedDimensionReducerWithFactory creates an optimized reducer using the factory pattern
+func NewOptimizedDimensionReducerWithFactory(config DimensionReducerConfig) (*OptimizedDimensionReducer, error) {
+	factory := NewReducerFactory()
+	
+	// Create the appropriate reducer based on configuration
+	var reducer Reducer
+	var err error
+	
+	// For optimized reducer, prefer Gonum implementations when available
+	if config.Type == PCAReducerType {
+		reducer, err = factory.CreateReducer(PCAGonumReducerType, config.ReducerConfig)
+	} else {
+		reducer, err = factory.CreateReducer(config.Type, config.ReducerConfig)
+	}
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reducer: %w", err)
+	}
+	
+	return &OptimizedDimensionReducer{
+		config:        config.ReducerConfig,
+		metrics:       &QualityMetrics{},
+		reducer:       reducer,
+		topKSelector:  NewTopKSelector(10), // Default top-K size
 		useObjectPool: true,
 	}, nil
 }
@@ -63,14 +114,14 @@ func (dr *OptimizedDimensionReducer) Learn(ctx context.Context, embeddings [][]f
 
 	startTime := time.Now()
 
-	// Train PCA with Gonum optimization
-	if err := dr.pca.Fit(ctx, embeddings); err != nil {
-		return fmt.Errorf("failed to fit PCA: %w", err)
+	// Train reducer with optimization
+	if err := dr.reducer.Fit(ctx, embeddings); err != nil {
+		return fmt.Errorf("failed to fit reducer: %w", err)
 	}
 
-	dr.originalDim = dr.pca.OriginalDim()
-	dr.reducedDim = dr.pca.ReducedDim()
-	dr.varianceRatio = dr.pca.ExplainedVarianceRatio()
+	dr.originalDim = dr.reducer.OriginalDim()
+	dr.reducedDim = dr.reducer.ReducedDim()
+	dr.varianceRatio = dr.reducer.ExplainedVarianceRatio()
 	dr.isLearned = true
 
 	// Calculate quality metrics
@@ -97,7 +148,7 @@ func (dr *OptimizedDimensionReducer) ReduceForSearch(ctx context.Context, embedd
 		defer PutEmbedding(reduced)
 	}
 	
-	reducedBatch, err := dr.pca.Transform(ctx, [][]float32{embedding})
+	reducedBatch, err := dr.reducer.Transform(ctx, [][]float32{embedding})
 	if err != nil {
 		return nil, err
 	}
@@ -455,6 +506,18 @@ func (dr *OptimizedDimensionReducer) calculateTotalVariance() float64 {
 		total += v
 	}
 	return total
+}
+
+// ReduceBatch reduces multiple embeddings efficiently
+func (dr *OptimizedDimensionReducer) ReduceBatch(ctx context.Context, embeddings [][]float32) ([][]float32, error) {
+	dr.mu.RLock()
+	if !dr.isLearned {
+		dr.mu.RUnlock()
+		return nil, fmt.Errorf("reducer not learned yet")
+	}
+	dr.mu.RUnlock()
+
+	return dr.reducer.Transform(ctx, embeddings)
 }
 
 // Helper functions for atomic float64 operations

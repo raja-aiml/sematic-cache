@@ -23,16 +23,18 @@ func main() {
 		return client.Embedding(context.Background(), text)
 	}
 
-	// Step 1: Create dimension reduction configuration
-	reductionConfig := &reduction.Config{
-		TargetDim:         384,  // Reduce from 1536 to 384 dimensions
-		VarianceThreshold: 0.95, // Retain 95% variance
-		Standardize:       true,
-		RandomSeed:        42,
+	// Step 1: Create dimension reduction configuration using factory pattern
+	reductionConfig := reduction.DimensionReducerConfig{
+		ReducerConfig: reduction.ReducerConfig{
+			OutputDimensions: 384,  // Reduce from 1536 to 384 dimensions
+			VarianceRetained: 0.95, // Retain 95% variance
+		},
+		Type:               reduction.PCAReducerType,  // Use PCA algorithm
+		EnableOptimization: true,                      // Use optimized Gonum implementation
 	}
 
-	// Create dimension reducer
-	reducer, err := reduction.NewDimensionReducer(reductionConfig)
+	// Create dimension reducer using factory
+	reducer, err := reduction.NewDimensionReducerWithFactory(reductionConfig)
 	if err != nil {
 		log.Fatalf("Failed to create dimension reducer: %v", err)
 	}
@@ -55,14 +57,21 @@ func main() {
 			ID:        "pca_384",
 			Name:      "PCA 384 Dimensions",
 			TargetDim: 384,
-			Algorithm: "pca",
+			Algorithm: string(reduction.PCAReducerType),
 			UseHybrid: true,
 		},
 		{
-			ID:        "pca_256",
-			Name:      "PCA 256 Dimensions",
+			ID:        "pca_gonum_256",
+			Name:      "PCA Gonum 256 Dimensions",
 			TargetDim: 256,
-			Algorithm: "pca",
+			Algorithm: string(reduction.PCAGonumReducerType),
+			UseHybrid: true,
+		},
+		{
+			ID:        "incremental_pca_384",
+			Name:      "Incremental PCA 384 Dimensions",
+			TargetDim: 384,
+			Algorithm: string(reduction.IncrementalPCAReducerType),
 			UseHybrid: true,
 		},
 	}

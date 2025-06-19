@@ -21,14 +21,17 @@ func main() {
 		return client.Embedding(context.Background(), text)
 	}
 
-	// Step 1: Create dimension reducer
-	reductionConfig := &reduction.Config{
-		TargetDim:         384,  // 75% reduction
-		VarianceThreshold: 0.95, // Retain 95% variance
-		Standardize:       true,
+	// Step 1: Create dimension reducer using factory pattern
+	reductionConfig := reduction.DimensionReducerConfig{
+		ReducerConfig: reduction.ReducerConfig{
+			OutputDimensions: 384,  // 75% reduction  
+			VarianceRetained: 0.95, // Retain 95% variance
+		},
+		Type:               reduction.PCAReducerType,  // Use standard PCA
+		EnableOptimization: false,                     // Use standard implementation for demo
 	}
 
-	reducer, err := reduction.NewDimensionReducer(reductionConfig)
+	reducer, err := reduction.NewDimensionReducerWithFactory(reductionConfig)
 	if err != nil {
 		log.Fatalf("Failed to create reducer: %v", err)
 	}

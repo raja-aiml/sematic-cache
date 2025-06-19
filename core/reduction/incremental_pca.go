@@ -334,6 +334,12 @@ func (p *IncrementalPCAReducer) Transform(ctx context.Context, embeddings [][]fl
 	return result, nil
 }
 
+// Fit trains the reduction model on sample embeddings
+// For incremental PCA, this is equivalent to PartialFit
+func (p *IncrementalPCAReducer) Fit(ctx context.Context, embeddings [][]float32) error {
+	return p.PartialFit(ctx, embeddings)
+}
+
 // FitTransform fits the model and transforms in one step
 func (p *IncrementalPCAReducer) FitTransform(ctx context.Context, embeddings [][]float32) ([][]float32, error) {
 	if err := p.PartialFit(ctx, embeddings); err != nil {

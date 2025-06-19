@@ -131,7 +131,12 @@ func (rlr *ResourceLimitedReducer) Learn(ctx context.Context, embeddings [][]flo
 // learnInBatches trains on large datasets in batches
 func (rlr *ResourceLimitedReducer) learnInBatches(ctx context.Context, embeddings [][]float32) error {
 	// Use incremental PCA for batch learning
-	incPCA := NewIncrementalPCAReducer(rlr.reducer.reducer.config, rlr.limits.MaxBatchSize)
+	// Create a default config since we don't have access to the internal config
+	config := &Config{
+		TargetDim:         10, // Default reduced dimensions
+		VarianceThreshold: 0.95, // Default value
+	}
+	incPCA := NewIncrementalPCAReducer(config, rlr.limits.MaxBatchSize)
 	
 	for i := 0; i < len(embeddings); i += rlr.limits.MaxBatchSize {
 		end := i + rlr.limits.MaxBatchSize

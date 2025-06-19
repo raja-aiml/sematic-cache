@@ -46,6 +46,20 @@ type Config struct {
 
 	// RandomSeed for reproducible results
 	RandomSeed int64
+
+	// New fields for compatibility
+	TargetDimensions    int     // Alias for TargetDim
+	MinVarianceRetained float64 // Alias for VarianceThreshold
+}
+
+// ReducerConfig is the new unified configuration for reducers
+type ReducerConfig struct {
+	// OutputDimensions is the desired output dimension
+	OutputDimensions int
+
+	// VarianceRetained is the minimum variance to retain (0.0-1.0)
+	// If set, overrides OutputDimensions
+	VarianceRetained float64
 }
 
 // Validate checks if the configuration is valid

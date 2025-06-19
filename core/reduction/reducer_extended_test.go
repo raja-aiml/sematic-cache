@@ -84,7 +84,7 @@ func TestLearnEdgeCases(t *testing.T) {
 			name:       "single embedding",
 			embeddings: [][]float32{{1, 2, 3, 4, 5}},
 			wantError:  true,
-			errorMsg:   "failed to fit PCA: insufficient samples for PCA: need at least 2 samples, got 1",
+			errorMsg:   "failed to fit reducer: insufficient samples for PCA: need at least 2 samples, got 1",
 		},
 		{
 			name: "inconsistent dimensions",
@@ -102,7 +102,7 @@ func TestLearnEdgeCases(t *testing.T) {
 				{4, 5, 6},
 			},
 			wantError: true,
-			errorMsg:  "failed to fit PCA: target dimension (5) cannot exceed original dimension (3)",
+			errorMsg:  "failed to fit reducer: target dimension (5) cannot exceed original dimension (3)",
 		},
 	}
 	

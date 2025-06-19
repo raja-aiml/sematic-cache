@@ -181,7 +181,7 @@ func TestOptimizedReducer(t *testing.T) {
 	}
 
 	// Create candidates
-	reduced, _ := reducer.pca.Transform(ctx, embeddings)
+	reduced, _ := reducer.ReduceBatch(ctx, embeddings)
 	candidates := make([]SearchCandidate, len(embeddings))
 	for i := range embeddings {
 		candidates[i] = SearchCandidate{

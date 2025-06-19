@@ -167,7 +167,7 @@ func BenchmarkHybridSearch(b *testing.B) {
 	for _, size := range testSizes {
 		// Generate candidates
 		fullEmbeddings := generateRandomEmbeddings(size.candidates, 1536)
-		reducedEmbeddings, _ := regularReducer.pca.Transform(ctx, fullEmbeddings)
+		reducedEmbeddings, _ := regularReducer.ReduceBatch(ctx, fullEmbeddings)
 		candidates := generateCandidates(fullEmbeddings, reducedEmbeddings)
 
 		// Generate query
@@ -211,7 +211,7 @@ func BenchmarkObjectPooling(b *testing.B) {
 
 	// Generate test data
 	fullEmbeddings := generateRandomEmbeddings(10000, 1536)
-	reducedEmbeddings, _ := reducer.pca.Transform(ctx, fullEmbeddings)
+	reducedEmbeddings, _ := reducer.ReduceBatch(ctx, fullEmbeddings)
 	candidates := generateCandidates(fullEmbeddings, reducedEmbeddings)
 	queryEmbedding := generateRandomEmbeddings(1, 1536)[0]
 
