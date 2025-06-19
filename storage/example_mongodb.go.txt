@@ -1,0 +1,41 @@
+// Example: How to add a new storage backend (e.g., MongoDB)
+// This file demonstrates how easy it is to extend the factory pattern
+
+package storage
+
+import (
+	"github.com/raja-aiml/sematic-cache/config"
+	"github.com/raja-aiml/sematic-cache/core"
+)
+
+// Step 1: Create your backend implementation
+type MongoDBStore struct {
+	// ... MongoDB client and fields
+}
+
+// Implement all methods from core.CacheBackend interface
+func (m *MongoDBStore) Get(prompt string) (string, bool) {
+	// Implementation
+	return "", false
+}
+
+func (m *MongoDBStore) SetWithModel(prompt string, embedding []float32, answer, modelName, modelID string) {
+	// Implementation
+}
+
+// ... implement other required methods ...
+
+// Step 2: Create a factory function
+func newMongoBackend(cfg *config.Config, embedFunc core.EmbeddingFunc) (core.CacheBackend, error) {
+	// Initialize MongoDB connection
+	// Return MongoDBStore instance
+	return &MongoDBStore{}, nil
+}
+
+// Step 3: Register in init() function
+func init() {
+	Register("mongodb", newMongoBackend)
+}
+
+// That's it! Now users can use type: "mongodb" in their config
+// No changes needed in main.go or anywhere else!
