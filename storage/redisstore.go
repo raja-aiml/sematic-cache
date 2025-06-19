@@ -4,7 +4,6 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -15,11 +14,16 @@ import (
 type RedisStore struct {
 	client *redis.ClusterClient
 	ttl    time.Duration
+	logger *Logger
 }
 
 // NewRedisStore creates a new RedisStore with the given cluster client and TTL.
 func NewRedisStore(client *redis.ClusterClient, ttl time.Duration) *RedisStore {
-	return &RedisStore{client: client, ttl: ttl}
+	return &RedisStore{
+		client: client,
+		ttl:    ttl,
+		logger: NewLogger("redis"),
+	}
 }
 
 // value stored in Redis for a prompt
@@ -34,11 +38,11 @@ func (r *RedisStore) SetWithModel(prompt string, embedding []float32, answer, mo
 	val := redisValue{Answer: answer, ModelName: modelName, ModelID: modelID}
 	data, err := json.Marshal(val)
 	if err != nil {
-		log.Printf("redis marshal failed for key %q: %v", prompt, err)
+		r.logger.LogError("marshal", prompt, err)
 		return
 	}
 	if err := r.client.Set(context.Background(), prompt, data, r.ttl).Err(); err != nil {
-		log.Printf("redis set failed for key %q: %v", prompt, err)
+		r.logger.LogError("set", prompt, err)
 	}
 }
 
@@ -55,12 +59,12 @@ func (r *RedisStore) Get(prompt string) (string, bool) {
 		return "", false
 	}
 	if err != nil {
-		log.Printf("redis get failed for key %q: %v", prompt, err)
+		r.logger.LogError("get", prompt, err)
 		return "", false
 	}
 	var val redisValue
 	if err := json.Unmarshal([]byte(data), &val); err != nil {
-		log.Printf("redis unmarshal failed for key %q: %v", prompt, err)
+		r.logger.LogError("unmarshal", prompt, err)
 		return "", false
 	}
 	return val.Answer, true
@@ -73,12 +77,12 @@ func (r *RedisStore) GetModelInfo(prompt string) (string, string, bool) {
 		return "", "", false
 	}
 	if err != nil {
-		log.Printf("redis get failed for key %q: %v", prompt, err)
+		r.logger.LogError("get", prompt, err)
 		return "", "", false
 	}
 	var val redisValue
 	if err := json.Unmarshal([]byte(data), &val); err != nil {
-		log.Printf("redis unmarshal failed for key %q: %v", prompt, err)
+		r.logger.LogError("unmarshal", prompt, err)
 		return "", "", false
 	}
 	return val.ModelName, val.ModelID, true
@@ -92,7 +96,7 @@ func (r *RedisStore) GetTopKByEmbedding(embed []float32, k int) []core.QueryResu
 // Flush removes all entries from Redis.
 func (r *RedisStore) Flush() {
 	if err := r.client.FlushAll(context.Background()).Err(); err != nil {
-		log.Printf("redis flush all failed: %v", err)
+		r.logger.LogError("flush", "all", err)
 	}
 }
 

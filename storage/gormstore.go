@@ -14,8 +14,9 @@ import (
 
 // GormStore implements a CacheBackend using GORM and pgvector.
 type GormStore struct {
-	db  *gorm.DB
-	ttl time.Duration // currently unused, for future TTL support
+	db     *gorm.DB
+	ttl    time.Duration // currently unused, for future TTL support
+	logger *Logger
 }
 
 // cacheEntry represents the GORM model for cache entries.
@@ -39,7 +40,11 @@ func NewGormStore(dsn string, ttl time.Duration) (*GormStore, error) {
 	if err := db.AutoMigrate(&cacheEntry{}); err != nil {
 		return nil, err
 	}
-	return &GormStore{db: db, ttl: ttl}, nil
+	return &GormStore{
+		db:     db,
+		ttl:    ttl,
+		logger: NewLogger("gorm"),
+	}, nil
 }
 
 // SetWithModel upserts an entry with embedding and metadata.
@@ -52,7 +57,9 @@ func (g *GormStore) SetWithModel(prompt string, embedding []float32, answer, mod
 		ModelID:   modelID,
 	}
 	// Upsert using primary key
-	g.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&ent)
+	if err := g.db.Clauses(clause.OnConflict{UpdateAll: true}).Create(&ent).Error; err != nil {
+		g.logger.LogError("set", prompt, err)
+	}
 }
 
 // SetPromptWithModel is equivalent to SetWithModel (no embedding provided).
@@ -122,7 +129,9 @@ func (g *GormStore) GetTopKByEmbedding(embed []float32, k int) []core.QueryResul
 
 // Flush removes all entries from the table.
 func (g *GormStore) Flush() {
-	g.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&cacheEntry{})
+	if err := g.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&cacheEntry{}).Error; err != nil {
+		g.logger.LogError("flush", "all", err)
+	}
 }
 
 // Stats returns zero metrics (not tracked in this store).
