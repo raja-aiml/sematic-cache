@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -10,16 +11,36 @@ import (
 )
 
 type Builder struct {
-	logger *utils.Logger
+	logger     *utils.Logger
+	sdkBuilder *SDKBuilder
+	useSDK     bool
 }
 
 func NewBuilder() *Builder {
-	return &Builder{
+	builder := &Builder{
 		logger: utils.NewLogger("docker"),
+		useSDK: true,
 	}
+
+	// Try to create SDK builder
+	if sdkBuilder, err := NewSDKBuilder(); err == nil {
+		builder.sdkBuilder = sdkBuilder
+		builder.logger.Info("Using Docker SDK")
+	} else {
+		builder.useSDK = false
+		builder.logger.Info("Falling back to Docker CLI: %v", err)
+	}
+
+	return builder
 }
 
 func (b *Builder) Build(ctx context.Context, dockerfilePath, imageName, buildContext string) error {
+	// Use SDK if available
+	if b.useSDK && b.sdkBuilder != nil {
+		return b.sdkBuilder.Build(ctx, dockerfilePath, imageName, buildContext)
+	}
+
+	// Fallback to CLI
 	b.logger.Info("Building image: %s", imageName)
 
 	args := []string{
@@ -40,6 +61,12 @@ func (b *Builder) Build(ctx context.Context, dockerfilePath, imageName, buildCon
 }
 
 func (b *Builder) Tag(ctx context.Context, sourceImage, targetImage string) error {
+	// Use SDK if available
+	if b.useSDK && b.sdkBuilder != nil {
+		return b.sdkBuilder.Tag(ctx, sourceImage, targetImage)
+	}
+
+	// Fallback to CLI
 	b.logger.Info("Tagging %s as %s", sourceImage, targetImage)
 
 	args := []string{"tag", sourceImage, targetImage}
@@ -53,6 +80,12 @@ func (b *Builder) Tag(ctx context.Context, sourceImage, targetImage string) erro
 }
 
 func (b *Builder) Push(ctx context.Context, imageName string) error {
+	// Use SDK if available
+	if b.useSDK && b.sdkBuilder != nil {
+		return b.sdkBuilder.Push(ctx, imageName)
+	}
+
+	// Fallback to CLI
 	b.logger.Info("Pushing image: %s", imageName)
 
 	args := []string{"push", imageName}
@@ -82,6 +115,12 @@ func (b *Builder) ImportToK3d(ctx context.Context, imageName, clusterName string
 }
 
 func (b *Builder) Run(ctx context.Context, imageName string, opts *RunOptions) (string, error) {
+	// Use SDK if available
+	if b.useSDK && b.sdkBuilder != nil {
+		return b.sdkBuilder.Run(ctx, imageName, opts)
+	}
+
+	// Fallback to CLI
 	args := []string{"run", "--rm"}
 
 	if opts != nil {
@@ -119,6 +158,12 @@ func (b *Builder) Run(ctx context.Context, imageName string, opts *RunOptions) (
 }
 
 func (b *Builder) Stop(ctx context.Context, containerID string) error {
+	// Use SDK if available
+	if b.useSDK && b.sdkBuilder != nil {
+		return b.sdkBuilder.Stop(ctx, containerID)
+	}
+
+	// Fallback to CLI
 	args := []string{"stop", containerID}
 
 	_, err := utils.RunCommand(ctx, "docker", args, nil)
@@ -130,6 +175,12 @@ func (b *Builder) Stop(ctx context.Context, containerID string) error {
 }
 
 func (b *Builder) Remove(ctx context.Context, containerID string) error {
+	// Use SDK if available
+	if b.useSDK && b.sdkBuilder != nil {
+		return b.sdkBuilder.Remove(ctx, containerID)
+	}
+
+	// Fallback to CLI
 	args := []string{"rm", "-f", containerID}
 
 	_, err := utils.RunCommand(ctx, "docker", args, nil)
@@ -150,11 +201,32 @@ type RunOptions struct {
 	Detach  bool
 }
 
+// IsDockerRunning checks if Docker daemon is running
+func (b *Builder) IsDockerRunning(ctx context.Context) bool {
+	// Use SDK if available
+	if b.useSDK && b.sdkBuilder != nil {
+		return b.sdkBuilder.IsDockerRunning(ctx)
+	}
+
+	// Fallback to CLI
+	_, err := utils.RunCommand(ctx, "docker", []string{"info"}, &utils.ExecOptions{Silent: true})
+	return err == nil
+}
+
+// Close closes the Docker client connection if using SDK
+func (b *Builder) Close() error {
+	if b.sdkBuilder != nil {
+		return b.sdkBuilder.Close()
+	}
+	return nil
+}
+
 func GetProjectRoot() (string, error) {
 	// Try to find project root by looking for go.mod
 	currentDir := "."
 	for i := 0; i < 5; i++ {
-		if _, err := filepath.Abs(filepath.Join(currentDir, "go.mod")); err == nil {
+		modPath := filepath.Join(currentDir, "go.mod")
+		if _, err := os.Stat(modPath); err == nil {
 			return filepath.Abs(currentDir)
 		}
 		currentDir = filepath.Join(currentDir, "..")

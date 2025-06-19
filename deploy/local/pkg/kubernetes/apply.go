@@ -11,6 +11,20 @@ import (
 func ApplyKustomize(ctx context.Context, path string, namespace string) error {
 	logger := utils.NewLogger("kustomize")
 
+	// Try SDK-based approach first
+	if config, err := NewApplyConfig(""); err == nil {
+		logger.Info("Using SDK-based kustomize apply")
+		return config.ApplyKustomizeSDK(ctx, path, namespace)
+	}
+
+	// Fallback to CLI-based approach
+	logger.Info("Falling back to CLI-based kustomize apply")
+	return applyKustomizeCLI(ctx, path, namespace)
+}
+
+func applyKustomizeCLI(ctx context.Context, path string, namespace string) error {
+	logger := utils.NewLogger("kustomize")
+
 	// Check if kustomize or kubectl exists
 	useKubectl := utils.CommandExists("kubectl")
 	useKustomize := utils.CommandExists("kustomize")
@@ -66,6 +80,20 @@ func ApplyKustomize(ctx context.Context, path string, namespace string) error {
 }
 
 func DeleteKustomize(ctx context.Context, path string, namespace string) error {
+	logger := utils.NewLogger("kustomize")
+
+	// Try SDK-based approach first
+	if config, err := NewApplyConfig(""); err == nil {
+		logger.Info("Using SDK-based kustomize delete")
+		return config.DeleteKustomizeSDK(ctx, path, namespace)
+	}
+
+	// Fallback to CLI-based approach
+	logger.Info("Falling back to CLI-based kustomize delete")
+	return deleteKustomizeCLI(ctx, path, namespace)
+}
+
+func deleteKustomizeCLI(ctx context.Context, path string, namespace string) error {
 	logger := utils.NewLogger("kustomize")
 
 	var args []string

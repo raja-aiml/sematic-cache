@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/database"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/testing"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 	"github.com/spf13/cobra"
@@ -139,27 +140,32 @@ func (ctm *CompositeTestManager) addPortForward(ctx context.Context, service, na
 func (ctm *CompositeTestManager) initializeDatabase(ctx context.Context) error {
 	ctm.logger.Info("Initializing PostgreSQL with pgvector...")
 
-	// Create database and extension
-	initSQL := `
+	// Create PostgreSQL manager
+	pgManager := database.NewPostgresManager(&database.Config{
+		Host:     "localhost",
+		Port:     5432,
+		User:     "postgres",
+		Password: "postgres",
+		Database: "semantic_cache",
+	})
+
+	// Wait for PostgreSQL to be ready
+	if err := pgManager.WaitForReady(ctx, 30*time.Second); err != nil {
+		return fmt.Errorf("PostgreSQL is not ready: %w", err)
+	}
+
+	// Initialize database and extensions
+	if err := pgManager.InitializeDatabase(ctx); err != nil {
+		// Try alternative approach via kubectl exec if direct connection fails
+		ctm.logger.Warn("Direct connection failed, trying via kubectl exec...")
+
+		initSQL := `
 CREATE DATABASE IF NOT EXISTS semantic_cache;
 \c semantic_cache;
 CREATE EXTENSION IF NOT EXISTS vector;
 `
 
-	cmd := exec.CommandContext(ctx, "psql",
-		"-h", "localhost",
-		"-p", "5432",
-		"-U", "postgres",
-		"-c", initSQL,
-	)
-	cmd.Env = append(os.Environ(), "PGPASSWORD=postgres")
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Try alternative approach
-		ctm.logger.Warn("Direct psql failed, trying via kubectl exec...")
-
-		output2, err2 := utils.RunCommand(ctx, "kubectl", []string{
+		output, err2 := utils.RunCommand(ctx, "kubectl", []string{
 			"exec", "-n", "infra", "deploy/postgres", "--",
 			"psql", "-U", "postgres", "-c", initSQL,
 		}, nil)
@@ -168,7 +174,14 @@ CREATE EXTENSION IF NOT EXISTS vector;
 			return fmt.Errorf("failed to initialize database: %w (output: %s)", err, output)
 		}
 
-		ctm.logger.Debug("Database initialized: %s", output2)
+		ctm.logger.Debug("Database initialized: %s", output)
+	} else {
+		// Verify the connection and setup
+		if err := pgManager.TestConnection(ctx); err != nil {
+			ctm.logger.Warn("Failed to verify database connection: %v", err)
+		} else {
+			ctm.logger.Info("Database connection verified successfully")
+		}
 	}
 
 	return nil
