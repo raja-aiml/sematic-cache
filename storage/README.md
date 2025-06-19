@@ -26,6 +26,16 @@ This package provides multiple storage backend implementations for the semantic 
   - Slower than in-memory for simple key-value operations
 - **Use Case**: When you need persistent storage with vector similarity search
 
+### 4. Composite Multi-Tier Backend
+- **Type**: `"composite"`
+- **Features**: Combines multiple backends in a tiered architecture
+  - Automatic fallback between tiers
+  - Smart cache promotion
+  - Per-tier metrics
+  - Optimizes for speed, cost, and reliability
+- **Use Case**: Production systems requiring optimal performance with multiple storage layers
+- **Example**: Memory (L1) → Redis (L2) → PostgreSQL (L3)
+
 ## Configuration
 
 ### Memory Backend
@@ -53,6 +63,30 @@ cache:
   type: "gorm"
 # Also requires DATABASE_URL environment variable
 ```
+
+### Composite Backend
+```yaml
+cache:
+  type: "composite"
+  min_similarity: 0.85
+  composite:
+    promote_on_hit: true
+    tiers:
+      - name: "memory-l1"
+        type: "memory"
+        priority: 1
+        capacity: 1000
+      - name: "redis-l2"
+        type: "redis"
+        priority: 2
+        redis:
+          addrs: ["localhost:6379"]
+      - name: "postgres-l3"
+        type: "gorm"
+        priority: 3
+```
+
+See [COMPOSITE_BACKEND.md](../docs/COMPOSITE_BACKEND.md) for detailed documentation.
 
 ## Adding New Backends
 

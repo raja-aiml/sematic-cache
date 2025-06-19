@@ -18,6 +18,7 @@ A high-performance semantic caching system for AI applications built in Go. This
 - **PostgreSQL with pgvector** for persistent vector similarity search
 - **Redis Cluster** support for distributed caching
 - **GORM integration** for advanced PostgreSQL operations
+- **Composite multi-tier backend** combining Memory → Redis → PostgreSQL for optimal performance
 
 ### AI Integration
 - **OpenAI API wrapper** with support for:
@@ -118,7 +119,7 @@ server:
   address: ":8080"
 
 cache:
-  type: "gorm"  # Options: memory, redis, gorm
+  type: "gorm"  # Options: memory, redis, gorm, composite
   capacity: 1000
   eviction_policy: "LRU"  # LRU, FIFO, LFU, RR
   ttl: "1h"
@@ -135,6 +136,20 @@ database_url: "host=localhost user=postgres dbname=cache sslmode=disable"
 redis:
   addrs: ["localhost:6379"]
   password: ""
+
+# For Composite backend (see config/composite-example.yml for full example)
+composite:
+  promote_on_hit: true
+  tiers:
+    - name: "memory-l1"
+      type: "memory"
+      priority: 1
+    - name: "redis-l2"
+      type: "redis"
+      priority: 2
+    - name: "postgres-l3"
+      type: "gorm"
+      priority: 3
 ```
 
 ### Environment Variables

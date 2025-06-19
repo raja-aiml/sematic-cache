@@ -40,6 +40,9 @@ func init() {
 
 	// Register GORM/PostgreSQL backend
 	Register("gorm", newGormBackend)
+
+	// Register composite backend
+	Register("composite", newCompositeBackend)
 }
 
 // NewBackend creates a cache backend based on the configuration.
@@ -122,4 +125,97 @@ func newGormBackend(cfg *config.Config, embedFunc core.EmbeddingFunc) (core.Cach
 	}
 
 	return NewGormStore(dsn, ttl)
+}
+
+// newCompositeBackend creates a composite multi-tier cache backend
+func newCompositeBackend(cfg *config.Config, embedFunc core.EmbeddingFunc) (core.CacheBackend, error) {
+	if cfg == nil || len(cfg.Cache.Composite.Tiers) == 0 {
+		return nil, fmt.Errorf("composite backend requires tier configuration")
+	}
+
+	// Create tiers based on configuration
+	tiers := make([]*Tier, 0, len(cfg.Cache.Composite.Tiers))
+
+	for _, tierCfg := range cfg.Cache.Composite.Tiers {
+		// Create a temporary config for each tier
+		tierConfig := &config.Config{}
+		tierConfig.Cache.Type = tierCfg.Type
+		tierConfig.Cache.Capacity = tierCfg.Capacity
+		tierConfig.Cache.EvictionPolicy = tierCfg.EvictionPolicy
+		tierConfig.Cache.TTL = cfg.Cache.TTL
+		tierConfig.Cache.Redis = cfg.Cache.Redis
+
+		// Override with tier-specific Redis config if provided
+		if len(tierCfg.Redis.Addrs) > 0 {
+			tierConfig.Cache.Redis.Addrs = tierCfg.Redis.Addrs
+			tierConfig.Cache.Redis.Password = tierCfg.Redis.Password
+		}
+
+		// Create the backend for this tier
+		backend, err := createTierBackend(tierCfg.Type, tierConfig, embedFunc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tier %s: %w", tierCfg.Name, err)
+		}
+
+		// Determine capabilities based on type
+		capabilities := TierCapabilities{}
+		switch tierCfg.Type {
+		case "memory":
+			capabilities = TierCapabilities{
+				SupportsVectorSearch: true,
+				AverageLatencyNs:     1000, // 1 microsecond
+				IsPersistent:         false,
+				IsDistributed:        false,
+			}
+		case "redis":
+			capabilities = TierCapabilities{
+				SupportsVectorSearch: false,
+				AverageLatencyNs:     100000, // 100 microseconds
+				IsPersistent:         true,
+				IsDistributed:        true,
+			}
+		case "gorm":
+			capabilities = TierCapabilities{
+				SupportsVectorSearch: true,
+				AverageLatencyNs:     5000000, // 5 milliseconds
+				IsPersistent:         true,
+				IsDistributed:        true,
+			}
+		}
+
+		tier := &Tier{
+			Type:         TierType(tierCfg.Type),
+			Name:         tierCfg.Name,
+			Backend:      backend,
+			Capabilities: capabilities,
+			Priority:     tierCfg.Priority,
+		}
+
+		tiers = append(tiers, tier)
+	}
+
+	// Create composite backend
+	threshold := cfg.Cache.MinSimilarity
+	if threshold == 0 {
+		threshold = 0.8 // default
+	}
+
+	composite := NewCompositeBackend(tiers, embedFunc, threshold)
+	composite.SetPromotionEnabled(cfg.Cache.Composite.PromoteOnHit)
+
+	return composite, nil
+}
+
+// createTierBackend creates a backend for a specific tier type
+func createTierBackend(tierType string, cfg *config.Config, embedFunc core.EmbeddingFunc) (core.CacheBackend, error) {
+	switch tierType {
+	case "memory":
+		return newMemoryBackend(cfg, embedFunc)
+	case "redis":
+		return newRedisBackend(cfg, embedFunc)
+	case "gorm":
+		return newGormBackend(cfg, embedFunc)
+	default:
+		return nil, fmt.Errorf("unknown tier type: %s", tierType)
+	}
 }

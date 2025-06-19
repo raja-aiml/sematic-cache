@@ -24,6 +24,21 @@ type Config struct {
 			Password string   `yaml:"password"`
 			DB       int      `yaml:"db"`
 		} `yaml:"redis"`
+		// Composite backend configuration
+		Composite struct {
+			PromoteOnHit bool `yaml:"promote_on_hit"`
+			Tiers        []struct {
+				Name           string `yaml:"name"`
+				Type           string `yaml:"type"`
+				Priority       int    `yaml:"priority"`
+				Capacity       int    `yaml:"capacity"`
+				EvictionPolicy string `yaml:"eviction_policy"`
+				Redis          struct {
+					Addrs    []string `yaml:"addrs"`
+					Password string   `yaml:"password"`
+				} `yaml:"redis"`
+			} `yaml:"tiers"`
+		} `yaml:"composite"`
 	} `yaml:"cache"`
 	OpenAI struct {
 		APIKey     string `yaml:"api_key"`
