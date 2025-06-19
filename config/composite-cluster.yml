@@ -1,0 +1,35 @@
+# Composite Backend Configuration for Cluster Services
+# Uses port-forwarded services from k3d cluster
+
+server:
+  address: ":8080"
+  
+cache:
+  type: "composite"
+  min_similarity: 0.85
+  
+  composite:
+    promote_on_hit: true
+    
+    tiers:
+      - name: "memory-l1"
+        type: "memory"
+        priority: 1
+        capacity: 1000
+        eviction_policy: "LRU"
+        
+      - name: "redis-l2"
+        type: "redis"
+        priority: 2
+        redis:
+          addrs:
+            - "localhost:6379"  # Port-forwarded from cluster
+          
+      - name: "postgres-l3"
+        type: "gorm"
+        priority: 3
+        # Uses DATABASE_URL environment variable
+
+openai:
+  api_key: "${OPENAI_API_KEY}"
+  base_url: "https://api.openai.com/v1"

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/raja-aiml/sematic-cache/config"
@@ -25,7 +26,21 @@ func main() {
 	}
 
 	// Create OpenAI client for embeddings
-	openaiClient := openai.NewClient(cfg.OpenAI.APIKey)
+	apiKey := cfg.OpenAI.APIKey
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+	
+	// Log API key status for debugging
+	if apiKey == "" {
+		log.Println("WARNING: No OpenAI API key found. Embeddings will fail.")
+	} else if len(apiKey) < 20 {
+		log.Printf("INFO: Using API key: %s...%s", apiKey[:3], apiKey[len(apiKey)-3:])
+	} else {
+		log.Printf("INFO: Using API key: %s...%s", apiKey[:8], apiKey[len(apiKey)-4:])
+	}
+	
+	openaiClient := openai.NewClient(apiKey)
 	embedFunc := func(prompt string) ([]float32, error) {
 		return openaiClient.Embedding(context.Background(), prompt)
 	}

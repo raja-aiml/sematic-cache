@@ -7,8 +7,9 @@ This directory contains the complete deployment solution for the Semantic Cache 
 ```
 deploy/
 ├── kustomization.yaml       # Root orchestration for entire deployment
-├── cluster.sh               # Wrapper script for cluster management  
+├── cluster.sh              # Wrapper script for cluster management  
 ├── dev.sh                  # Wrapper script for development workflow
+├── composite-test.sh       # Test composite backend with cluster services
 ├── README.md               # This file
 ├── app/                    # Application components
 │   ├── kustomization.yaml       # App kustomization
@@ -191,6 +192,32 @@ After deployment, the Sematic Cache API is accessible via:
 - **Fast**: Direct image import vs registry push/pull cycle
 - **Local**: Everything runs locally with k3d
 - **Reproducible**: Consistent deployment using Kustomize
+
+## Testing Composite Backend
+
+The `composite-test.sh` script enables testing the three-tier composite backend (Memory → PostgreSQL) using cluster services without deploying the application:
+
+```bash
+# Run all composite backend tests
+./deploy/composite-test.sh test
+
+# Run interactive demo
+OPENAI_API_KEY="your-key" ./deploy/composite-test.sh demo
+
+# Start development server connected to cluster backends
+./deploy/composite-test.sh server
+
+# Set up port forwarding only
+./deploy/composite-test.sh port-forward
+```
+
+This is useful for:
+- Testing composite backend locally with real infrastructure
+- Developing without deploying to Kubernetes
+- Debugging cache tier interactions
+- Performance testing with production-like setup
+
+See [docs/COMPOSITE_TEST.md](docs/COMPOSITE_TEST.md) for detailed documentation.
 
 ## Development Workflow
 
