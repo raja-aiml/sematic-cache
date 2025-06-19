@@ -11,9 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/raja-aiml/sematic-cache/config"
-	"github.com/raja-aiml/sematic-cache/core"
 	"github.com/raja-aiml/sematic-cache/observability"
 	"github.com/raja-aiml/sematic-cache/openai"
 	"github.com/raja-aiml/sematic-cache/server"
@@ -66,53 +64,12 @@ func main() {
 	if cfg != nil && cfg.OpenAI.APIVersion != "" {
 		openaiClient.APIVersion = cfg.OpenAI.APIVersion
 	}
-	// Configure cache backend (in-memory or Redis)
-	var cache core.CacheBackend
-	cap := 100
-	if cfg != nil && cfg.Cache.Capacity > 0 {
-		cap = cfg.Cache.Capacity
-	}
-	opts := []core.Option{
-		core.WithEmbeddingFunc(func(p string) ([]float32, error) {
-			return openaiClient.Embedding(context.Background(), p)
-		}),
-	}
-	if cfg != nil {
-		if cfg.Cache.EvictionPolicy != "" {
-			opts = append(opts, core.WithEvictionPolicy(cfg.Cache.EvictionPolicy))
-		}
-		if ttl := cfg.TTLDuration(); ttl > 0 {
-			opts = append(opts, core.WithTTL(ttl))
-		}
-		if cfg.Cache.MinSimilarity != 0 {
-			opts = append(opts, core.WithMinSimilarity(cfg.Cache.MinSimilarity))
-		}
-	}
-	// Select cache backend based on config
-	if cfg != nil && cfg.Cache.Type == "gorm" {
-		// Use Postgres via GORM and pgvector
-		dsn := os.Getenv("DATABASE_URL")
-		if dsn == "" {
-			log.Fatalf("DATABASE_URL must be set for GORM cache backend")
-		}
-		store, err := storage.NewGormStore(dsn, cfg.TTLDuration())
-		if err != nil {
-			log.Fatalf("failed to initialize GORM store: %v", err)
-		}
-		cache = store
-	} else if cfg != nil && cfg.Cache.Type == "redis" {
-		redisOpts := &redis.ClusterOptions{
-			Addrs:    cfg.Cache.Redis.Addrs,
-			Password: cfg.Cache.Redis.Password,
-		}
-		client := redis.NewClusterClient(redisOpts)
-		if err := client.Ping(context.Background()).Err(); err != nil {
-			log.Fatalf("redis ping failed: %v", err)
-		}
-		cache = storage.NewRedisStore(client, cfg.TTLDuration())
-	} else {
-		// Default to in-memory LRU cache
-		cache = core.NewCache(cap, opts...)
+	// Create cache backend using factory
+	cache, err := storage.NewBackend(cfg, func(p string) ([]float32, error) {
+		return openaiClient.Embedding(context.Background(), p)
+	})
+	if err != nil {
+		log.Fatalf("failed to create cache backend: %v", err)
 	}
 	srv := server.New(cache)
 	httpSrv := &http.Server{
