@@ -31,7 +31,7 @@ func TestVersionCmd(t *testing.T) {
 
 	output := buf.String()
 	expectedStrings := []string{
-		"Semantic Cache Deploy",
+		"IaaC - Infrastructure as Code Tool",
 		"Version:",
 		"Built:",
 		"Git Commit:",

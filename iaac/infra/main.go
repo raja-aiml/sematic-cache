@@ -17,10 +17,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "semantic-cache-deploy",
-	Short: "Semantic Cache deployment tools for local Kubernetes development",
+	Use:   "iaac",
+	Short: "Infrastructure as Code tool for Semantic Cache deployment",
 	Long: `A comprehensive CLI tool for managing semantic cache deployments in local Kubernetes environments.
-This tool replaces shell scripts with a robust Go implementation using k3d SDK.`,
+This tool provides infrastructure-as-code capabilities using k3d, Docker SDK, and Kubernetes client-go.`,
 	Version: fmt.Sprintf("%s (built %s, commit %s)", version, buildTime, gitCommit),
 }
 
@@ -50,7 +50,7 @@ func versionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Semantic Cache Deploy\n"); err != nil {
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "IaaC - Infrastructure as Code Tool\n"); err != nil {
 				cmd.PrintErrf("Failed to write output: %v\n", err)
 			}
 			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  Version:    %s\n", version); err != nil {

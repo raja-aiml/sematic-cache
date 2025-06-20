@@ -1,248 +1,81 @@
-# Semantic Cache Deploy - Go Implementation
+# Semantic Cache Infrastructure
 
-A Go-based CLI tool for managing semantic cache deployments in local Kubernetes environments using k3d. This tool replaces shell scripts with a robust Go implementation using the k3d SDK and Cobra CLI framework.
+Production-ready infrastructure-as-code for deploying the Semantic Cache system to local Kubernetes environments.
 
-## Features
-
-- **Cluster Management**: Create and manage k3d clusters with pre-configured infrastructure
-- **Application Lifecycle**: Build, deploy, and manage the semantic cache application
-- **Workflow Orchestration**: End-to-end deployment workflows with automated testing
-- **Composite Backend Testing**: Test three-tier cache architecture (memory + Redis + PostgreSQL)
-- **Debugging Tools**: Comprehensive debugging, secret management, and API testing
-
-## Installation
+## Quick Start
 
 ```bash
-# From the project root
-cd deploy/local
-go build -o semantic-cache-deploy .
+# Build the tool
+task build
 
-# Or install globally
-go install .
+# Deploy everything
+./bin/iaac workflow full
 ```
 
-## Usage
+## Overview
 
-### Cluster Management
+This directory contains a Go-based CLI tool that manages the complete lifecycle of the Semantic Cache infrastructure:
 
-```bash
-# Create k3d cluster and deploy infrastructure
-semantic-cache-deploy cluster up
-
-# Destroy cluster
-semantic-cache-deploy cluster down
-
-# Show cluster status
-semantic-cache-deploy cluster ps
-
-# View pod logs
-semantic-cache-deploy cluster logs -n app -l app=semantic-cache
-
-# Verify deployment health
-semantic-cache-deploy cluster test
-```
-
-### Development Workflow
-
-```bash
-# Build Docker image and import to k3d
-semantic-cache-deploy dev build
-
-# Deploy application with secrets
-semantic-cache-deploy dev deploy
-
-# Test application endpoints
-semantic-cache-deploy dev test
-
-# View application logs
-semantic-cache-deploy dev logs
-
-# Check deployment status
-semantic-cache-deploy dev status
-
-# Remove application
-semantic-cache-deploy dev remove
-```
-
-### End-to-End Workflows
-
-```bash
-# Run complete workflow (setup, build, deploy, test)
-semantic-cache-deploy workflow full
-
-# Run individual workflow phases
-semantic-cache-deploy workflow setup
-semantic-cache-deploy workflow build
-semantic-cache-deploy workflow deploy
-semantic-cache-deploy workflow test
-
-# Clean up application
-semantic-cache-deploy workflow cleanup
-
-# Reset everything
-semantic-cache-deploy workflow reset
-```
-
-### Composite Backend Testing
-
-```bash
-# Test three-tier cache architecture with cluster services
-semantic-cache-deploy composite-test
-```
-
-### Debugging and Management
-
-```bash
-# Secret management
-semantic-cache-deploy debug secrets create
-semantic-cache-deploy debug secrets view
-semantic-cache-deploy debug secrets update
-
-# Deployment analysis
-semantic-cache-deploy debug analyze full
-semantic-cache-deploy debug analyze quick
-
-# API testing
-semantic-cache-deploy debug test quick
-semantic-cache-deploy debug test detailed
-```
-
-## Architecture
-
-### Package Structure
-
-```
-deploy/local/
-├── cmd/                    # Cobra command implementations
-│   ├── cluster.go         # Cluster management commands
-│   ├── dev.go            # Development commands
-│   ├── workflow.go       # Workflow orchestration
-│   ├── composite_test.go # Composite backend testing
-│   └── debug.go          # Debugging tools
-├── pkg/                   # Shared packages
-│   ├── k3d/              # k3d cluster management
-│   ├── kubernetes/       # Kubernetes client operations
-│   ├── docker/          # Docker build and run
-│   └── utils/           # Common utilities
-└── main.go              # CLI entry point
-```
-
-### Key Components
-
-1. **k3d Integration**: Direct integration with k3d v5 SDK for cluster management
-2. **Kubernetes Client**: Native k8s client-go for resource management
-3. **Docker Builder**: Docker image building and k3d import functionality
-4. **Port Forwarding**: Automatic port forwarding for testing cluster services
-5. **Configuration Management**: YAML-based config generation for testing
+- **Local Kubernetes**: k3d cluster creation and management
+- **Infrastructure Components**: PostgreSQL with pgvector, Redis, and NGINX Ingress
+- **Application Deployment**: Automated build, deploy, and configuration
+- **Testing**: Built-in endpoint testing and composite backend validation
 
 ## Prerequisites
 
-- Go 1.21 or later
+- Go 1.23.8+
 - Docker
 - k3d v5.x
 - kubectl
-- OpenAI API key (set as `OPENAI_API_KEY` environment variable)
 
-## Environment Variables
+## Documentation
 
-- `OPENAI_API_KEY`: Required for OpenAI API access
-- `DATABASE_URL`: PostgreSQL connection string (optional, defaults to cluster service)
-- `DEBUG`: Enable debug logging
+Comprehensive documentation is available in the `docs/guide` directory:
 
-## Integration with Main Project
+- [**README.md**](docs/guide/README.md) - Complete command reference and usage guide
+- [**DEVELOPMENT_GUIDE.md**](docs/guide/DEVELOPMENT_GUIDE.md) - Development workflow and testing
+- [**PRODUCTION_GUIDE.md**](docs/guide/PRODUCTION_GUIDE.md) - Production deployment best practices
 
-The tool is integrated with the main semantic cache project using Go workspaces:
+## Key Features
 
-```bash
-# From project root
-go work use ./deploy/local
-```
+- **SDK Integration**: Uses Docker SDK and Kubernetes client-go for reliable operations
+- **Production Workflows**: Automated end-to-end deployment with health checks
+- **Composite Backend**: Test three-tier cache architecture (Memory + Redis + PostgreSQL)
+- **Debug Tools**: Built-in troubleshooting and secret management
+- **Type Safety**: Full Go type safety with comprehensive error handling
 
-This allows the tool to share code and dependencies with the main project while maintaining its own module.
-
-## Comparison with Shell Scripts
-
-| Feature | Shell Scripts | Go Implementation |
-|---------|--------------|-------------------|
-| Error Handling | Basic with `set -e` | Comprehensive error types and context |
-| Dependency Management | Manual PATH checks | Go modules with versioning |
-| Testing | Bash-based | Go test framework |
-| Portability | Shell-dependent | Cross-platform binary |
-| IDE Support | Limited | Full Go tooling support |
-| Type Safety | None | Compile-time type checking |
-| Concurrency | Background processes | Goroutines with proper synchronization |
-
-## Development
-
-### Building
+## Commands at a Glance
 
 ```bash
-# Build using Task
-task build
+# Cluster management
+iaac cluster up/down/ps/test
 
-# Build for all platforms
-task build-all
+# Development workflow
+iaac dev build/deploy/test/logs
 
-# Build directly with go
-go build -o bin/semantic-cache-deploy .
+# Production workflow
+iaac workflow full/reset
+
+# Debugging
+iaac debug analyze full
+iaac debug secrets create
+
+# Composite testing
+iaac composite-test
 ```
 
-### Testing
+## Project Structure
 
-See [TEST_GUIDE.md](TEST_GUIDE.md) for comprehensive testing documentation.
-
-```bash
-# Run tests (filters macOS warnings)
-task test
-
-# Run tests quietly
-task test-quiet
-
-# Generate coverage report
-task test-coverage
-
-# Use the test script
-./scripts/test.sh --coverage
+```
+iaac/infra/
+├── cmd/              # Command implementations
+├── pkg/              # Core packages (k3d, kubernetes, docker, etc.)
+├── config/           # Configuration management
+├── docs/guide/       # Documentation
+├── bin/              # Compiled binaries (git-ignored)
+└── Taskfile.yaml     # Build automation
 ```
 
-### Code Quality
+## License
 
-```bash
-# Format code
-task fmt
-
-# Check formatting
-task fmt-check
-
-# Run linter
-task lint
-
-# Run go vet
-task vet
-
-# Run all checks
-task check
-```
-
-### Development with Task
-
-This project uses [Task](https://taskfile.dev/) for build automation. See [TASKFILE_USAGE.md](TASKFILE_USAGE.md) for details.
-
-```bash
-# List all available tasks
-task --list-all
-
-# Run CI pipeline
-task ci
-```
-
-## Future Enhancements
-
-- [ ] Add support for multiple cluster configurations
-- [ ] Implement streaming logs with follow mode
-- [ ] Add Helm chart deployment option
-- [ ] Support for remote cluster deployment
-- [ ] Integration with CI/CD pipelines
-- [ ] Prometheus metrics export
-- [ ] Interactive mode with prompts
-- [ ] Configuration file support
+Part of the Semantic Cache project. See the main repository for license information.

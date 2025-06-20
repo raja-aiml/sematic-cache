@@ -215,7 +215,7 @@ func debugAnalyzeQuickCmd() *cobra.Command {
 			clusterRunning := checkClusterStatus(ctx)
 			if !clusterRunning {
 				logger.Error("Cluster is not running")
-				logger.Info("Recommendation: Run 'semantic-cache-deploy cluster up'")
+				logger.Info("Recommendation: Run 'iaac cluster up'")
 				return nil
 			}
 			logger.Info("✓ Cluster is running")
@@ -224,7 +224,7 @@ func debugAnalyzeQuickCmd() *cobra.Command {
 			appDeployed := checkAppDeployment(ctx)
 			if !appDeployed {
 				logger.Error("Application is not deployed")
-				logger.Info("Recommendation: Run 'semantic-cache-deploy dev deploy'")
+				logger.Info("Recommendation: Run 'iaac dev deploy'")
 				return nil
 			}
 			logger.Info("✓ Application is deployed")
@@ -233,7 +233,7 @@ func debugAnalyzeQuickCmd() *cobra.Command {
 			appHealthy := checkAppHealth()
 			if !appHealthy {
 				logger.Error("Application is not healthy")
-				logger.Info("Recommendation: Check logs with 'semantic-cache-deploy dev logs'")
+				logger.Info("Recommendation: Check logs with 'iaac dev logs'")
 				return nil
 			}
 			logger.Info("✓ Application is healthy")

@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -ldflags="-w -s -X main.version=$(git describe --tags --always) \
     -X main.buildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') \
     -X main.gitCommit=$(git rev-parse HEAD)" \
-    -o bin/semantic-cache-deploy .
+    -o bin/iaac .
 
 # Runtime stage
 FROM alpine:3.20
@@ -42,13 +42,13 @@ RUN addgroup -g 1000 deploy && \
     adduser -D -u 1000 -G deploy deploy
 
 # Copy binary from builder
-COPY --from=builder /app/bin/semantic-cache-deploy /usr/local/bin/
+COPY --from=builder /app/bin/iaac /usr/local/bin/
 
 # Set permissions
-RUN chmod +x /usr/local/bin/semantic-cache-deploy
+RUN chmod +x /usr/local/bin/iaac
 
 # Switch to non-root user
 USER deploy
 
 # Set entrypoint
-ENTRYPOINT ["semantic-cache-deploy"]
+ENTRYPOINT ["iaac"]

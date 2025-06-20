@@ -6,7 +6,7 @@ includes:
     dir: '{{.USER_WORKING_DIR}}'
 
 vars:
-  BINARY_NAME: semantic-cache-deploy
+  BINARY_NAME: iaac
   BINARY_DIR: bin
 
 tasks:
