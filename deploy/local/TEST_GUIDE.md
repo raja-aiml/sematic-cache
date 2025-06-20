@@ -33,6 +33,9 @@ A test script is provided that automatically filters out macOS linker warnings:
 
 # Run tests quietly with coverage
 ./scripts/test.sh --quiet --coverage
+
+# Run tests with detailed per-package coverage
+./scripts/test.sh --detailed
 ```
 
 ### Direct Go Test Command
