@@ -141,7 +141,7 @@ func clusterStatusCmd(clusterName string) *cobra.Command {
 	}
 }
 
-func clusterLogsCmd(clusterName string) *cobra.Command {
+func clusterLogsCmd(_ string) *cobra.Command {
 	var namespace string
 	var labelSelector string
 	var tail int64

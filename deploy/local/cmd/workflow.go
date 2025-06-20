@@ -175,7 +175,7 @@ func workflowStatusCmd(wm *WorkflowManager) *cobra.Command {
 	}
 }
 
-func workflowLogsCmd(wm *WorkflowManager) *cobra.Command {
+func workflowLogsCmd(_ *WorkflowManager) *cobra.Command {
 	return &cobra.Command{
 		Use:   "logs",
 		Short: "Show application and infrastructure logs",
@@ -207,7 +207,7 @@ func workflowResetCmd(wm *WorkflowManager) *cobra.Command {
 }
 
 // Helper functions for workflow steps
-func runSetup(ctx context.Context, wm *WorkflowManager) error {
+func runSetup(_ context.Context, wm *WorkflowManager) error {
 	wm.logger.Info("Setting up cluster and infrastructure...")
 
 	// Create cluster
@@ -219,7 +219,7 @@ func runSetup(ctx context.Context, wm *WorkflowManager) error {
 	return nil
 }
 
-func runBuild(ctx context.Context, wm *WorkflowManager) error {
+func runBuild(_ context.Context, wm *WorkflowManager) error {
 	wm.logger.Info("Building application...")
 
 	// Build and import image
@@ -231,7 +231,7 @@ func runBuild(ctx context.Context, wm *WorkflowManager) error {
 	return nil
 }
 
-func runDeploy(ctx context.Context, wm *WorkflowManager) error {
+func runDeploy(_ context.Context, wm *WorkflowManager) error {
 	wm.logger.Info("Deploying application...")
 
 	// Deploy application
