@@ -92,8 +92,7 @@ func clusterUpCmd(clusterName *string, kustomizePath *string) *cobra.Command {
 				return fmt.Errorf("infrastructure failed to start: %w", err)
 			}
 
-			logger.Info("Cluster is ready!")
-			logger.Info("Access the application at: http://localhost:8080")
+			logger.Info("Infrastructure components are ready!")
 
 			return nil
 		},
