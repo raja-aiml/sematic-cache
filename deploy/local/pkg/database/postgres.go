@@ -48,7 +48,7 @@ func (pm *PostgresManager) InitializeDatabase(ctx context.Context) error {
 
 	// Create database if it doesn't exist
 	pm.logger.Info("Creating database if not exists: %s", pm.config.Database)
-	
+
 	// Check if database exists
 	var exists bool
 	err = conn.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)", pm.config.Database).Scan(&exists)
@@ -114,7 +114,7 @@ func (pm *PostgresManager) WaitForReady(ctx context.Context, timeout time.Durati
 				var result int
 				err = conn.QueryRow(ctx, "SELECT 1").Scan(&result)
 				conn.Close(ctx)
-				
+
 				if err == nil && result == 1 {
 					pm.logger.Info("PostgreSQL is ready")
 					return nil

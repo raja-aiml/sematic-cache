@@ -111,12 +111,12 @@ func TestRunCommand(t *testing.T) {
 
 			ctx := context.Background()
 			got, err := RunCommand(ctx, tt.cmd, tt.args, tt.opts)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RunCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			// Special handling for pwd command
 			if tt.name == "command_with_dir" && !tt.wantErr {
 				// Resolve symlinks for comparison
@@ -124,7 +124,7 @@ func TestRunCommand(t *testing.T) {
 				wantPath := strings.TrimSpace(tt.want)
 				gotResolved, _ := filepath.EvalSymlinks(gotPath)
 				wantResolved, _ := filepath.EvalSymlinks(wantPath)
-				
+
 				if gotResolved != wantResolved {
 					t.Errorf("RunCommand() = %v, want %v", got, tt.want)
 				}
@@ -137,13 +137,13 @@ func TestRunCommand(t *testing.T) {
 
 func TestRunCommand_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Start a long-running command
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
-	
+
 	_, err := RunCommand(ctx, "sleep", []string{"2"}, nil)
 	if err == nil {
 		t.Error("RunCommand() expected error for cancelled context")
@@ -241,15 +241,15 @@ func TestRunShellCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			got, err := RunShellCommand(ctx, tt.command, tt.opts)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RunShellCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			got = strings.TrimSpace(got)
 			want := strings.TrimSpace(tt.want)
-			
+
 			if got != want {
 				t.Errorf("RunShellCommand() = %v, want %v", got, want)
 			}
@@ -262,7 +262,7 @@ func TestRunShellCommand_Timeout(t *testing.T) {
 	opts := &ExecOptions{
 		Timeout: 100 * time.Millisecond,
 	}
-	
+
 	_, err := RunShellCommand(ctx, "sleep 2", opts)
 	if err == nil {
 		t.Error("RunShellCommand() expected timeout error")

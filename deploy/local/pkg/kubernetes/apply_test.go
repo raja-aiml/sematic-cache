@@ -7,7 +7,7 @@ import (
 
 func TestApplyKustomize(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name      string
 		dir       string
@@ -27,7 +27,7 @@ func TestApplyKustomize(t *testing.T) {
 			wantErr:   true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ApplyKustomize(ctx, tt.dir, tt.namespace)
@@ -40,7 +40,7 @@ func TestApplyKustomize(t *testing.T) {
 
 func TestDeleteKustomize(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name      string
 		dir       string
@@ -60,7 +60,7 @@ func TestDeleteKustomize(t *testing.T) {
 			wantErr:   true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := DeleteKustomize(ctx, tt.dir, tt.namespace)
@@ -74,9 +74,9 @@ func TestDeleteKustomize(t *testing.T) {
 // Benchmark tests
 func BenchmarkApplyKustomize(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = ApplyKustomize(ctx, "/nonexistent/dir", "default")
 	}
@@ -84,9 +84,9 @@ func BenchmarkApplyKustomize(b *testing.B) {
 
 func BenchmarkDeleteKustomize(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = DeleteKustomize(ctx, "/nonexistent/dir", "default")
 	}

@@ -86,7 +86,7 @@ func (ac *ApplyConfig) ApplyKustomizeSDK(ctx context.Context, path string, names
 
 	// Parse and apply resources
 	decoder := yamlutil.NewYAMLOrJSONDecoder(bytes.NewReader(resources), 4096)
-	
+
 	for {
 		var rawObj runtime.RawExtension
 		if err := decoder.Decode(&rawObj); err != nil {
@@ -117,12 +117,12 @@ func (ac *ApplyConfig) ApplyKustomizeSDK(ctx context.Context, path string, names
 
 		// Apply the resource
 		if err := ac.applyResource(ctx, unstructuredObj, gvk); err != nil {
-			ac.Logger.Warn("Failed to apply resource %s/%s: %v", 
+			ac.Logger.Warn("Failed to apply resource %s/%s: %v",
 				unstructuredObj.GetKind(), unstructuredObj.GetName(), err)
 			continue
 		}
 
-		ac.Logger.Info("Applied %s/%s in namespace %s", 
+		ac.Logger.Info("Applied %s/%s in namespace %s",
 			unstructuredObj.GetKind(), unstructuredObj.GetName(), unstructuredObj.GetNamespace())
 	}
 
@@ -133,10 +133,10 @@ func (ac *ApplyConfig) ApplyKustomizeSDK(ctx context.Context, path string, names
 func (ac *ApplyConfig) buildKustomize(path string) ([]byte, error) {
 	// Create kustomizer
 	k := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
-	
+
 	// Create filesystem
 	fSys := filesys.MakeFsOnDisk()
-	
+
 	// Build resources
 	resMap, err := k.Run(fSys, path)
 	if err != nil {
@@ -199,7 +199,7 @@ func (ac *ApplyConfig) DeleteKustomizeSDK(ctx context.Context, path string, name
 
 	// Parse and delete resources
 	decoder := yamlutil.NewYAMLOrJSONDecoder(bytes.NewReader(resources), 4096)
-	
+
 	for {
 		var rawObj runtime.RawExtension
 		if err := decoder.Decode(&rawObj); err != nil {
@@ -230,12 +230,12 @@ func (ac *ApplyConfig) DeleteKustomizeSDK(ctx context.Context, path string, name
 
 		// Delete the resource
 		if err := ac.deleteResource(ctx, unstructuredObj, gvk); err != nil {
-			ac.Logger.Warn("Failed to delete resource %s/%s: %v", 
+			ac.Logger.Warn("Failed to delete resource %s/%s: %v",
 				unstructuredObj.GetKind(), unstructuredObj.GetName(), err)
 			continue
 		}
 
-		ac.Logger.Info("Deleted %s/%s in namespace %s", 
+		ac.Logger.Info("Deleted %s/%s in namespace %s",
 			unstructuredObj.GetKind(), unstructuredObj.GetName(), unstructuredObj.GetNamespace())
 	}
 

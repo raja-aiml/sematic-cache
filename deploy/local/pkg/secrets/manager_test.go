@@ -153,7 +153,7 @@ func TestSecretData(t *testing.T) {
 
 			// Verify data matches
 			if string(secretData["openai-api-key"]) != tt.data.OpenAIAPIKey {
-				t.Errorf("OpenAI API key mismatch: got %s, want %s", 
+				t.Errorf("OpenAI API key mismatch: got %s, want %s",
 					string(secretData["openai-api-key"]), tt.data.OpenAIAPIKey)
 			}
 			if string(secretData["database-url"]) != tt.data.DatabaseURL {
@@ -205,18 +205,18 @@ func TestSecretDataMap(t *testing.T) {
 func TestManager_LoadEnvFile(t *testing.T) {
 	// Save current directory
 	oldPwd, _ := os.Getwd()
-	
+
 	// Create a temp directory
 	tmpDir, err := os.MkdirTemp("", "test-secrets")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	
+
 	// Change to temp directory
 	os.Chdir(tmpDir)
 	defer os.Chdir(oldPwd)
-	
+
 	// Create .env file
 	content := `TEST_SECRET_VAR=secret_value`
 	err = os.WriteFile(".env", []byte(content), 0644)
@@ -229,7 +229,7 @@ func TestManager_LoadEnvFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("LoadEnvFile() error = %v", err)
 	}
-	
+
 	value := os.Getenv("TEST_SECRET_VAR")
 	if value != "secret_value" {
 		t.Logf("LoadEnvFile() didn't load test variable correctly, got %q", value)

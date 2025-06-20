@@ -74,15 +74,15 @@ func TestNewPostgresManager(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pm := NewPostgresManager(tt.config)
-			
+
 			if pm == nil {
 				t.Fatal("NewPostgresManager returned nil")
 			}
-			
+
 			if pm.logger == nil {
 				t.Error("PostgresManager logger is nil")
 			}
-			
+
 			if pm.config != tt.config {
 				t.Error("PostgresManager config not set correctly")
 			}
@@ -113,10 +113,10 @@ func TestPostgresManager_InitializeDatabase(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pm := NewPostgresManager(tt.config)
 			ctx := context.Background()
-			
+
 			// This will fail as we can't connect to a real database in tests
 			err := pm.InitializeDatabase(ctx)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("InitializeDatabase() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -149,9 +149,9 @@ func TestPostgresManager_WaitForReady(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pm := NewPostgresManager(tt.config)
 			ctx := context.Background()
-			
+
 			err := pm.WaitForReady(ctx, tt.timeout)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WaitForReady() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -169,12 +169,12 @@ func TestPostgresManager_WaitForReady_ContextCancellation(t *testing.T) {
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Cancel context immediately
 	cancel()
-	
+
 	err := pm.WaitForReady(ctx, 5*time.Second)
-	
+
 	if err == nil {
 		t.Error("WaitForReady() expected error for cancelled context")
 	}
@@ -203,9 +203,9 @@ func TestPostgresManager_TestConnection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pm := NewPostgresManager(tt.config)
 			ctx := context.Background()
-			
+
 			err := pm.TestConnection(ctx)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TestConnection() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -250,9 +250,9 @@ func TestPostgresManager_ExecuteSQL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pm := NewPostgresManager(tt.config)
 			ctx := context.Background()
-			
+
 			err := pm.ExecuteSQL(ctx, tt.sql)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ExecuteSQL() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -306,7 +306,7 @@ func TestConfig_ConnectionString(t *testing.T) {
 			// Test connection string format
 			connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 				tt.config.User, tt.config.Password, tt.config.Host, tt.config.Port, tt.config.Database)
-			
+
 			if connStr != tt.expected {
 				t.Errorf("Connection string = %v, want %v", connStr, tt.expected)
 			}

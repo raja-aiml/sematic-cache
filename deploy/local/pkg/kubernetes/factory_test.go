@@ -24,11 +24,11 @@ func TestNewClientFactory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cf := NewClientFactory(tt.kubeconfigPath)
-			
+
 			if cf == nil {
 				t.Fatal("NewClientFactory returned nil")
 			}
-			
+
 			if cf.kubeconfigPath != tt.kubeconfigPath {
 				t.Errorf("NewClientFactory() kubeconfigPath = %v, want %v", cf.kubeconfigPath, tt.kubeconfigPath)
 			}
@@ -38,7 +38,7 @@ func TestNewClientFactory(t *testing.T) {
 
 func TestClientFactory_GetClient(t *testing.T) {
 	cf := NewClientFactory("/nonexistent/path")
-	
+
 	// This will fail as kubeconfig doesn't exist
 	_, err := cf.GetClient()
 	if err == nil {
@@ -76,15 +76,15 @@ func TestClientFactory_GetClientWithRetry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cf := NewClientFactory("/nonexistent/path")
-			
+
 			start := time.Now()
 			_, err := cf.GetClientWithRetry(tt.maxRetries, tt.retryDelay)
 			elapsed := time.Since(start)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetClientWithRetry() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			// Check that retries actually happened
 			expectedMinDuration := time.Duration(tt.maxRetries-1) * tt.retryDelay
 			if tt.maxRetries > 1 && elapsed < expectedMinDuration {
@@ -109,13 +109,13 @@ func TestMustGetDefaultClient(t *testing.T) {
 			t.Error("MustGetDefaultClient() should panic without valid kubeconfig")
 		}
 	}()
-	
+
 	_ = MustGetDefaultClient()
 }
 
 func TestClientFactory_WithContext(t *testing.T) {
 	cf := NewClientFactory("/nonexistent/path")
-	
+
 	tests := []struct {
 		name    string
 		timeout time.Duration
@@ -145,7 +145,7 @@ func TestClientFactory_WithContext(t *testing.T) {
 				ctx, cancel = context.WithCancel(ctx)
 				cancel() // Cancel immediately
 			}
-			
+
 			_, err := cf.WithContext(ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("WithContext() error = %v, wantErr %v", err, tt.wantErr)
@@ -159,7 +159,7 @@ func TestDefaultClientFactory(t *testing.T) {
 	if DefaultClientFactory == nil {
 		t.Fatal("DefaultClientFactory is nil")
 	}
-	
+
 	if DefaultClientFactory.kubeconfigPath != "" {
 		t.Errorf("DefaultClientFactory.kubeconfigPath = %v, want empty string", DefaultClientFactory.kubeconfigPath)
 	}
@@ -174,9 +174,9 @@ func BenchmarkNewClientFactory(b *testing.B) {
 
 func BenchmarkGetClientWithRetry(b *testing.B) {
 	cf := NewClientFactory("/nonexistent/path")
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, _ = cf.GetClientWithRetry(1, 0)
 	}

@@ -140,7 +140,7 @@ func (b *SDKBuilder) Run(ctx context.Context, imageName string, opts *RunOptions
 		if len(opts.Ports) > 0 {
 			config.ExposedPorts = make(nat.PortSet)
 			hostConfig.PortBindings = make(nat.PortMap)
-			
+
 			for hostPort, containerPort := range opts.Ports {
 				port, err := nat.NewPort("tcp", containerPort)
 				if err != nil {

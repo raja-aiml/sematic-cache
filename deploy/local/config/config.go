@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // Config represents the application configuration
@@ -55,14 +55,14 @@ type ResourceLimits struct {
 
 // BuildConfig contains build settings
 type BuildConfig struct {
-	ImageName      string        `yaml:"image_name" validate:"required"`
-	Dockerfile     string        `yaml:"dockerfile" validate:"required"`
-	Context        string        `yaml:"context" validate:"required"`
-	Timeout        time.Duration `yaml:"timeout" validate:"required,min=1m"`
-	NoCache        bool          `yaml:"no_cache" validate:""`
-	BuildArgs      []string      `yaml:"build_args" validate:""`
-	CacheFrom      []string      `yaml:"cache_from" validate:""`
-	Platform       string        `yaml:"platform" validate:"omitempty"`
+	ImageName  string        `yaml:"image_name" validate:"required"`
+	Dockerfile string        `yaml:"dockerfile" validate:"required"`
+	Context    string        `yaml:"context" validate:"required"`
+	Timeout    time.Duration `yaml:"timeout" validate:"required,min=1m"`
+	NoCache    bool          `yaml:"no_cache" validate:""`
+	BuildArgs  []string      `yaml:"build_args" validate:""`
+	CacheFrom  []string      `yaml:"cache_from" validate:""`
+	Platform   string        `yaml:"platform" validate:"omitempty"`
 }
 
 // DeployConfig contains deployment settings
@@ -110,15 +110,15 @@ func DefaultConfig() *Config {
 		Debug:   false,
 		LogFile: "",
 		Cluster: ClusterConfig{
-			Name:         "semantic-cache",
-			APIPort:      "6550",
-			HTTPPort:     "8080:80",
-			HTTPSPort:    "8443:443",
-			Servers:      1,
-			Agents:       0,
-			Timeout:      5 * time.Minute,
-			WaitTime:     10 * time.Second,
-			AutoRestart:  false,
+			Name:        "semantic-cache",
+			APIPort:     "6550",
+			HTTPPort:    "8080:80",
+			HTTPSPort:   "8443:443",
+			Servers:     1,
+			Agents:      0,
+			Timeout:     5 * time.Minute,
+			WaitTime:    10 * time.Second,
+			AutoRestart: false,
 			ResourceLimits: ResourceLimits{
 				CPULimit:    "",
 				MemoryLimit: "",
@@ -294,7 +294,7 @@ func GetConfigPaths() []string {
 // PrintConfig prints the configuration in YAML format
 func PrintConfig(config *Config) error {
 	logger := utils.NewLogger("config")
-	
+
 	data, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)

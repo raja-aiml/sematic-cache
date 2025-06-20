@@ -29,11 +29,11 @@ func TestFindProjectRoot(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		startDir   string
-		wantRoot   string
-		wantErr    bool
-		setupFunc  func()
+		name        string
+		startDir    string
+		wantRoot    string
+		wantErr     bool
+		setupFunc   func()
 		cleanupFunc func()
 	}{
 		{
@@ -100,7 +100,7 @@ func TestFindProjectRoot(t *testing.T) {
 			if !tt.wantErr {
 				// Resolve symlinks for comparison
 				gotResolved, _ := filepath.EvalSymlinks(got)
-				
+
 				// For current directory test, just check that go.mod exists
 				if tt.name == "current_directory" {
 					goModPath := filepath.Join(got, "go.mod")

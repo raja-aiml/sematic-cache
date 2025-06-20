@@ -30,15 +30,15 @@ func TestNewBaseCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bc := NewBaseCommand(tt.loggerPrefix)
-			
+
 			if bc == nil {
 				t.Fatal("NewBaseCommand returned nil")
 			}
-			
+
 			if bc.Logger == nil {
 				t.Error("NewBaseCommand() Logger is nil")
 			}
-			
+
 			if bc.K8sClient != nil {
 				t.Error("NewBaseCommand() K8sClient should be nil initially")
 			}
@@ -49,10 +49,10 @@ func TestNewBaseCommand(t *testing.T) {
 func TestBaseCommand_Initialize(t *testing.T) {
 	bc := NewBaseCommand("test")
 	ctx := context.Background()
-	
+
 	// This will fail as we can't connect to k8s in test environment
 	err := bc.Initialize(ctx)
-	
+
 	// We expect an error in test environment
 	if err == nil {
 		t.Error("Initialize() expected error in test environment")
@@ -92,13 +92,13 @@ func TestBaseCommand_AddCommonFlags(t *testing.T) {
 			bc := NewBaseCommand("test")
 			bc.ClusterName = tt.clusterName
 			bc.Namespace = tt.namespace
-			
+
 			cmd := &cobra.Command{
 				Use: "test",
 			}
-			
+
 			bc.AddCommonFlags(cmd)
-			
+
 			// Check if flags were added
 			if tt.clusterName != "" {
 				flag := cmd.PersistentFlags().Lookup("cluster")
@@ -108,7 +108,7 @@ func TestBaseCommand_AddCommonFlags(t *testing.T) {
 					t.Errorf("cluster flag default = %v, want %v", flag.DefValue, tt.clusterName)
 				}
 			}
-			
+
 			if tt.namespace != "" {
 				flag := cmd.PersistentFlags().Lookup("namespace")
 				if flag == nil {
@@ -146,9 +146,9 @@ func TestBaseCommand_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bc := NewBaseCommand("test")
-			
+
 			err := bc.Execute(tt.fn)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -205,11 +205,11 @@ func TestCommandBuilder_Build(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := tt.cb.Build()
-			
+
 			if cmd == nil {
 				t.Fatal("Build() returned nil")
 			}
-			
+
 			if err := tt.check(cmd); err != nil {
 				t.Errorf("Build() command validation failed: %v", err)
 			}
@@ -247,7 +247,7 @@ func TestWrapError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := WrapError(tt.operation, tt.err)
-			
+
 			if tt.err == nil {
 				if got != nil {
 					t.Errorf("WrapError() = %v, want nil", got)
@@ -294,7 +294,7 @@ func TestCommandRunner(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			err := tt.runner.Run(ctx)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CommandRunner.Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -318,9 +318,9 @@ func BenchmarkCommandBuilder_Build(b *testing.B) {
 			return nil
 		},
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = cb.Build()
 	}
@@ -328,9 +328,9 @@ func BenchmarkCommandBuilder_Build(b *testing.B) {
 
 func BenchmarkWrapError(b *testing.B) {
 	err := errors.New("test error")
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = WrapError("operation", err)
 	}

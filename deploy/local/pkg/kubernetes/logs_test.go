@@ -8,17 +8,17 @@ import (
 func TestNewLogRetriever(t *testing.T) {
 	// Mock client
 	client := &Client{}
-	
+
 	lr := NewLogRetriever(client)
-	
+
 	if lr == nil {
 		t.Fatal("NewLogRetriever returned nil")
 	}
-	
+
 	if lr.client != client {
 		t.Error("NewLogRetriever() client mismatch")
 	}
-	
+
 	if lr.logger == nil {
 		t.Error("NewLogRetriever() logger is nil")
 	}
@@ -28,7 +28,7 @@ func TestLogRetriever_GetLogs(t *testing.T) {
 	// This will fail without a real k8s client
 	lr := NewLogRetriever(nil)
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name    string
 		opts    LogOptions
@@ -60,7 +60,7 @@ func TestLogRetriever_GetLogs(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := lr.GetLogs(ctx, tt.opts)
@@ -81,27 +81,27 @@ func TestLogOptions(t *testing.T) {
 		Follow:        false,
 		PodName:       "test-pod",
 	}
-	
+
 	if opts.Namespace != "test-ns" {
 		t.Errorf("LogOptions.Namespace = %v", opts.Namespace)
 	}
-	
+
 	if opts.LabelSelector != "app=test" {
 		t.Errorf("LogOptions.LabelSelector = %v", opts.LabelSelector)
 	}
-	
+
 	if opts.TailLines != 50 {
 		t.Errorf("LogOptions.TailLines = %v", opts.TailLines)
 	}
-	
+
 	if !opts.ShowPodName {
 		t.Error("LogOptions.ShowPodName should be true")
 	}
-	
+
 	if opts.Follow {
 		t.Error("LogOptions.Follow should be false")
 	}
-	
+
 	if opts.PodName != "test-pod" {
 		t.Errorf("LogOptions.PodName = %v", opts.PodName)
 	}
@@ -110,7 +110,7 @@ func TestLogOptions(t *testing.T) {
 func TestLogRetriever_StreamLogs(t *testing.T) {
 	lr := NewLogRetriever(nil)
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name    string
 		opts    LogOptions
@@ -135,7 +135,7 @@ func TestLogRetriever_StreamLogs(t *testing.T) {
 			wantErr: false, // Just shows warning
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := lr.StreamLogs(ctx, tt.opts)
@@ -149,7 +149,7 @@ func TestLogRetriever_StreamLogs(t *testing.T) {
 func TestLogRetriever_GetPodStatus(t *testing.T) {
 	lr := NewLogRetriever(nil)
 	ctx := context.Background()
-	
+
 	// This will fail without a real k8s client
 	_, err := lr.GetPodStatus(ctx, "default", "app=test")
 	if err == nil {
@@ -166,23 +166,23 @@ func TestPodStatus(t *testing.T) {
 		Ready:     true,
 		Restarts:  2,
 	}
-	
+
 	if status.Name != "test-pod" {
 		t.Errorf("PodStatus.Name = %v", status.Name)
 	}
-	
+
 	if status.Namespace != "default" {
 		t.Errorf("PodStatus.Namespace = %v", status.Namespace)
 	}
-	
+
 	if status.Phase != "Running" {
 		t.Errorf("PodStatus.Phase = %v", status.Phase)
 	}
-	
+
 	if !status.Ready {
 		t.Error("PodStatus.Ready should be true")
 	}
-	
+
 	if status.Restarts != 2 {
 		t.Errorf("PodStatus.Restarts = %v", status.Restarts)
 	}
@@ -191,9 +191,9 @@ func TestPodStatus(t *testing.T) {
 // Benchmark tests
 func BenchmarkNewLogRetriever(b *testing.B) {
 	client := &Client{}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = NewLogRetriever(client)
 	}

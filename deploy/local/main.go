@@ -27,7 +27,7 @@ This tool replaces shell scripts with a robust Go implementation using k3d SDK.`
 func init() {
 	// Disable completion command
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
-	
+
 	// Add commands
 	rootCmd.AddCommand(cmd.ClusterCmd())
 	rootCmd.AddCommand(cmd.DevCmd())

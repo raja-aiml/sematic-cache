@@ -197,18 +197,18 @@ func TestParseEnvFile_FileNotExists(t *testing.T) {
 func TestLoadEnvFile(t *testing.T) {
 	// Save current directory
 	oldPwd, _ := os.Getwd()
-	
+
 	// Create a temp directory
 	tmpDir, err := os.MkdirTemp("", "test-env")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	
+
 	// Change to temp directory
 	os.Chdir(tmpDir)
 	defer os.Chdir(oldPwd)
-	
+
 	// Create .env file (exact name)
 	content := `TEST_LOAD_ENV_VAR=loaded_value`
 	err = os.WriteFile(".env", []byte(content), 0644)

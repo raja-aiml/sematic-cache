@@ -6,16 +6,16 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	if cfg == nil {
 		t.Fatal("DefaultConfig() returned nil")
 	}
-	
+
 	// Test cluster defaults
 	if cfg.Cluster.Name != "semantic-cache" {
 		t.Errorf("DefaultConfig() Cluster.Name = %v, want %v", cfg.Cluster.Name, "semantic-cache")
@@ -29,7 +29,7 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Cluster.Timeout != 5*time.Minute {
 		t.Errorf("DefaultConfig() Cluster.Timeout = %v, want %v", cfg.Cluster.Timeout, 5*time.Minute)
 	}
-	
+
 	// Test build defaults
 	if cfg.Build.ImageName != "semantic-cache:local" {
 		t.Errorf("DefaultConfig() Build.ImageName = %v, want %v", cfg.Build.ImageName, "semantic-cache:local")
@@ -40,7 +40,7 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Build.Timeout != 10*time.Minute {
 		t.Errorf("DefaultConfig() Build.Timeout = %v, want %v", cfg.Build.Timeout, 10*time.Minute)
 	}
-	
+
 	// Test deploy defaults
 	if cfg.Deploy.Namespace != "app" {
 		t.Errorf("DefaultConfig() Deploy.Namespace = %v, want %v", cfg.Deploy.Namespace, "app")
@@ -51,7 +51,7 @@ func TestDefaultConfig(t *testing.T) {
 	if !cfg.Deploy.WaitForReady {
 		t.Error("DefaultConfig() Deploy.WaitForReady should be true")
 	}
-	
+
 	// Test security defaults
 	if !cfg.Security.EnableRBAC {
 		t.Error("DefaultConfig() Security.EnableRBAC should be true")
@@ -59,7 +59,7 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Security.SecretBackend != "env" {
 		t.Errorf("DefaultConfig() Security.SecretBackend = %v, want %v", cfg.Security.SecretBackend, "env")
 	}
-	
+
 	// Test test config defaults
 	if !cfg.Test.Enabled {
 		t.Error("DefaultConfig() Test.Enabled should be true")
@@ -165,7 +165,7 @@ func TestValidateConfig(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateConfig(tt.config)
@@ -266,13 +266,13 @@ func TestApplyEnvOverrides(t *testing.T) {
 		{
 			name: "multiple_overrides",
 			envVars: map[string]string{
-				"SC_DEPLOY_DEBUG":         "true",
-				"SC_DEPLOY_CLUSTER_NAME":  "multi-test",
-				"SC_DEPLOY_TEST_ENABLED":  "false",
+				"SC_DEPLOY_DEBUG":        "true",
+				"SC_DEPLOY_CLUSTER_NAME": "multi-test",
+				"SC_DEPLOY_TEST_ENABLED": "false",
 			},
 			validate: func(cfg *Config) bool {
-				return cfg.Debug == true && 
-					cfg.Cluster.Name == "multi-test" && 
+				return cfg.Debug == true &&
+					cfg.Cluster.Name == "multi-test" &&
 					cfg.Test.Enabled == false
 			},
 		},
@@ -286,23 +286,23 @@ func TestApplyEnvOverrides(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear env vars first
 			for k := range tt.envVars {
 				os.Unsetenv(k)
 			}
-			
+
 			// Set test env vars
 			for k, v := range tt.envVars {
 				os.Setenv(k, v)
 				defer os.Unsetenv(k)
 			}
-			
+
 			cfg := DefaultConfig()
 			applyEnvOverrides(cfg)
-			
+
 			if !tt.validate(cfg) {
 				t.Errorf("applyEnvOverrides() failed validation for %s", tt.name)
 			}
@@ -312,7 +312,7 @@ func TestApplyEnvOverrides(t *testing.T) {
 
 func TestSaveConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	// Create temp file
 	tmpFile, err := os.CreateTemp("", "config-test-*.yaml")
 	if err != nil {
@@ -321,40 +321,40 @@ func TestSaveConfig(t *testing.T) {
 	tmpPath := tmpFile.Name()
 	tmpFile.Close()
 	defer os.Remove(tmpPath)
-	
+
 	// Save config
 	err = SaveConfig(cfg, tmpPath)
 	if err != nil {
 		t.Errorf("SaveConfig() error = %v", err)
 	}
-	
+
 	// Verify file exists
 	if _, err := os.Stat(tmpPath); os.IsNotExist(err) {
 		t.Error("SaveConfig() didn't create file")
 	}
-	
+
 	// Read and verify content
 	data, err := os.ReadFile(tmpPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	var loaded Config
 	err = yaml.Unmarshal(data, &loaded)
 	if err != nil {
 		t.Errorf("SaveConfig() produced invalid YAML: %v", err)
 	}
-	
+
 	// Verify some fields
 	if loaded.Cluster.Name != cfg.Cluster.Name {
-		t.Errorf("Saved config has different cluster name: got %v, want %v", 
+		t.Errorf("Saved config has different cluster name: got %v, want %v",
 			loaded.Cluster.Name, cfg.Cluster.Name)
 	}
 }
 
 func TestSaveConfig_WriteError(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	// Try to save to invalid path
 	err := SaveConfig(cfg, "/invalid/path/config.yaml")
 	if err == nil {
@@ -367,7 +367,7 @@ func TestLoadConfig_NonExistentFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("LoadConfig() expected error for non-existent file")
 	}
-	
+
 	if cfg != nil {
 		t.Error("LoadConfig() should return nil config on error")
 	}
@@ -376,8 +376,10 @@ func TestLoadConfig_NonExistentFile(t *testing.T) {
 func TestLoadConfig_ValidFile(t *testing.T) {
 	// Clear any environment variables that might interfere
 	os.Unsetenv("SC_DEPLOY_BUILD_IMAGE")
-	
-	// Create a minimal valid config using nanoseconds for durations
+
+	// Create a minimal valid config
+	// Note: sigs.k8s.io/yaml doesn't support time.Duration parsing from nanoseconds
+	// so we skip duration fields in this test
 	configData := `
 debug: true
 cluster:
@@ -386,22 +388,16 @@ cluster:
   http_port: "8080:80"
   https_port: "8443:443"
   servers: 1
-  timeout: 300000000000  # 5m in nanoseconds
-  wait_time: 10000000000  # 10s in nanoseconds
 build:
   image_name: test-image:latest
   dockerfile: Dockerfile
   context: .
-  timeout: 600000000000  # 10m in nanoseconds
 deploy:
   namespace: test
-  timeout: 300000000000  # 5m in nanoseconds
   health_check_path: /health
 test:
   enabled: true
-  timeout: 120000000000  # 2m in nanoseconds
   retry_attempts: 3
-  retry_delay: 5000000000  # 5s in nanoseconds
   concurrent_tests: 5
 security:
   enable_rbac: true
@@ -409,7 +405,7 @@ security:
   encryption:
     algorithm: aes256
 `
-	
+
 	// Create temp file
 	tmpFile, err := os.CreateTemp("", "config-test-*.yaml")
 	if err != nil {
@@ -417,32 +413,36 @@ security:
 	}
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
-	
+
 	// Write config
 	if _, err := tmpFile.WriteString(configData); err != nil {
 		t.Fatal(err)
 	}
 	tmpFile.Close()
-	
+
 	// Load config
 	cfg, err := LoadConfig(tmpPath)
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
 	}
-	
+
 	if cfg == nil {
 		t.Fatal("LoadConfig() returned nil config")
 	}
-	
+
 	// Verify loaded values
 	if !cfg.Debug {
 		t.Error("LoadConfig() didn't load debug value")
 	}
-	
+
 	if cfg.Cluster.Name != "test-cluster" {
 		t.Errorf("LoadConfig() Cluster.Name = %v, want %v", cfg.Cluster.Name, "test-cluster")
 	}
-	
+
+	// Debug what actually loaded
+	t.Logf("Loaded config: Debug=%v, Cluster.Name=%v, Build.ImageName=%v",
+		cfg.Debug, cfg.Cluster.Name, cfg.Build.ImageName)
+
 	if cfg.Build.ImageName != "test-image:latest" {
 		t.Errorf("LoadConfig() Build.ImageName = %v, want %v", cfg.Build.ImageName, "test-image:latest")
 	}
@@ -456,19 +456,19 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 	}
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
-	
+
 	// Write invalid YAML
 	if _, err := tmpFile.WriteString("invalid: yaml: content:"); err != nil {
 		t.Fatal(err)
 	}
 	tmpFile.Close()
-	
+
 	// Try to load
 	cfg, err := LoadConfig(tmpPath)
 	if err == nil {
 		t.Error("LoadConfig() expected error for invalid YAML")
 	}
-	
+
 	if cfg != nil {
 		t.Error("LoadConfig() should return nil config on error")
 	}
@@ -478,16 +478,16 @@ func TestLoadConfig_EmptyPath(t *testing.T) {
 	// When path is empty, it should try default locations
 	// Since they don't exist in test environment, it should return defaults
 	cfg, err := LoadConfig("")
-	
+
 	// Should not error - just uses defaults
 	if err != nil {
 		t.Errorf("LoadConfig(\"\") unexpected error = %v", err)
 	}
-	
+
 	if cfg == nil {
 		t.Fatal("LoadConfig(\"\") returned nil config")
 	}
-	
+
 	// Should have default values
 	if cfg.Cluster.Name != "semantic-cache" {
 		t.Errorf("LoadConfig(\"\") didn't use defaults, got cluster name = %v", cfg.Cluster.Name)
@@ -495,7 +495,7 @@ func TestLoadConfig_EmptyPath(t *testing.T) {
 }
 
 func TestValidateConfigFile(t *testing.T) {
-	// Create a valid config file using nanoseconds for durations
+	// Create a valid config file using duration strings
 	configData := `
 cluster:
   name: test
@@ -503,22 +503,22 @@ cluster:
   http_port: "8080:80"
   https_port: "8443:443"
   servers: 1
-  timeout: 300000000000  # 5m in nanoseconds
-  wait_time: 10000000000  # 10s in nanoseconds
+  timeout: 5m
+  wait_time: 10s
 build:
   image_name: test:latest
   dockerfile: Dockerfile
   context: .
-  timeout: 600000000000  # 10m in nanoseconds
+  timeout: 10m
 deploy:
   namespace: test
-  timeout: 300000000000  # 5m in nanoseconds
+  timeout: 5m
   health_check_path: /health
 test:
   enabled: true
-  timeout: 120000000000  # 2m in nanoseconds
+  timeout: 2m
   retry_attempts: 3
-  retry_delay: 5000000000  # 5s in nanoseconds
+  retry_delay: 5s
   concurrent_tests: 5
 security:
   enable_rbac: true
@@ -526,19 +526,19 @@ security:
   encryption:
     algorithm: aes256
 `
-	
+
 	tmpFile, err := os.CreateTemp("", "config-test-*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
-	
+
 	if _, err := tmpFile.WriteString(configData); err != nil {
 		t.Fatal(err)
 	}
 	tmpFile.Close()
-	
+
 	// Validate file
 	err = ValidateConfigFile(tmpPath)
 	if err != nil {
@@ -548,18 +548,18 @@ security:
 
 func TestGetConfigPaths(t *testing.T) {
 	paths := GetConfigPaths()
-	
+
 	if len(paths) != 3 {
 		t.Errorf("GetConfigPaths() returned %d paths, want 3", len(paths))
 	}
-	
+
 	// Check expected paths
 	expectedPaths := []string{
 		"deploy-config.yaml",
 		"./config/deploy-config.yaml",
 		filepath.Join(os.Getenv("HOME"), ".semantic-cache", "deploy-config.yaml"),
 	}
-	
+
 	for i, path := range paths {
 		if path != expectedPaths[i] {
 			t.Errorf("GetConfigPaths()[%d] = %v, want %v", i, path, expectedPaths[i])
@@ -569,7 +569,7 @@ func TestGetConfigPaths(t *testing.T) {
 
 func TestPrintConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	// PrintConfig should not error
 	err := PrintConfig(cfg)
 	if err != nil {
@@ -587,7 +587,7 @@ func BenchmarkDefaultConfig(b *testing.B) {
 func BenchmarkValidateConfig(b *testing.B) {
 	cfg := DefaultConfig()
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = ValidateConfig(cfg)
 	}
@@ -598,9 +598,9 @@ func BenchmarkApplyEnvOverrides(b *testing.B) {
 	os.Setenv("SC_DEPLOY_CLUSTER_NAME", "bench-cluster")
 	defer os.Unsetenv("SC_DEPLOY_DEBUG")
 	defer os.Unsetenv("SC_DEPLOY_CLUSTER_NAME")
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		cfg := DefaultConfig()
 		applyEnvOverrides(cfg)

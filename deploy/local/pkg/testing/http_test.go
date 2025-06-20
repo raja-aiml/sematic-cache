@@ -8,27 +8,27 @@ import (
 
 func TestNewHTTPClient(t *testing.T) {
 	client := NewHTTPClient()
-	
+
 	if client == nil {
 		t.Fatal("NewHTTPClient returned nil")
 	}
-	
+
 	// Check that timeout is set
 	if client.Timeout != 5*time.Second {
 		t.Errorf("NewHTTPClient() Timeout = %v, want %v", client.Timeout, 5*time.Second)
 	}
-	
+
 	// Check that transport is configured
 	transport, ok := client.Transport.(*http.Transport)
 	if !ok {
 		t.Fatal("NewHTTPClient() Transport is not *http.Transport")
 	}
-	
+
 	// Check transport configuration
 	if transport.MaxIdleConns != 10 {
 		t.Errorf("Transport.MaxIdleConns = %v, want %v", transport.MaxIdleConns, 10)
 	}
-	
+
 	if transport.IdleConnTimeout != 30*time.Second {
 		t.Errorf("Transport.IdleConnTimeout = %v, want %v", transport.IdleConnTimeout, 30*time.Second)
 	}
@@ -56,25 +56,25 @@ func TestNewHTTPClientWithTimeout(t *testing.T) {
 			timeout: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := NewHTTPClientWithTimeout(tt.timeout)
-			
+
 			if client == nil {
 				t.Fatal("NewHTTPClientWithTimeout returned nil")
 			}
-			
+
 			if client.Timeout != tt.timeout {
 				t.Errorf("NewHTTPClientWithTimeout() Timeout = %v, want %v", client.Timeout, tt.timeout)
 			}
-			
+
 			// Check that transport is configured
 			transport, ok := client.Transport.(*http.Transport)
 			if !ok {
 				t.Fatal("NewHTTPClientWithTimeout() Transport is not *http.Transport")
 			}
-			
+
 			// Check transport configuration remains the same
 			if transport.MaxIdleConns != 10 {
 				t.Errorf("Transport.MaxIdleConns = %v, want %v", transport.MaxIdleConns, 10)

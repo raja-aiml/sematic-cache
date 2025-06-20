@@ -68,7 +68,7 @@ func TestClient_CreateNamespace(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// This will fail without a real cluster
 	err = client.CreateNamespace(ctx, "test-namespace")
 	if err == nil {
@@ -91,7 +91,7 @@ func TestClient_CreateSecret(t *testing.T) {
 	data := map[string][]byte{
 		"key": []byte("value"),
 	}
-	
+
 	// This will fail without a real cluster
 	err = client.CreateSecret(ctx, "default", "test-secret", data)
 	if err == nil {
@@ -114,7 +114,7 @@ func TestClient_UpdateSecret(t *testing.T) {
 	data := map[string][]byte{
 		"key": []byte("updated-value"),
 	}
-	
+
 	// This will fail without a real cluster
 	err = client.UpdateSecret(ctx, "default", "test-secret", data)
 	if err == nil {
@@ -134,7 +134,7 @@ func TestClient_WaitForDeployment(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// This will timeout without a real cluster
 	err = client.WaitForDeployment(ctx, "default", "test-deployment", 2*time.Second)
 	if err == nil {
@@ -154,7 +154,7 @@ func TestClient_GetPods(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// This will fail without a real cluster
 	_, err = client.GetPods(ctx, "default", "app=test")
 	if err == nil {
@@ -174,7 +174,7 @@ func TestClient_GetPodLogs(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// This will fail without a real cluster
 	_, err = client.GetPodLogs(ctx, "default", "test-pod", 100)
 	if err == nil {
@@ -194,7 +194,7 @@ func TestClient_PortForward(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// This returns not implemented error
 	err = client.PortForward(ctx, "default", "test-pod", 8080, 80)
 	if err == nil {
@@ -208,7 +208,7 @@ func TestKubeconfigPath(t *testing.T) {
 	if _, err := NewClient(""); err == nil {
 		t.Skip("Unexpected success with empty path")
 	}
-	
+
 	// Test with specific path
 	if _, err := NewClient("/tmp/nonexistent"); err == nil {
 		t.Skip("Unexpected success with nonexistent path")
