@@ -12,7 +12,7 @@ go vet ./...            # Static analysis (MANDATORY before commit)
 go run cmd/server/main.go -config config.yml  # Run server
 ```
 
-### Git Commit Shortcut
+### Git Commit Guidelines
 When you need to quickly stage all changes and commit with an auto-generated message, use this instruction:
 ```
 "git add, generate git commit message and commit"
@@ -21,7 +21,14 @@ This will:
 1. Check git status to understand changes
 2. Stage all modified and new files (limited to current directory when in iaac/iaac)
 3. Generate a descriptive commit message following conventional commits format
-4. Create the commit with co-authorship attribution
+4. Create the commit without any AI attribution
+
+**IMPORTANT: Never include these lines in commit messages:**
+```
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
 
 Note: When working in iaac/iaac, only changes within that directory will be staged and committed.
 
