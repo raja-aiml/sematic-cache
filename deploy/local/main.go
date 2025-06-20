@@ -50,12 +50,12 @@ func versionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Semantic Cache Deploy\n")
-			fmt.Printf("  Version:    %s\n", version)
-			fmt.Printf("  Built:      %s\n", buildTime)
-			fmt.Printf("  Git Commit: %s\n", gitCommit)
-			fmt.Printf("  Go Version: %s\n", runtime.Version())
-			fmt.Printf("  OS/Arch:    %s/%s\n", runtime.GOOS, runtime.GOARCH)
+			fmt.Fprintf(cmd.OutOrStdout(), "Semantic Cache Deploy\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  Version:    %s\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "  Built:      %s\n", buildTime)
+			fmt.Fprintf(cmd.OutOrStdout(), "  Git Commit: %s\n", gitCommit)
+			fmt.Fprintf(cmd.OutOrStdout(), "  Go Version: %s\n", runtime.Version())
+			fmt.Fprintf(cmd.OutOrStdout(), "  OS/Arch:    %s/%s\n", runtime.GOOS, runtime.GOARCH)
 		},
 	}
 }

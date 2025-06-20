@@ -18,19 +18,19 @@ type Config struct {
 	LogFile string `yaml:"log_file" validate:"omitempty"`
 
 	// Cluster configuration
-	Cluster ClusterConfig `yaml:"cluster" validate:"required,dive"`
+	Cluster ClusterConfig `yaml:"cluster" validate:"required"`
 
 	// Build configuration
-	Build BuildConfig `yaml:"build" validate:"required,dive"`
+	Build BuildConfig `yaml:"build" validate:"required"`
 
 	// Deployment configuration
-	Deploy DeployConfig `yaml:"deploy" validate:"required,dive"`
+	Deploy DeployConfig `yaml:"deploy" validate:"required"`
 
 	// Testing configuration
-	Test TestConfig `yaml:"test" validate:"required,dive"`
+	Test TestConfig `yaml:"test" validate:"required"`
 
 	// Security configuration
-	Security SecurityConfig `yaml:"security" validate:"required,dive"`
+	Security SecurityConfig `yaml:"security" validate:"required"`
 }
 
 // ClusterConfig contains k3d cluster settings
@@ -44,7 +44,7 @@ type ClusterConfig struct {
 	Timeout        time.Duration  `yaml:"timeout" validate:"required,min=30s"`
 	WaitTime       time.Duration  `yaml:"wait_time" validate:"required,min=5s"`
 	AutoRestart    bool           `yaml:"auto_restart" validate:""`
-	ResourceLimits ResourceLimits `yaml:"resource_limits" validate:"dive"`
+	ResourceLimits ResourceLimits `yaml:"resource_limits" validate:""`
 }
 
 // ResourceLimits defines resource constraints
@@ -94,7 +94,7 @@ type SecurityConfig struct {
 	AuditLogging    bool             `yaml:"audit_logging" validate:""`
 	NetworkPolicies bool             `yaml:"network_policies" validate:""`
 	SecretBackend   string           `yaml:"secret_backend" validate:"omitempty,oneof=env file vault"`
-	Encryption      EncryptionConfig `yaml:"encryption" validate:"dive"`
+	Encryption      EncryptionConfig `yaml:"encryption" validate:""`
 }
 
 // EncryptionConfig contains encryption settings

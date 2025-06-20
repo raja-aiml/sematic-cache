@@ -19,9 +19,11 @@ When you need to quickly stage all changes and commit with an auto-generated mes
 ```
 This will:
 1. Check git status to understand changes
-2. Stage all modified and new files
+2. Stage all modified and new files (limited to current directory when in deploy/local)
 3. Generate a descriptive commit message following conventional commits format
 4. Create the commit with co-authorship attribution
+
+Note: When working in deploy/local, only changes within that directory will be staged and committed.
 
 ### Key Principles to Follow
 1. **KISS**: Keep implementations simple and readable
