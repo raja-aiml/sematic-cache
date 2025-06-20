@@ -54,12 +54,18 @@ func applyKustomizeCLI(ctx context.Context, path string, namespace string) error
 		if err != nil {
 			return fmt.Errorf("failed to create temp file: %w", err)
 		}
-		defer os.Remove(tmpfile.Name())
+		defer func() {
+			if err := os.Remove(tmpfile.Name()); err != nil {
+				logger.Debug("failed to remove temp file: %v", err)
+			}
+		}()
 
 		if _, err := tmpfile.WriteString(kustomizeOut); err != nil {
 			return fmt.Errorf("failed to write kustomize output: %w", err)
 		}
-		tmpfile.Close()
+		if err := tmpfile.Close(); err != nil {
+			return fmt.Errorf("failed to close temp file: %w", err)
+		}
 
 		cmd = "kubectl"
 		args = []string{"apply", "-f", tmpfile.Name()}

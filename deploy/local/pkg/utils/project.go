@@ -4,44 +4,38 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 )
 
-var (
-	projectRootCache string
-	projectRootOnce  sync.Once
-	projectRootErr   error
-)
+const maxDepth = 10 // Maximum depth to search for go.mod
 
 // FindProjectRoot finds the project root by looking for go.mod file
-// Results are cached for subsequent calls
 func FindProjectRoot() (string, error) {
-	projectRootOnce.Do(func() {
-		dir, err := os.Getwd()
-		if err != nil {
-			projectRootErr = fmt.Errorf("failed to get working directory: %w", err)
-			return
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	depth := 0
+	for {
+		// Check if go.mod exists in this directory
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
 		}
 
-		for {
-			// Check if go.mod exists in this directory
-			if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-				projectRootCache = dir
-				return
-			}
-
-			// Move up one directory
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				// Reached root directory
-				projectRootErr = fmt.Errorf("could not find project root (no go.mod found)")
-				return
-			}
-			dir = parent
+		// Check depth limit
+		depth++
+		if depth > maxDepth {
+			return "", fmt.Errorf("could not find project root (no go.mod found within %d levels)", maxDepth)
 		}
-	})
 
-	return projectRootCache, projectRootErr
+		// Move up one directory
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached root directory
+			return "", fmt.Errorf("could not find project root (no go.mod found)")
+		}
+		dir = parent
+	}
 }
 
 // GetDeployPath returns the path to the deploy directory

@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -83,7 +83,11 @@ func (ctm *CompositeTestManager) run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create config: %w", err)
 	}
-	defer os.Remove(configPath)
+	defer func() {
+		if err := os.Remove(configPath); err != nil {
+			ctm.logger.Error("Failed to remove config file: %v", err)
+		}
+	}()
 
 	// Run the server with composite backend
 	if err := ctm.runCompositeDemo(ctx, configPath); err != nil {
@@ -236,18 +240,24 @@ func (ctm *CompositeTestManager) createCompositeConfig() (string, error) {
 	}
 
 	// Write to temp file
-	tmpfile, err := ioutil.TempFile("", "composite-config-*.yml")
+	tmpfile, err := os.CreateTemp("", "composite-config-*.yml")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
 
 	if _, err := tmpfile.Write(yamlData); err != nil {
-		tmpfile.Close()
-		os.Remove(tmpfile.Name())
+		if closeErr := tmpfile.Close(); closeErr != nil {
+			ctm.logger.Error("Failed to close temp file: %v", closeErr)
+		}
+		if removeErr := os.Remove(tmpfile.Name()); removeErr != nil {
+			ctm.logger.Error("Failed to remove temp file: %v", removeErr)
+		}
 		return "", fmt.Errorf("failed to write config: %w", err)
 	}
 
-	tmpfile.Close()
+	if err := tmpfile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
 	ctm.logger.Info("Configuration created at: %s", tmpfile.Name())
 	return tmpfile.Name(), nil
 }
@@ -295,7 +305,12 @@ func (ctm *CompositeTestManager) runCompositeDemo(ctx context.Context, configPat
 
 	// Stop the server
 	serverCancel()
-	serverCmd.Wait()
+	if err := serverCmd.Wait(); err != nil {
+		// Context cancellation is expected, so only log non-context errors
+		if !errors.Is(err, context.Canceled) {
+			ctm.logger.Debug("Server stopped with error: %v", err)
+		}
+	}
 
 	return nil
 }
@@ -325,8 +340,13 @@ func (ctm *CompositeTestManager) cleanup() {
 	for _, pf := range ctm.portForwards {
 		if pf.cmd != nil && pf.cmd.Process != nil {
 			ctm.logger.Debug("Stopping port-forward for %s", pf.service)
-			pf.cmd.Process.Kill()
-			pf.cmd.Wait()
+			if err := pf.cmd.Process.Kill(); err != nil {
+				ctm.logger.Debug("Failed to kill port-forward process: %v", err)
+			}
+			if err := pf.cmd.Wait(); err != nil {
+				// Process kill errors are expected
+				ctm.logger.Debug("Port-forward process exited: %v", err)
+			}
 		}
 	}
 }

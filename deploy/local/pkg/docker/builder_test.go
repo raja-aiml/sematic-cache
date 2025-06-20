@@ -88,7 +88,11 @@ func TestGetProjectRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create go.mod in temp dir
 	goModPath := filepath.Join(tmpDir, "go.mod")
@@ -99,7 +103,11 @@ func TestGetProjectRoot(t *testing.T) {
 
 	// Save current directory
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Failed to change back to original dir: %v", err)
+		}
+	}()
 
 	// Change to temp directory
 	err = os.Chdir(tmpDir)
@@ -123,8 +131,12 @@ func TestGetProjectRoot(t *testing.T) {
 
 	// Test from subdirectory
 	subDir := filepath.Join(tmpDir, "sub")
-	os.Mkdir(subDir, 0755)
-	os.Chdir(subDir)
+	if err := os.Mkdir(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(subDir); err != nil {
+		t.Fatal(err)
+	}
 
 	root, err = GetProjectRoot()
 	if err != nil {
@@ -145,20 +157,32 @@ func TestGetProjectRoot_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	deepPath := tmpDir
 	for i := 0; i < 6; i++ {
 		deepPath = filepath.Join(deepPath, "level")
 	}
-	os.MkdirAll(deepPath, 0755)
+	if err := os.MkdirAll(deepPath, 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	// Save current directory
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("Failed to change back to original dir: %v", err)
+		}
+	}()
 
 	// Change to deep directory
-	os.Chdir(deepPath)
+	if err := os.Chdir(deepPath); err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = GetProjectRoot()
 	if err == nil {
@@ -223,7 +247,9 @@ func TestBuilder_Build_CLIFallback(t *testing.T) {
 	if err == nil {
 		t.Error("Build() expected error in test environment")
 		// If somehow it succeeded, try to clean up
-		builder.Remove(ctx, "test-cli-build:shouldnotexist")
+		if removeErr := builder.Remove(ctx, "test-cli-build:shouldnotexist"); removeErr != nil {
+			t.Logf("Failed to remove test image: %v", removeErr)
+		}
 	}
 }
 
@@ -353,13 +379,17 @@ func TestBuilder_Build_WithSDK(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Create a temp directory for build context
 	tmpDir, err := os.MkdirTemp("", "build-test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create a test Dockerfile
 	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
@@ -523,14 +553,26 @@ func BenchmarkNewBuilder(b *testing.B) {
 func BenchmarkGetProjectRoot(b *testing.B) {
 	// Create a temp dir with go.mod
 	tmpDir, _ := os.MkdirTemp("", "bench-project")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			b.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	goModPath := filepath.Join(tmpDir, "go.mod")
-	os.WriteFile(goModPath, []byte("module bench\n"), 0644)
+	if err := os.WriteFile(goModPath, []byte("module bench\n"), 0644); err != nil {
+		b.Fatal(err)
+	}
 
 	originalDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		b.Fatalf("Failed to change to temp dir: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			b.Logf("Failed to change back to original dir: %v", err)
+		}
+	}()
 
 	b.ResetTimer()
 

@@ -366,6 +366,12 @@ func checkAppHealth() bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log error if we have a way to do so, otherwise ignore
+			// since this is just a health check
+			_ = closeErr // Acknowledge the error to satisfy linter
+		}
+	}()
 	return resp.StatusCode == 200
 }

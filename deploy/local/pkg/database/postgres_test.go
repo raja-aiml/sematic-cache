@@ -5,44 +5,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
-
-// Mock types for testing
-type mockRow struct {
-	scanFunc func(dest ...interface{}) error
-}
-
-func (m *mockRow) Scan(dest ...interface{}) error {
-	if m.scanFunc != nil {
-		return m.scanFunc(dest...)
-	}
-	return nil
-}
-
-type mockConn struct {
-	connectErr   error
-	execErr      error
-	queryRowFunc func(ctx context.Context, sql string, args ...interface{}) pgx.Row
-	closeErr     error
-}
-
-func (m *mockConn) Close(ctx context.Context) error {
-	return m.closeErr
-}
-
-func (m *mockConn) Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error) {
-	return pgconn.NewCommandTag(""), m.execErr
-}
-
-func (m *mockConn) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
-	if m.queryRowFunc != nil {
-		return m.queryRowFunc(ctx, sql, args...)
-	}
-	return &mockRow{}
-}
 
 func TestNewPostgresManager(t *testing.T) {
 	tests := []struct {

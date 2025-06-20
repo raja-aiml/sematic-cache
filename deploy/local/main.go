@@ -50,12 +50,24 @@ func versionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "Semantic Cache Deploy\n")
-			fmt.Fprintf(cmd.OutOrStdout(), "  Version:    %s\n", version)
-			fmt.Fprintf(cmd.OutOrStdout(), "  Built:      %s\n", buildTime)
-			fmt.Fprintf(cmd.OutOrStdout(), "  Git Commit: %s\n", gitCommit)
-			fmt.Fprintf(cmd.OutOrStdout(), "  Go Version: %s\n", runtime.Version())
-			fmt.Fprintf(cmd.OutOrStdout(), "  OS/Arch:    %s/%s\n", runtime.GOOS, runtime.GOARCH)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Semantic Cache Deploy\n"); err != nil {
+				cmd.PrintErrf("Failed to write output: %v\n", err)
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  Version:    %s\n", version); err != nil {
+				cmd.PrintErrf("Failed to write output: %v\n", err)
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  Built:      %s\n", buildTime); err != nil {
+				cmd.PrintErrf("Failed to write output: %v\n", err)
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  Git Commit: %s\n", gitCommit); err != nil {
+				cmd.PrintErrf("Failed to write output: %v\n", err)
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  Go Version: %s\n", runtime.Version()); err != nil {
+				cmd.PrintErrf("Failed to write output: %v\n", err)
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  OS/Arch:    %s/%s\n", runtime.GOOS, runtime.GOARCH); err != nil {
+				cmd.PrintErrf("Failed to write output: %v\n", err)
+			}
 		},
 	}
 }

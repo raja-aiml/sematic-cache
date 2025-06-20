@@ -30,10 +30,14 @@ func TestNewClient(t *testing.T) {
 			name:           "with_home_dir",
 			kubeconfigPath: "",
 			setup: func() {
-				os.Setenv("HOME", "/tmp/test-home")
+				if err := os.Setenv("HOME", "/tmp/test-home"); err != nil {
+					t.Logf("Failed to set HOME: %v", err)
+				}
 			},
 			teardown: func() {
-				os.Unsetenv("HOME")
+				if err := os.Unsetenv("HOME"); err != nil {
+					t.Logf("Failed to unset HOME: %v", err)
+				}
 			},
 			wantErr: true,
 		},

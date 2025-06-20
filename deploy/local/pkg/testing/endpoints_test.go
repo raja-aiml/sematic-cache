@@ -55,15 +55,17 @@ func TestEndpointTester_TestEndpoint(t *testing.T) {
 		switch r.URL.Path {
 		case "/health":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"healthy"}`))
+			_, _ = w.Write([]byte(`{"status":"healthy"}`))
 		case "/error":
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"internal error"}`))
+			_, _ = w.Write([]byte(`{"error":"internal error"}`))
 		case "/json":
 			var body map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&body)
+			_ = json.NewDecoder(r.Body).Decode(&body)
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(body)
+			if err := json.NewEncoder(w).Encode(body); err != nil {
+				t.Logf("failed to encode response: %v", err)
+			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -143,10 +145,10 @@ func TestEndpointTester_TestStandardEndpoints(t *testing.T) {
 		switch r.URL.Path {
 		case "/health":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"healthy"}`))
+			_, _ = w.Write([]byte(`{"status":"healthy"}`))
 		case "/metrics":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("# HELP app_info\n# TYPE app_info gauge\napp_info 1\n"))
+			_, _ = w.Write([]byte("# HELP app_info\n# TYPE app_info gauge\napp_info 1\n"))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -198,21 +200,21 @@ func TestEndpointTester_TestCacheOperations(t *testing.T) {
 		case "/set":
 			if r.Method == "POST" {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"success":true}`))
+				_, _ = w.Write([]byte(`{"success":true}`))
 			} else {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}
 		case "/get":
 			if r.Method == "GET" && r.URL.Query().Get("key") == "test-key" {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"value":"test-value"}`))
+				_, _ = w.Write([]byte(`{"value":"test-value"}`))
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		case "/query":
 			if r.Method == "POST" {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"results":[]}`))
+				_, _ = w.Write([]byte(`{"results":[]}`))
 			} else {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 			}
@@ -310,7 +312,7 @@ func BenchmarkNewEndpointTester(b *testing.B) {
 func BenchmarkTestEndpoint(b *testing.B) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}))
 	defer ts.Close()
 

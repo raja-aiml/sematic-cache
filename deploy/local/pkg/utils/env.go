@@ -47,7 +47,12 @@ func ParseEnvFile(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Log error but don't fail the operation since we're already returning
+			fmt.Fprintf(os.Stderr, "warning: failed to close file: %v\n", err)
+		}
+	}()
 
 	env := make(map[string]string)
 	scanner := bufio.NewScanner(file)
@@ -61,8 +66,10 @@ func ParseEnvFile(path string) (map[string]string, error) {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) == 2 {
 			key := strings.TrimSpace(parts[0])
-			value := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
-			env[key] = value
+			if key != "" { // Skip empty keys
+				value := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+				env[key] = value
+			}
 		}
 	}
 

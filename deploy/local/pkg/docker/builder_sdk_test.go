@@ -16,34 +16,35 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
-	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 )
 
 // MockDockerClient implements the Docker client interface for testing
 type MockDockerClient struct {
-	pingErr          error
-	imageBuildErr    error
-	imageTagErr      error
-	imagePushErr     error
-	imageListErr     error
+	pingErr            error
+	imageBuildErr      error
+	imageTagErr        error
+	imagePushErr       error
+	imageListErr       error
 	containerCreateErr error
 	containerStartErr  error
 	containerStopErr   error
 	containerRemoveErr error
 	containerWaitErr   error
 	containerLogsErr   error
-	buildResponse      *types.ImageBuildResponse
+	buildResponse      *types.ImageBuildResponse //nolint:staticcheck // Using deprecated type for testing
 	pushResponse       io.ReadCloser
-	images            []image.Summary
-	containerID       string
-	logs              string
+	images             []image.Summary
+	containerID        string
+	logs               string
 }
 
 func (m *MockDockerClient) Ping(ctx context.Context) (types.Ping, error) {
 	return types.Ping{}, m.pingErr
 }
 
+//nolint:staticcheck // Using stable API
 func (m *MockDockerClient) ImageBuild(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error) {
 	if m.imageBuildErr != nil {
 		return types.ImageBuildResponse{}, m.imageBuildErr
@@ -105,7 +106,7 @@ func (m *MockDockerClient) ContainerRemove(ctx context.Context, containerID stri
 func (m *MockDockerClient) ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error) {
 	statusCh := make(chan container.WaitResponse, 1)
 	errCh := make(chan error, 1)
-	
+
 	go func() {
 		if m.containerWaitErr != nil {
 			errCh <- m.containerWaitErr
@@ -115,7 +116,7 @@ func (m *MockDockerClient) ContainerWait(ctx context.Context, containerID string
 		close(statusCh)
 		close(errCh)
 	}()
-	
+
 	return statusCh, errCh
 }
 
@@ -123,15 +124,15 @@ func (m *MockDockerClient) ContainerLogs(ctx context.Context, container string, 
 	if m.containerLogsErr != nil {
 		return nil, m.containerLogsErr
 	}
-	
+
 	// Create a proper multiplexed stream
 	var buf bytes.Buffer
 	// Write stdout header (stream type 1, then size as big-endian uint32)
 	msgLen := len(m.logs)
-	buf.Write([]byte{1, 0, 0, 0, 
+	buf.Write([]byte{1, 0, 0, 0,
 		byte(msgLen >> 24), byte(msgLen >> 16), byte(msgLen >> 8), byte(msgLen)})
 	buf.WriteString(m.logs)
-	
+
 	return io.NopCloser(&buf), nil
 }
 
@@ -142,7 +143,7 @@ func (m *MockDockerClient) Close() error {
 func TestNewSDKBuilder(t *testing.T) {
 	// Test actual NewSDKBuilder function
 	builder, err := NewSDKBuilder()
-	
+
 	// The function will either succeed (if Docker is available)
 	// or fail (if Docker is not available)
 	if err != nil {
@@ -158,7 +159,9 @@ func TestNewSDKBuilder(t *testing.T) {
 			t.Error("NewSDKBuilder() returned nil builder with nil error")
 		} else {
 			// Clean up
-			builder.Close()
+			if err := builder.Close(); err != nil {
+				t.Errorf("Failed to close builder: %v", err)
+			}
 		}
 	}
 }
@@ -168,12 +171,12 @@ func TestSDKBuilder_Close(t *testing.T) {
 		client: &MockDockerClient{},
 		logger: nil,
 	}
-	
+
 	err := builder.Close()
 	if err != nil {
 		t.Errorf("Close() error = %v", err)
 	}
-	
+
 	// Test with nil client
 	builder.client = nil
 	err = builder.Close()
@@ -188,21 +191,25 @@ func TestSDKBuilder_Build(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
-	
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
+
 	// Create a test Dockerfile
 	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
 	dockerfileContent := "FROM alpine\nRUN echo hello"
 	if err := os.WriteFile(dockerfilePath, []byte(dockerfileContent), 0644); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a test file in context
 	testFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	tests := []struct {
 		name           string
 		dockerfilePath string
@@ -237,7 +244,7 @@ func TestSDKBuilder_Build(t *testing.T) {
 			imageName:      "test:latest",
 			buildContext:   tmpDir,
 			mockClient: &MockDockerClient{
-				buildResponse: &types.ImageBuildResponse{
+				buildResponse: &types.ImageBuildResponse{ //nolint:staticcheck // Using deprecated type for testing
 					Body: io.NopCloser(strings.NewReader(`{"errorDetail":{"message":"build failed"}}`)),
 				},
 			},
@@ -254,21 +261,21 @@ func TestSDKBuilder_Build(t *testing.T) {
 			errContains:    "failed to create build context",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 				logger: utils.NewLogger("test"),
 			}
-			
+
 			ctx := context.Background()
 			err := builder.Build(ctx, tt.dockerfilePath, tt.imageName, tt.buildContext)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Build() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 				t.Errorf("Build() error = %v, want error containing %v", err, tt.errContains)
 			}
@@ -301,17 +308,17 @@ func TestSDKBuilder_Tag(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 				logger: utils.NewLogger("test"),
 			}
-			
+
 			ctx := context.Background()
 			err := builder.Tag(ctx, tt.sourceImage, tt.targetImage)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tag() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -352,21 +359,21 @@ func TestSDKBuilder_Push(t *testing.T) {
 			errContains: "push error",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 				logger: utils.NewLogger("test"),
 			}
-			
+
 			ctx := context.Background()
 			err := builder.Push(ctx, tt.imageName)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Push() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 				t.Errorf("Push() error = %v, want error containing %v", err, tt.errContains)
 			}
@@ -482,25 +489,25 @@ func TestSDKBuilder_Run(t *testing.T) {
 			wantErr:    false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 				logger: utils.NewLogger("test"),
 			}
-			
+
 			ctx := context.Background()
 			output, err := builder.Run(ctx, tt.imageName, tt.opts)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 				t.Errorf("Run() error = %v, want error containing %v", err, tt.errContains)
 			}
-			
+
 			if err == nil && output != tt.wantOutput {
 				t.Errorf("Run() output = %v, want %v", output, tt.wantOutput)
 			}
@@ -530,17 +537,17 @@ func TestSDKBuilder_Stop(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 				logger: utils.NewLogger("test"),
 			}
-			
+
 			ctx := context.Background()
 			err := builder.Stop(ctx, tt.containerID)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Stop() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -570,17 +577,17 @@ func TestSDKBuilder_Remove(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 				logger: utils.NewLogger("test"),
 			}
-			
+
 			ctx := context.Background()
 			err := builder.Remove(ctx, tt.containerID)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Remove() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -607,16 +614,16 @@ func TestSDKBuilder_IsDockerRunning(t *testing.T) {
 			want: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 			}
-			
+
 			ctx := context.Background()
 			got := builder.IsDockerRunning(ctx)
-			
+
 			if got != tt.want {
 				t.Errorf("IsDockerRunning() = %v, want %v", got, tt.want)
 			}
@@ -653,20 +660,20 @@ func TestSDKBuilder_ListImages(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := &SDKBuilder{
 				client: tt.mockClient,
 			}
-			
+
 			ctx := context.Background()
 			images, err := builder.ListImages(ctx)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ListImages() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if !tt.wantErr && len(images) != len(tt.wantImages) {
 				t.Errorf("ListImages() returned %d images, want %d", len(images), len(tt.wantImages))
 			}
@@ -680,14 +687,18 @@ func TestCreateTarArchive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
-	
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
+
 	// Create test files
 	testFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create .git directory (should be skipped)
 	gitDir := filepath.Join(tmpDir, ".git")
 	if err := os.Mkdir(gitDir, 0755); err != nil {
@@ -697,13 +708,13 @@ func TestCreateTarArchive(t *testing.T) {
 	if err := os.WriteFile(gitFile, []byte("git config"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create node_modules directory (should be skipped)
 	nodeDir := filepath.Join(tmpDir, "node_modules")
 	if err := os.Mkdir(nodeDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create subdirectory
 	subDir := filepath.Join(tmpDir, "subdir")
 	if err := os.Mkdir(subDir, 0755); err != nil {
@@ -713,19 +724,19 @@ func TestCreateTarArchive(t *testing.T) {
 	if err := os.WriteFile(subFile, []byte("sub content"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create tar archive
 	reader, err := createTarArchive(tmpDir, "Dockerfile")
 	if err != nil {
 		t.Fatalf("createTarArchive() error = %v", err)
 	}
-	
+
 	// Verify tar contents
 	tr := tar.NewReader(reader)
 	fileCount := 0
 	foundTestFile := false
 	foundSubFile := false
-	
+
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -734,9 +745,9 @@ func TestCreateTarArchive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("tar.Next() error = %v", err)
 		}
-		
+
 		fileCount++
-		
+
 		// Check that .git and node_modules are not included
 		if strings.Contains(header.Name, ".git") {
 			t.Errorf("tar contains .git file: %s", header.Name)
@@ -744,7 +755,7 @@ func TestCreateTarArchive(t *testing.T) {
 		if strings.Contains(header.Name, "node_modules") {
 			t.Errorf("tar contains node_modules file: %s", header.Name)
 		}
-		
+
 		// Check expected files
 		if header.Name == "test.txt" {
 			foundTestFile = true
@@ -753,20 +764,20 @@ func TestCreateTarArchive(t *testing.T) {
 			foundSubFile = true
 		}
 	}
-	
+
 	if !foundTestFile {
 		t.Error("tar archive missing test.txt")
 	}
 	if !foundSubFile {
 		t.Error("tar archive missing subdir/sub.txt")
 	}
-	
+
 	// Test with non-existent directory
 	_, err = createTarArchive("/nonexistent/path", "Dockerfile")
 	if err == nil {
 		t.Error("createTarArchive() expected error for non-existent path")
 	}
-	
+
 	// Test with file that can't be read
 	unreadableDir := filepath.Join(tmpDir, "unreadable")
 	if err := os.Mkdir(unreadableDir, 0755); err != nil {
@@ -780,8 +791,12 @@ func TestCreateTarArchive(t *testing.T) {
 	if err := os.Chmod(unreadableFile, 0000); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chmod(unreadableFile, 0644) // Restore permissions for cleanup
-	
+	defer func() {
+		if err := os.Chmod(unreadableFile, 0644); err != nil {
+			t.Logf("Failed to restore file permissions: %v", err)
+		}
+	}() // Restore permissions for cleanup
+
 	// This should fail when trying to read the file
 	_, err = createTarArchive(unreadableDir, "Dockerfile")
 	if err == nil {
@@ -829,18 +844,18 @@ func TestProcessBuildOutput(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	logger := utils.NewLogger("test")
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := strings.NewReader(tt.input)
 			err := processBuildOutput(reader, logger)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("processBuildOutput() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errMsg != "" && err.Error() != tt.errMsg {
 				t.Errorf("processBuildOutput() error = %v, want %v", err, tt.errMsg)
 			}
@@ -888,18 +903,18 @@ func TestProcessPushOutput(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	logger := utils.NewLogger("test")
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := io.NopCloser(strings.NewReader(tt.input))
 			err := processPushOutput(reader, logger)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("processPushOutput() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err != nil && tt.errMsg != "" && err.Error() != tt.errMsg {
 				t.Errorf("processPushOutput() error = %v, want %v", err, tt.errMsg)
 			}
@@ -911,16 +926,22 @@ func TestProcessPushOutput(t *testing.T) {
 func BenchmarkCreateTarArchive(b *testing.B) {
 	// Create a temporary directory with some files
 	tmpDir, _ := os.MkdirTemp("", "bench-tar")
-	defer os.RemoveAll(tmpDir)
-	
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			b.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
+
 	// Create some test files
 	for i := 0; i < 10; i++ {
 		filename := filepath.Join(tmpDir, fmt.Sprintf("file%d.txt", i))
-		os.WriteFile(filename, []byte("test content"), 0644)
+		if err := os.WriteFile(filename, []byte("test content"), 0644); err != nil {
+			b.Fatalf("Failed to write test file: %v", err)
+		}
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, _ = createTarArchive(tmpDir, "Dockerfile")
 	}
@@ -929,9 +950,9 @@ func BenchmarkCreateTarArchive(b *testing.B) {
 func BenchmarkProcessBuildOutput(b *testing.B) {
 	input := `{"stream":"Step 1/2 : FROM alpine\n"}{"stream":"Successfully built\n"}`
 	logger := utils.NewLogger("bench")
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		reader := strings.NewReader(input)
 		_ = processBuildOutput(reader, logger)

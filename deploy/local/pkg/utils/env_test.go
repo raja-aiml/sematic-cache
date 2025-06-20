@@ -39,8 +39,14 @@ func TestGetEnvOrDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				os.Setenv(tt.key, tt.envValue)
-				defer os.Unsetenv(tt.key)
+				if err := os.Setenv(tt.key, tt.envValue); err != nil {
+					t.Fatalf("failed to set env var: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv(tt.key); err != nil {
+						t.Logf("failed to unset env var: %v", err)
+					}
+				}()
 			}
 
 			got := GetEnvOrDefault(tt.key, tt.defaultValue)
@@ -78,8 +84,14 @@ func TestRequireEnv(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				os.Setenv(tt.key, tt.envValue)
-				defer os.Unsetenv(tt.key)
+				if err := os.Setenv(tt.key, tt.envValue); err != nil {
+					t.Fatalf("failed to set env var: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv(tt.key); err != nil {
+						t.Logf("failed to unset env var: %v", err)
+					}
+				}()
 			}
 
 			got, err := RequireEnv(tt.key)
@@ -157,13 +169,19 @@ KEY3==value3`,
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer os.Remove(tmpFile.Name())
+			defer func() {
+				if err := os.Remove(tmpFile.Name()); err != nil {
+					t.Logf("failed to remove temp file: %v", err)
+				}
+			}()
 
 			// Write content
 			if _, err := tmpFile.WriteString(tt.content); err != nil {
 				t.Fatal(err)
 			}
-			tmpFile.Close()
+			if err := tmpFile.Close(); err != nil {
+				t.Logf("failed to close temp file: %v", err)
+			}
 
 			// Test ParseEnvFile
 			got, err := ParseEnvFile(tmpFile.Name())
@@ -203,11 +221,21 @@ func TestLoadEnvFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("failed to remove temp directory: %v", err)
+		}
+	}()
 
 	// Change to temp directory
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldPwd)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldPwd); err != nil {
+			t.Logf("failed to return to original directory: %v", err)
+		}
+	}()
 
 	// Create .env file (exact name)
 	content := `TEST_LOAD_ENV_VAR=loaded_value`
@@ -230,7 +258,9 @@ func TestLoadEnvFile(t *testing.T) {
 	}
 
 	// Clean up
-	os.Unsetenv("TEST_LOAD_ENV_VAR")
+	if err := os.Unsetenv("TEST_LOAD_ENV_VAR"); err != nil {
+		t.Logf("failed to unset env var: %v", err)
+	}
 }
 
 func TestLoadEnvFile_NoFile(t *testing.T) {
@@ -239,12 +269,22 @@ func TestLoadEnvFile_NoFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("failed to remove temp directory: %v", err)
+		}
+	}()
 
 	// Change to temp dir
 	oldWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldWd)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Logf("failed to return to original directory: %v", err)
+		}
+	}()
 
 	// Test LoadEnvFile with no .env file
 	err = LoadEnvFile()

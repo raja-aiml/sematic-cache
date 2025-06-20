@@ -11,18 +11,17 @@ import (
 	"testing"
 )
 
-
 // TestMain runs cleanup before and after all tests
 func TestMain(m *testing.M) {
 	// Run cleanup before tests (without testing.T)
 	cleanupBeforeTests()
-	
+
 	// Run tests
 	code := m.Run()
-	
+
 	// Run cleanup after tests
 	cleanupAfterTests()
-	
+
 	// Exit with test result code
 	os.Exit(code)
 }
@@ -33,9 +32,9 @@ func cleanupBeforeTests() {
 	if err := exec.Command("docker", "version").Run(); err != nil {
 		return
 	}
-	
+
 	ctx := context.Background()
-	
+
 	// Remove test images
 	testImagePatterns := []string{"test:", "test-", "bench:", "nonexistent:"}
 	cmd := exec.CommandContext(ctx, "docker", "images", "--format", "{{.Repository}}:{{.Tag}}")
@@ -48,13 +47,16 @@ func cleanupBeforeTests() {
 			}
 			for _, pattern := range testImagePatterns {
 				if strings.HasPrefix(img, pattern) {
-					exec.CommandContext(ctx, "docker", "rmi", "-f", img).Run()
+					if err := exec.CommandContext(ctx, "docker", "rmi", "-f", img).Run(); err != nil {
+						// Ignore error - cleanup effort
+						_ = err
+					}
 					break
 				}
 			}
 		}
 	}
-	
+
 	// Remove test containers
 	testContainerPatterns := []string{"test-container", "container-123"}
 	cmd = exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{.Names}}")
@@ -67,7 +69,10 @@ func cleanupBeforeTests() {
 			}
 			for _, pattern := range testContainerPatterns {
 				if strings.Contains(container, pattern) {
-					exec.CommandContext(ctx, "docker", "rm", "-f", container).Run()
+					if err := exec.CommandContext(ctx, "docker", "rm", "-f", container).Run(); err != nil {
+						// Ignore error - cleanup effort
+						_ = err
+					}
 					break
 				}
 			}

@@ -130,7 +130,12 @@ func (c *Client) GetPodLogs(ctx context.Context, namespace, podName string, tail
 	if err != nil {
 		return "", fmt.Errorf("failed to get logs: %w", err)
 	}
-	defer logs.Close()
+	defer func() {
+		if err := logs.Close(); err != nil {
+			// Log error but don't fail the operation
+			fmt.Printf("warning: failed to close log stream: %v\n", err)
+		}
+	}()
 
 	buf := make([]byte, 2048)
 	var result string

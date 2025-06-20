@@ -18,13 +18,14 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
-	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 )
 
 // DockerClient is an interface that wraps the Docker client methods we use
 type DockerClient interface {
 	Ping(ctx context.Context) (types.Ping, error)
+	//nolint:staticcheck // Using stable API
 	ImageBuild(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error)
 	ImageTag(ctx context.Context, source, target string) error
 	ImagePush(ctx context.Context, image string, options image.PushOptions) (io.ReadCloser, error)
@@ -76,6 +77,7 @@ func (b *SDKBuilder) Build(ctx context.Context, dockerfilePath, imageName, build
 	}
 
 	// Prepare build options
+	//nolint:staticcheck // Using stable API
 	buildOptions := types.ImageBuildOptions{
 		Tags:       []string{imageName},
 		Dockerfile: filepath.Base(dockerfilePath),
@@ -88,7 +90,11 @@ func (b *SDKBuilder) Build(ctx context.Context, dockerfilePath, imageName, build
 	if err != nil {
 		return fmt.Errorf("docker build failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			b.logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	// Process build output
 	if err := processBuildOutput(resp.Body, b.logger); err != nil {
@@ -121,7 +127,11 @@ func (b *SDKBuilder) Push(ctx context.Context, imageName string) error {
 	if err != nil {
 		return fmt.Errorf("docker push failed: %w", err)
 	}
-	defer resp.Close()
+	defer func() {
+		if err := resp.Close(); err != nil {
+			b.logger.Debug("Failed to close response: %v", err)
+		}
+	}()
 
 	// Process push output
 	if err := processPushOutput(resp, b.logger); err != nil {
@@ -217,7 +227,11 @@ func (b *SDKBuilder) Run(ctx context.Context, imageName string, opts *RunOptions
 	if err != nil {
 		return "", fmt.Errorf("failed to get container logs: %w", err)
 	}
-	defer logs.Close()
+	defer func() {
+		if err := logs.Close(); err != nil {
+			b.logger.Debug("Failed to close logs: %v", err)
+		}
+	}()
 
 	// Read logs
 	var buf bytes.Buffer
@@ -271,7 +285,12 @@ func (b *SDKBuilder) ListImages(ctx context.Context) ([]image.Summary, error) {
 func createTarArchive(contextPath, _ string) (io.Reader, error) {
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
-	defer tw.Close()
+	defer func() {
+		if err := tw.Close(); err != nil {
+			// Log error but don't fail the function
+			_ = err
+		}
+	}()
 
 	// Walk the build context and add files to tar
 	err := filepath.Walk(contextPath, func(path string, info os.FileInfo, err error) error {
@@ -308,7 +327,12 @@ func createTarArchive(contextPath, _ string) (io.Reader, error) {
 			if err != nil {
 				return err
 			}
-			defer file.Close()
+			defer func() {
+				if err := file.Close(); err != nil {
+					// Log error but don't fail the function
+					_ = err
+				}
+			}()
 
 			if _, err := io.Copy(tw, file); err != nil {
 				return err

@@ -12,7 +12,11 @@ func TestFindProjectRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("failed to remove temp directory: %v", err)
+		}
+	}()
 
 	// Create nested directories
 	subDir := filepath.Join(tmpDir, "sub", "dir", "deep")
@@ -62,18 +66,26 @@ func TestFindProjectRoot(t *testing.T) {
 			setupFunc: func() {
 				// Create temp dir without go.mod
 				tempNoMod, _ := os.MkdirTemp("", "no-go-mod")
-				os.Chdir(tempNoMod)
+				if err := os.Chdir(tempNoMod); err != nil {
+					t.Logf("failed to change to temp directory: %v", err)
+				}
 			},
 			cleanupFunc: func() {
 				// Return to original directory
-				os.Chdir(tmpDir)
+				if err := os.Chdir(tmpDir); err != nil {
+					t.Logf("failed to return to original directory: %v", err)
+				}
 			},
 		},
 	}
 
 	// Save current directory
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("failed to return to original directory: %v", err)
+		}
+	}()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -124,7 +136,11 @@ func TestFindProjectRoot_MaxDepth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("failed to remove temp directory: %v", err)
+		}
+	}()
 
 	// Create 12 levels deep (more than maxDepth)
 	deepPath := tmpDir
@@ -138,7 +154,11 @@ func TestFindProjectRoot_MaxDepth(t *testing.T) {
 
 	// Save current directory
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Logf("failed to return to original directory: %v", err)
+		}
+	}()
 
 	// Change to deep directory
 	err = os.Chdir(deepPath)

@@ -78,13 +78,23 @@ func TestManager_getSecretData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear environment first
-			os.Unsetenv("OPENAI_API_KEY")
-			os.Unsetenv("DATABASE_URL")
+			if err := os.Unsetenv("OPENAI_API_KEY"); err != nil {
+				t.Logf("Failed to unset OPENAI_API_KEY: %v", err)
+			}
+			if err := os.Unsetenv("DATABASE_URL"); err != nil {
+				t.Logf("Failed to unset DATABASE_URL: %v", err)
+			}
 
 			// Set environment variables
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
-				defer os.Unsetenv(k)
+				if err := os.Setenv(k, v); err != nil {
+					t.Logf("Failed to set %s: %v", k, err)
+				}
+				defer func(key string) {
+					if err := os.Unsetenv(key); err != nil {
+						t.Logf("Failed to unset %s: %v", key, err)
+					}
+				}(k)
 			}
 
 			manager := &Manager{
@@ -211,11 +221,21 @@ func TestManager_LoadEnvFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Change to temp directory
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldPwd)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Chdir(oldPwd); err != nil {
+			t.Logf("Failed to restore directory: %v", err)
+		}
+	}()
 
 	// Create .env file
 	content := `TEST_SECRET_VAR=secret_value`
@@ -236,7 +256,9 @@ func TestManager_LoadEnvFile(t *testing.T) {
 		// This might be expected if godotenv is not working in test environment
 	}
 
-	os.Unsetenv("TEST_SECRET_VAR")
+	if err := os.Unsetenv("TEST_SECRET_VAR"); err != nil {
+		t.Logf("Failed to unset TEST_SECRET_VAR: %v", err)
+	}
 }
 
 // Benchmark tests
@@ -246,10 +268,20 @@ func BenchmarkGetSecretData(b *testing.B) {
 	}
 
 	// Set some env vars
-	os.Setenv("OPENAI_API_KEY", "benchmark-key")
-	os.Setenv("DATABASE_URL", "postgres://bench")
-	defer os.Unsetenv("OPENAI_API_KEY")
-	defer os.Unsetenv("DATABASE_URL")
+	if err := os.Setenv("OPENAI_API_KEY", "benchmark-key"); err != nil {
+		b.Logf("Failed to set OPENAI_API_KEY: %v", err)
+	}
+	if err := os.Setenv("DATABASE_URL", "postgres://bench"); err != nil {
+		b.Logf("Failed to set DATABASE_URL: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("OPENAI_API_KEY"); err != nil {
+			b.Logf("Failed to unset OPENAI_API_KEY: %v", err)
+		}
+		if err := os.Unsetenv("DATABASE_URL"); err != nil {
+			b.Logf("Failed to unset DATABASE_URL: %v", err)
+		}
+	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

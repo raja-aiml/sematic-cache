@@ -44,7 +44,11 @@ func (pm *PostgresManager) InitializeDatabase(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to PostgreSQL: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		if err := conn.Close(ctx); err != nil {
+			pm.logger.Error("Failed to close PostgreSQL connection: %v", err)
+		}
+	}()
 
 	// Create database if it doesn't exist
 	pm.logger.Info("Creating database if not exists: %s", pm.config.Database)
@@ -67,7 +71,9 @@ func (pm *PostgresManager) InitializeDatabase(ctx context.Context) error {
 	}
 
 	// Close connection to postgres database
-	conn.Close(ctx)
+	if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close initial connection: %w", err)
+	}
 
 	// Connect to the newly created database
 	connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
@@ -77,7 +83,11 @@ func (pm *PostgresManager) InitializeDatabase(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to database %s: %w", pm.config.Database, err)
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		if err := conn.Close(ctx); err != nil {
+			pm.logger.Error("Failed to close database connection: %v", err)
+		}
+	}()
 
 	// Create pgvector extension
 	pm.logger.Info("Creating pgvector extension...")
@@ -113,7 +123,9 @@ func (pm *PostgresManager) WaitForReady(ctx context.Context, timeout time.Durati
 				// Try a simple query
 				var result int
 				err = conn.QueryRow(ctx, "SELECT 1").Scan(&result)
-				conn.Close(ctx)
+				if closeErr := conn.Close(ctx); closeErr != nil {
+					pm.logger.Debug("Failed to close connection: %v", closeErr)
+				}
 
 				if err == nil && result == 1 {
 					pm.logger.Info("PostgreSQL is ready")
@@ -134,7 +146,11 @@ func (pm *PostgresManager) TestConnection(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		if err := conn.Close(ctx); err != nil {
+			pm.logger.Debug("Failed to close connection: %v", err)
+		}
+	}()
 
 	// Test query
 	var version string
@@ -166,7 +182,11 @@ func (pm *PostgresManager) ExecuteSQL(ctx context.Context, sql string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		if err := conn.Close(ctx); err != nil {
+			pm.logger.Debug("Failed to close connection: %v", err)
+		}
+	}()
 
 	_, err = conn.Exec(ctx, sql)
 	if err != nil {

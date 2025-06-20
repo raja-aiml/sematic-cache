@@ -98,7 +98,12 @@ func (et *EndpointTester) TestEndpoint(method, path string, body interface{}) Te
 		result.Error = err
 		return result
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log error but don't fail the operation
+			et.logger.Debug("failed to close response body: %v", err)
+		}
+	}()
 
 	result.StatusCode = resp.StatusCode
 	result.Success = resp.StatusCode >= 200 && resp.StatusCode < 300

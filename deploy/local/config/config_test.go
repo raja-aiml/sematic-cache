@@ -291,13 +291,21 @@ func TestApplyEnvOverrides(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear env vars first
 			for k := range tt.envVars {
-				os.Unsetenv(k)
+				if err := os.Unsetenv(k); err != nil {
+					t.Logf("Failed to unset env var %s: %v", k, err)
+				}
 			}
 
 			// Set test env vars
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
-				defer os.Unsetenv(k)
+				if err := os.Setenv(k, v); err != nil {
+					t.Fatalf("Failed to set env var %s: %v", k, err)
+				}
+				defer func(key string) {
+					if err := os.Unsetenv(key); err != nil {
+						t.Logf("Failed to unset env var %s: %v", key, err)
+					}
+				}(k)
 			}
 
 			cfg := DefaultConfig()
@@ -319,8 +327,14 @@ func TestSaveConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	tmpPath := tmpFile.Name()
-	tmpFile.Close()
-	defer os.Remove(tmpPath)
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
+	defer func() {
+		if err := os.Remove(tmpPath); err != nil {
+			t.Logf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	// Save config
 	err = SaveConfig(cfg, tmpPath)
@@ -375,7 +389,9 @@ func TestLoadConfig_NonExistentFile(t *testing.T) {
 
 func TestLoadConfig_ValidFile(t *testing.T) {
 	// Clear any environment variables that might interfere
-	os.Unsetenv("SC_DEPLOY_BUILD_IMAGE")
+	if err := os.Unsetenv("SC_DEPLOY_BUILD_IMAGE"); err != nil {
+		t.Logf("Failed to unset SC_DEPLOY_BUILD_IMAGE: %v", err)
+	}
 
 	// Create a minimal valid config
 	// Note: sigs.k8s.io/yaml doesn't support time.Duration parsing from nanoseconds
@@ -412,13 +428,19 @@ security:
 		t.Fatal(err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() {
+		if err := os.Remove(tmpPath); err != nil {
+			t.Logf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	// Write config
 	if _, err := tmpFile.WriteString(configData); err != nil {
 		t.Fatal(err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
 
 	// Load config
 	cfg, err := LoadConfig(tmpPath)
@@ -455,13 +477,19 @@ func TestLoadConfig_InvalidYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() {
+		if err := os.Remove(tmpPath); err != nil {
+			t.Logf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	// Write invalid YAML
 	if _, err := tmpFile.WriteString("invalid: yaml: content:"); err != nil {
 		t.Fatal(err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		t.Logf("Failed to close temp file: %v", err)
+	}
 
 	// Try to load
 	cfg, err := LoadConfig(tmpPath)
@@ -532,12 +560,18 @@ security:
 		t.Fatal(err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() {
+		if err := os.Remove(tmpPath); err != nil {
+			t.Logf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	if _, err := tmpFile.WriteString(configData); err != nil {
 		t.Fatal(err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		t.Logf("Failed to close temp file: %v", err)
+	}
 
 	// Validate file
 	err = ValidateConfigFile(tmpPath)
@@ -594,10 +628,20 @@ func BenchmarkValidateConfig(b *testing.B) {
 }
 
 func BenchmarkApplyEnvOverrides(b *testing.B) {
-	os.Setenv("SC_DEPLOY_DEBUG", "true")
-	os.Setenv("SC_DEPLOY_CLUSTER_NAME", "bench-cluster")
-	defer os.Unsetenv("SC_DEPLOY_DEBUG")
-	defer os.Unsetenv("SC_DEPLOY_CLUSTER_NAME")
+	if err := os.Setenv("SC_DEPLOY_DEBUG", "true"); err != nil {
+		b.Fatalf("Failed to set SC_DEPLOY_DEBUG: %v", err)
+	}
+	if err := os.Setenv("SC_DEPLOY_CLUSTER_NAME", "bench-cluster"); err != nil {
+		b.Fatalf("Failed to set SC_DEPLOY_CLUSTER_NAME: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("SC_DEPLOY_DEBUG"); err != nil {
+			b.Logf("Failed to unset SC_DEPLOY_DEBUG: %v", err)
+		}
+		if err := os.Unsetenv("SC_DEPLOY_CLUSTER_NAME"); err != nil {
+			b.Logf("Failed to unset SC_DEPLOY_CLUSTER_NAME: %v", err)
+		}
+	}()
 
 	b.ResetTimer()
 
