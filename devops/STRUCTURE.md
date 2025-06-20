@@ -7,52 +7,53 @@ This document outlines the reorganized Taskfile structure for the Semantic Cache
 ```
 semantic-cache/
 ├── Taskfile.yaml                    # Root orchestration
-├── build/
-│   ├── Taskfile.common.yaml        # Common build tasks
+├── devops/
+│   ├── Taskfile.build.common.yaml  # Common build tasks
+│   ├── Taskfile.deploy.common.yaml # Common deploy tasks
 │   ├── Taskfile.example.yaml       # Usage examples
-│   ├── README.md                   # Build system docs
+│   ├── README.md                   # DevOps system docs
 │   └── STRUCTURE.md                # This file
-└── deploy/
-    ├── Taskfile.yaml               # Deploy orchestration  
-    ├── Taskfile.common.yaml        # Common deploy tasks
-    └── local/
-        └── Taskfile.yaml           # Local deploy tool
+└── iaac/
+    ├── infra/
+    │   └── Taskfile.yaml           # Local deployment tool
+    └── blueprint/archive/
+        └── Taskfile.yaml           # Deploy orchestration
 ```
 
 ## Task Organization
 
-### 1. Build Directory (`./build/`)
+### 1. DevOps Build Tasks (`devops/Taskfile.build.common.yaml`)
 **Purpose**: Common Go build, test, and code quality tasks
 
 **Contains**:
-- `Taskfile.common.yaml` - Reusable build tasks
+- Reusable build tasks
 - Tasks for: build, test, format, lint, dependencies, Docker, CI/CD
 
-**Used by**: Root Taskfile, deploy/local Taskfile
+**Used by**: Root Taskfile, iaac/infra Taskfile
 
-### 2. Deploy Directory (`./deploy/`)
+### 2. DevOps Deploy Tasks (`devops/Taskfile.deploy.common.yaml`)
 **Purpose**: Kubernetes deployment and cluster management tasks
 
 **Contains**:
-- `Taskfile.common.yaml` - Reusable deployment tasks  
+- Reusable deployment tasks  
 - Tasks for: cluster management, monitoring, testing, debugging
 
-**Used by**: Root Taskfile, deploy Taskfile
+**Used by**: Root Taskfile, iaac/blueprint/archive Taskfile
 
 ### 3. Root Taskfile (`./Taskfile.yaml`)
 **Purpose**: Main orchestration layer
 
 **Includes**:
-- `build:*` tasks from `./build/Taskfile.common.yaml`
-- `deploy:*` tasks from `./deploy/Taskfile.yaml`
+- `build:*` tasks from `devops/Taskfile.build.common.yaml`
+- `deploy:*` tasks from `devops/Taskfile.deploy.common.yaml`
 
 **Provides**: High-level commands for the entire project
 
-### 4. Deploy/Local Taskfile (`./deploy/local/Taskfile.yaml`)
+### 4. IaaC Infra Taskfile (`iaac/infra/Taskfile.yaml`)
 **Purpose**: Local deployment tool specific tasks
 
 **Includes**:
-- `build:*` tasks from `../../build/Taskfile.common.yaml`
+- `build:*` tasks from `../../devops/Taskfile.build.common.yaml`
 
 **Provides**: Go application build/test tasks for the deployment tool
 
@@ -106,18 +107,18 @@ task quick
 task status
 ```
 
-### From Deploy Directory
+### From IaaC Blueprint Directory
 ```bash
-cd deploy
+cd iaac/blueprint/archive
 task full          # Full deployment workflow
 task quick         # Quick deployment
 task status        # Check status
 task cleanup       # Clean up resources
 ```
 
-### From Deploy/Local Directory
+### From IaaC Infra Directory
 ```bash
-cd deploy/local
+cd iaac/infra
 task build         # Build deployment tool
 task test          # Test deployment tool
 task ci            # Run CI pipeline
@@ -141,12 +142,12 @@ task ci            # Run CI pipeline
 ## Adding New Tasks
 
 ### For Build Tasks
-Add to `./build/Taskfile.common.yaml` and reference as `build:taskname`
+Add to `devops/Taskfile.build.common.yaml` and reference as `build:taskname`
 
 ### For Deploy Tasks  
-Add to `./deploy/Taskfile.common.yaml` and reference as `deploy:taskname`
+Add to `devops/Taskfile.deploy.common.yaml` and reference as `deploy:taskname`
 
 ### For Project-Specific Tasks
-Add to the appropriate local Taskfile (root, deploy, or deploy/local)
+Add to the appropriate local Taskfile (root, iaac/blueprint/archive, or iaac/infra)
 
 This structure provides a clean, maintainable, and scalable task organization system.

@@ -6,7 +6,7 @@ version: '3'
 
 includes:
   deploy:
-    taskfile: ../devops/Taskfile.deploy.common.yaml
+    taskfile: ../../../devops/Taskfile.deploy.common.yaml
     dir: '{{.USER_WORKING_DIR}}'
 
 vars:

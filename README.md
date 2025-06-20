@@ -179,25 +179,25 @@ go run cmd/server/main.go -address :8080
 Quick start with enterprise-ready Kubernetes deployment:
 ```bash
 # Create cluster and deploy infrastructure
-deploy/cluster.sh up
+iaac/blueprint/archive/cluster.sh up
 
 # Build and deploy application
-deploy/dev.sh build
-deploy/dev.sh deploy
+iaac/blueprint/archive/dev.sh build
+iaac/blueprint/archive/dev.sh deploy
 
 # Alternative: Deploy entire stack at once
-kubectl apply -k deploy/
+kubectl apply -k iaac/blueprint/archive/
 
 # Production-ready automated workflow
-task full                    # From project root
+task full                              # From project root
 # OR
-task -C deploy full         # Explicit deploy directory
+task -C iaac/blueprint/archive full    # Explicit iaac directory
 
 # Test the deployment
-deploy/cluster.sh test
+iaac/blueprint/archive/cluster.sh test
 
 # Cleanup
-deploy/cluster.sh down
+iaac/blueprint/archive/cluster.sh down
 ```
 
 Access URLs:
@@ -211,15 +211,17 @@ Access URLs:
 ├── cmd/server/              # Application entry point
 ├── core/                   # Core cache and agent logic
 ├── config/                 # Configuration management
-├── deploy/                 # Kubernetes deployment
-│   ├── app/                # Application deployments and services
-│   │   ├── sematic-cache/  # Sematic Cache API service
-│   │   └── web/            # Static web service
-│   ├── infra/              # Infrastructure components
-│   │   ├── postgres/       # PostgreSQL service
-│   │   ├── redis/          # Redis service
-│   │   └── ingress-nginx/  # Ingress controller
-│   └── scripts/            # Development and utility scripts
+├── iaac/                   # Infrastructure as Code
+│   ├── infra/              # Local deployment tooling
+│   └── blueprint/archive/  # Kubernetes deployment manifests
+│       ├── app/            # Application deployments and services
+│       │   ├── sematic-cache/  # Sematic Cache API service
+│       │   └── web/        # Static web service
+│       ├── infra/          # Infrastructure components
+│       │   ├── postgres/   # PostgreSQL service
+│       │   ├── redis/      # Redis service
+│       │   └── ingress-nginx/  # Ingress controller
+│       └── scripts/        # Development and utility scripts
 ├── storage/                # Storage backend implementations
 ├── server/                 # HTTP server and API handlers
 ├── openai/                 # OpenAI API integration

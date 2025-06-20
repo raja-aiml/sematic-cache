@@ -16,10 +16,11 @@ semantic-cache/
 │   ├── README.md                    # ✅ Documentation
 │   ├── STRUCTURE.md                 # ✅ Structure docs
 │   └── ARCHITECTURE.md              # ✅ Architecture guide
-└── deploy/
-    ├── Taskfile.yaml                # ✅ Deploy orchestration (CLEANED)
-    └── local/
-        └── Taskfile.yaml            # ✅ Local tool (CLEANED)
+└── iaac/                             # ✅ Infrastructure as Code
+    ├── infra/                        # ✅ Local deployment tool (former deploy/local)
+    │   └── Taskfile.yaml            # ✅ Local tool (CLEANED)
+    └── blueprint/archive/            # ✅ Other deployment resources
+        └── Taskfile.yaml            # ✅ Deploy orchestration (CLEANED)
 ```
 
 ## 🔧 Major Changes Made
@@ -46,7 +47,7 @@ semantic-cache/
 - ✅ Organized tasks by clear categories
 - ✅ Simplified help and documentation
 
-### 4. Deploy/Local Taskfile Cleanup
+### 4. IaaC/Infra Taskfile Cleanup
 **Fixes Applied**:
 - ✅ Removed duplicate Go variables (GOCMD, GOBUILD, etc.)
 - ✅ Replaced custom build tasks with common tasks
@@ -86,11 +87,11 @@ All tasks tested and working perfectly:
 ✅ task status          # Uses deploy:status
 
 # Local tool tasks  
-✅ cd deploy/local && task build    # Uses build:build
-✅ cd deploy/local && task test     # Uses build:test
+✅ cd iaac/infra && task build      # Uses build:build
+✅ cd iaac/infra && task test       # Uses build:test
 
 # Deploy tasks
-✅ cd deploy && task full           # Uses deploy:full
+✅ cd iaac/blueprint/archive && task full  # Uses deploy:full
 ```
 
 ## 🎉 Benefits Achieved

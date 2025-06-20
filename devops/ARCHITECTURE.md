@@ -14,10 +14,11 @@ semantic-cache/
 │   ├── README.md                          # DevOps documentation
 │   ├── STRUCTURE.md                       # Structure documentation
 │   └── ARCHITECTURE.md                    # This file
-└── deploy/
-    ├── Taskfile.yaml                      # 🔄 Updated: Uses deploy commons
-    └── local/
-        └── Taskfile.yaml                  # 🔄 Updated: Uses build commons
+└── iaac/                                   # Infrastructure as Code
+    ├── infra/
+    │   └── Taskfile.yaml                  # 🔄 Updated: Uses build commons
+    └── blueprint/archive/
+        └── Taskfile.yaml                  # 🔄 Updated: Uses deploy commons
 ```
 
 ## Task Namespace Organization
@@ -63,11 +64,11 @@ deploy:cleanup           # Resource cleanup
 graph TD
     A[Root Taskfile.yaml] --> B[build: devops/Taskfile.build.common.yaml]
     A --> C[deploy: devops/Taskfile.deploy.common.yaml]
-    A --> D[deploy-ops: deploy/Taskfile.yaml]
+    A --> D[deploy-ops: iaac/blueprint/archive/Taskfile.yaml]
     
     D --> C
     
-    E[deploy/local/Taskfile.yaml] --> B
+    E[iaac/infra/Taskfile.yaml] --> B
     
     B --> F[Go Build Operations]
     C --> G[K8s Deploy Operations]
@@ -94,13 +95,13 @@ graph TD
 - **User-friendly command interface**
 - **Variable configuration**
 
-### `deploy/Taskfile.yaml`
+### `iaac/blueprint/archive/Taskfile.yaml`
 - **Project-specific deployment workflows**
 - **Uses deploy commons + custom scripts**
 - **Workflow orchestration**
 - **Environment-specific logic**
 
-### `deploy/local/Taskfile.yaml`
+### `iaac/infra/Taskfile.yaml`
 - **Local tool specific tasks**
 - **Uses build commons for Go operations**
 - **Tool-specific customizations**
@@ -127,7 +128,7 @@ graph TD
 ### Global Variables (Root Taskfile)
 ```yaml
 vars:
-  DEPLOY_DIR: ./deploy
+  IAAC_DIR: ./iaac
   DEVOPS_DIR: ./devops
 ```
 

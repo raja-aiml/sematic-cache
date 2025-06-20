@@ -11,13 +11,13 @@ includes:
     taskfile: ./devops/Taskfile.deploy.common.yaml
     dir: '{{.USER_WORKING_DIR}}'
     
-  # Include deploy orchestration
-  deploy-ops:
-    taskfile: ./deploy/Taskfile.yaml
-    dir: ./deploy
+  # Include IaaC orchestration
+  iaac-ops:
+    taskfile: ./iaac/blueprint/archive/Taskfile.yaml
+    dir: ./iaac/blueprint/archive
 
 vars:
-  DEPLOY_DIR: ./deploy
+  IAAC_DIR: ./iaac
   DEVOPS_DIR: ./devops
 
 tasks:
@@ -70,10 +70,10 @@ tasks:
           BINARY_NAME: semantic-cache
           MAIN: ./cmd/server
 
-  build:local:
-    desc: Build the local deployment tool
+  build:iaac:
+    desc: Build the IaaC deployment tool
     cmds:
-      - cd ./deploy/local && task build
+      - cd ./iaac/infra && task build
 
   # === TEST TASKS ===
   test:
@@ -112,7 +112,7 @@ tasks:
     desc: Clean all build artifacts
     cmds:
       - task: build:clean
-      - cd ./deploy/local && task clean
+      - cd ./iaac/infra && task clean
 
   # === CORE WORKFLOWS ===
   full:
@@ -289,7 +289,7 @@ tasks:
       - |
         echo ""
         echo "📦 Semantic Cache Project Info:"
-        echo "Deploy Directory: {{.DEPLOY_DIR}}"
+        echo "IaaC Directory: {{.IAAC_DIR}}"
         echo "DevOps Directory: {{.DEVOPS_DIR}}"
 
   docs:
@@ -298,7 +298,7 @@ tasks:
       - |
         echo "📚 Semantic Cache Documentation:"
         echo "Main README: ./README.md"
-        echo "Deploy README: ./deploy/README.md"
+        echo "IaaC README: ./iaac/README.md"
         echo "DevOps README: ./devops/README.md"
         echo ""
         echo "Quick links:"
