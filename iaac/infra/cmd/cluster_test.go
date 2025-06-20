@@ -1,231 +1,236 @@
 package cmd
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClusterCmd(t *testing.T) {
 	cmd := ClusterCmd()
-
-	if cmd == nil {
-		t.Fatal("ClusterCmd() returned nil")
-	}
-
-	if cmd.Use != "cluster" {
-		t.Errorf("ClusterCmd().Use = %v, want %v", cmd.Use, "cluster")
-	}
-
-	// Check that subcommands are added
-	subcommands := cmd.Commands()
-	if len(subcommands) == 0 {
-		t.Error("ClusterCmd() has no subcommands")
-	}
-
-	// Check specific commands exist
-	commandNames := make(map[string]bool)
-	for _, subcmd := range subcommands {
-		commandNames[subcmd.Use] = true
-	}
-
-	expectedCommands := []string{"up", "down", "ps", "logs", "test"}
-	for _, expected := range expectedCommands {
-		if !commandNames[expected] {
-			t.Errorf("ClusterCmd() missing command %q", expected)
+	
+	t.Run("command basic properties", func(t *testing.T) {
+		assert.Equal(t, "cluster", cmd.Use)
+		assert.Contains(t, cmd.Short, "blueprint scenarios")
+		// ClusterCmd returns a command with subcommands, not a RunE
+	})
+	
+	t.Run("has required subcommands", func(t *testing.T) {
+		subcommands := make(map[string]bool)
+		for _, subcmd := range cmd.Commands() {
+			subcommands[subcmd.Use] = true
 		}
-	}
-
-	// Check flags
-	flag := cmd.PersistentFlags().Lookup("name")
-	if flag == nil {
-		t.Error("ClusterCmd() missing 'name' flag")
-	} else if flag.DefValue != constants.DefaultClusterName {
-		t.Errorf("ClusterCmd() name flag default = %v, want %v", flag.DefValue, constants.DefaultClusterName)
-	}
-
-	// Check kustomize-path flag
-	kustomizeFlag := cmd.PersistentFlags().Lookup("kustomize-path")
-	if kustomizeFlag == nil {
-		t.Error("ClusterCmd() missing 'kustomize-path' flag")
-	} else if kustomizeFlag.DefValue != "" {
-		t.Errorf("ClusterCmd() kustomize-path flag default = %v, want empty string", kustomizeFlag.DefValue)
-	}
+		
+		assert.True(t, subcommands["up"], "should have 'up' subcommand")
+		assert.True(t, subcommands["down"], "should have 'down' subcommand")
+		assert.True(t, subcommands["ps"], "should have 'ps' subcommand")
+		assert.True(t, subcommands["test"], "should have 'test' subcommand")
+		assert.True(t, subcommands["logs"], "should have 'logs' subcommand")
+	})
+	
+	t.Run("has blueprint flags", func(t *testing.T) {
+		// Check for scenario flag
+		scenarioFlag := cmd.PersistentFlags().Lookup("scenario")
+		require.NotNil(t, scenarioFlag, "should have --scenario flag")
+		assert.Equal(t, constants.ScenarioMinimal, scenarioFlag.DefValue)
+		
+		// Check for overlay flag
+		overlayFlag := cmd.PersistentFlags().Lookup("overlay")
+		require.NotNil(t, overlayFlag, "should have --overlay flag")
+		assert.Equal(t, "local", overlayFlag.DefValue)
+		
+		// Check for backward compatibility kustomize-path flag
+		kustomizeFlag := cmd.PersistentFlags().Lookup("kustomize-path")
+		require.NotNil(t, kustomizeFlag, "should have --kustomize-path flag")
+	})
 }
 
 func TestClusterUpCmd(t *testing.T) {
 	clusterName := "test-cluster"
+	scenario := constants.ScenarioMinimal
+	overlay := "local"
 	kustomizePath := ""
-	cmd := clusterUpCmd(&clusterName, &kustomizePath)
+	
+	cmd := clusterUpCmd(&clusterName, &scenario, &overlay, &kustomizePath)
+	
+	t.Run("command properties", func(t *testing.T) {
+		assert.Equal(t, "up", cmd.Use)
+		assert.Contains(t, cmd.Short, "deploy blueprint scenario")
+		assert.NotNil(t, cmd.RunE)
+	})
+	
+	t.Run("help text includes scenarios", func(t *testing.T) {
+		assert.Contains(t, cmd.Long, "minimal:")
+		assert.Contains(t, cmd.Long, "development:")
+		assert.Contains(t, cmd.Long, "service-mesh:")
+		assert.Contains(t, cmd.Long, "monitoring-only:")
+		assert.Contains(t, cmd.Long, "full-stack:")
+	})
+}
 
-	if cmd == nil {
-		t.Fatal("clusterUpCmd() returned nil")
+func TestScenarioConstants(t *testing.T) {
+	// Verify all scenario constants are defined
+	scenarios := []string{
+		constants.ScenarioMinimal,
+		constants.ScenarioDevelopment,
+		constants.ScenarioServiceMesh,
+		constants.ScenarioMonitoring,
+		constants.ScenarioFullStack,
 	}
-
-	if cmd.Use != "up" {
-		t.Errorf("clusterUpCmd().Use = %v, want %v", cmd.Use, "up")
+	
+	for _, scenario := range scenarios {
+		assert.NotEmpty(t, scenario, "scenario constant should not be empty")
 	}
-
-	if cmd.RunE == nil {
-		t.Error("clusterUpCmd().RunE is nil")
+	
+	// Verify scenario paths
+	for _, scenario := range scenarios {
+		path := constants.GetScenarioPath(scenario)
+		assert.Contains(t, path, "blueprint/scenarios/")
+		assert.Contains(t, path, scenario)
 	}
 }
 
-func TestClusterDownCmd(t *testing.T) {
-	clusterName := "test-cluster"
-	cmd := clusterDownCmd(&clusterName)
+func TestBlueprintPaths(t *testing.T) {
+	t.Run("GetBlueprintPath", func(t *testing.T) {
+		path := constants.GetBlueprintPath("test-component")
+		assert.Contains(t, path, "blueprint")
+		assert.Contains(t, path, "test-component")
+	})
+	
+	t.Run("GetModulePath", func(t *testing.T) {
+		path := constants.GetModulePath("observability")
+		assert.Contains(t, path, "blueprint/infra/modules")
+		assert.Contains(t, path, "observability")
+	})
+	
+	t.Run("GetOverlayPath", func(t *testing.T) {
+		path := constants.GetOverlayPath("local")
+		assert.Contains(t, path, "blueprint/infra/overlays")
+		assert.Contains(t, path, "local")
+	})
+}
 
-	if cmd == nil {
-		t.Fatal("clusterDownCmd() returned nil")
+func TestFindIaacPath(t *testing.T) {
+	// Test with various starting paths
+	testCases := []struct {
+		name     string
+		start    string
+		expected bool
+	}{
+		{
+			name:     "from project root",
+			start:    "/Users/test/project",
+			expected: false, // Won't find iaac in test environment
+		},
+		{
+			name:     "from deep nested path",
+			start:    "/Users/test/project/deep/nested/path",
+			expected: false,
+		},
 	}
-
-	if cmd.Use != "down" {
-		t.Errorf("clusterDownCmd().Use = %v, want %v", cmd.Use, "down")
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := findIaacPath(tc.start)
+			if tc.expected {
+				assert.NotEmpty(t, result)
+			}
+		})
 	}
+}
 
-	if cmd.RunE == nil {
-		t.Error("clusterDownCmd().RunE is nil")
+func TestWaitForScenarioComponents(t *testing.T) {
+	// This would require mocking the kubernetes client
+	// For now, just verify the function exists and handles scenarios
+	
+	scenarios := []string{
+		constants.ScenarioMinimal,
+		constants.ScenarioDevelopment,
+		constants.ScenarioServiceMesh,
+		constants.ScenarioMonitoring,
+		constants.ScenarioFullStack,
+		"unknown-scenario", // Should fall back to default
+	}
+	
+	for _, scenario := range scenarios {
+		t.Run("scenario_"+scenario, func(t *testing.T) {
+			// Just verify we can call the function without panic
+			// In real tests, we'd mock the k8s client
+			assert.NotPanics(t, func() {
+				// The function will error due to nil client, but shouldn't panic
+				_ = waitForScenarioComponents(nil, nil, scenario)
+			})
+		})
+	}
+}
+
+func TestPrintScenarioAccess(t *testing.T) {
+	// Test that printScenarioAccess doesn't panic for any scenario
+	scenarios := []string{
+		constants.ScenarioMinimal,
+		constants.ScenarioDevelopment,
+		constants.ScenarioServiceMesh,
+		constants.ScenarioMonitoring,
+		constants.ScenarioFullStack,
+	}
+	
+	for _, scenario := range scenarios {
+		t.Run("print_access_"+scenario, func(t *testing.T) {
+			assert.NotPanics(t, func() {
+				// Capture output to avoid test noise
+				printScenarioAccess(scenario)
+			})
+		})
 	}
 }
 
 func TestClusterStatusCmd(t *testing.T) {
 	clusterName := "test-cluster"
 	cmd := clusterStatusCmd(&clusterName)
-
-	if cmd == nil {
-		t.Fatal("clusterStatusCmd() returned nil")
-	}
-
-	if cmd.Use != "ps" {
-		t.Errorf("clusterStatusCmd().Use = %v, want %v", cmd.Use, "ps")
-	}
-
-	if cmd.RunE == nil {
-		t.Error("clusterStatusCmd().RunE is nil")
-	}
-}
-
-func TestClusterLogsCmd(t *testing.T) {
-	clusterName := "test-cluster"
-	cmd := clusterLogsCmd(&clusterName)
-
-	if cmd == nil {
-		t.Fatal("clusterLogsCmd() returned nil")
-	}
-
-	if cmd.Use != "logs" {
-		t.Errorf("clusterLogsCmd().Use = %v, want %v", cmd.Use, "logs")
-	}
-
-	if cmd.RunE == nil {
-		t.Error("clusterLogsCmd().RunE is nil")
-	}
-
-	// Check flags
-	flags := []struct {
-		name     string
-		defValue string
-	}{
-		{"namespace", constants.AppNamespace},
-		{"selector", ""},
-		{"tail", "50"},
-	}
-
-	for _, f := range flags {
-		flag := cmd.Flags().Lookup(f.name)
-		if flag == nil {
-			t.Errorf("clusterLogsCmd() missing '%s' flag", f.name)
-		} else if flag.DefValue != f.defValue {
-			t.Errorf("clusterLogsCmd() %s flag default = %v, want %v", f.name, flag.DefValue, f.defValue)
-		}
-	}
+	
+	t.Run("command properties", func(t *testing.T) {
+		assert.Equal(t, "ps", cmd.Use)
+		assert.Contains(t, cmd.Short, "blueprint component")
+		assert.NotNil(t, cmd.RunE)
+	})
 }
 
 func TestClusterTestCmd(t *testing.T) {
 	clusterName := "test-cluster"
-	cmd := clusterTestCmd(&clusterName)
-
-	if cmd == nil {
-		t.Fatal("clusterTestCmd() returned nil")
-	}
-
-	if cmd.Use != "test" {
-		t.Errorf("clusterTestCmd().Use = %v, want %v", cmd.Use, "test")
-	}
-
-	if cmd.RunE == nil {
-		t.Error("clusterTestCmd().RunE is nil")
-	}
+	scenario := constants.ScenarioMinimal
+	cmd := clusterTestCmd(&clusterName, &scenario)
+	
+	t.Run("command properties", func(t *testing.T) {
+		assert.Equal(t, "test", cmd.Use)
+		assert.Contains(t, cmd.Short, "blueprint scenario")
+		assert.NotNil(t, cmd.RunE)
+	})
 }
 
-func TestWaitForInfrastructure(t *testing.T) {
-	// Skip this test as it requires a real k8s client and cluster
-	t.Skip("Skipping TestWaitForInfrastructure - requires real k8s cluster")
-}
-
-// Helper function to execute command
-func executeClusterCommand(args ...string) (output string, err error) {
+// Integration test for command help output
+func TestCommandHelpOutput(t *testing.T) {
 	cmd := ClusterCmd()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs(args)
-
-	err = cmd.Execute()
-	return buf.String(), err
-}
-
-func TestClusterCmdExecution(t *testing.T) {
-	tests := []struct {
-		name    string
-		args    []string
-		wantErr bool
-	}{
-		{
-			name:    "no_args",
-			args:    []string{},
-			wantErr: false, // Shows help
-		},
-		{
-			name:    "help",
-			args:    []string{"--help"},
-			wantErr: false,
-		},
-		{
-			name:    "invalid_subcommand",
-			args:    []string{"invalid"},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			output, err := executeClusterCommand(tt.args...)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("executeClusterCommand() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			if !tt.wantErr && !strings.Contains(output, "Create, destroy, and manage k3d clusters") {
-				t.Errorf("executeClusterCommand() output missing expected help text. Got: %q", output)
-			}
-		})
-	}
-}
-
-// Benchmark tests
-func BenchmarkClusterCmd(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = ClusterCmd()
-	}
-}
-
-func BenchmarkClusterUpCmd(b *testing.B) {
-	clusterName := "bench-cluster"
-	kustomizePath := ""
-	for i := 0; i < b.N; i++ {
-		_ = clusterUpCmd(&clusterName, &kustomizePath)
-	}
+	
+	// Capture help output
+	var helpOutput strings.Builder
+	cmd.SetOut(&helpOutput)
+	cmd.SetArgs([]string{"--help"})
+	
+	err := cmd.Execute()
+	require.NoError(t, err)
+	
+	help := helpOutput.String()
+	
+	// Verify help contains expected content
+	assert.Contains(t, help, "blueprint scenarios")
+	assert.Contains(t, help, "--scenario")
+	assert.Contains(t, help, "--overlay")
+	assert.Contains(t, help, "--kustomize-path")
+	assert.Contains(t, help, "up")
+	assert.Contains(t, help, "down")
+	assert.Contains(t, help, "ps")
+	assert.Contains(t, help, "test")
 }

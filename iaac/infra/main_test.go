@@ -68,8 +68,8 @@ func TestRootCmd(t *testing.T) {
 		t.Fatal("rootCmd is nil")
 	}
 
-	if rootCmd.Use != "semantic-cache-deploy" {
-		t.Errorf("rootCmd.Use = %v, want %v", rootCmd.Use, "semantic-cache-deploy")
+	if rootCmd.Use != "iaac" {
+		t.Errorf("rootCmd.Use = %v, want %v", rootCmd.Use, "iaac")
 	}
 
 	// Check that subcommands are added

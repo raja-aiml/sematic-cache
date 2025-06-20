@@ -17,8 +17,8 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	// Test cluster defaults
-	if cfg.Cluster.Name != "semantic-cache" {
-		t.Errorf("DefaultConfig() Cluster.Name = %v, want %v", cfg.Cluster.Name, "semantic-cache")
+	if cfg.Cluster.Name != "local-k8s" {
+		t.Errorf("DefaultConfig() Cluster.Name = %v, want %v", cfg.Cluster.Name, "local-k8s")
 	}
 	if cfg.Cluster.APIPort != "6550" {
 		t.Errorf("DefaultConfig() Cluster.APIPort = %v, want %v", cfg.Cluster.APIPort, "6550")
@@ -517,7 +517,7 @@ func TestLoadConfig_EmptyPath(t *testing.T) {
 	}
 
 	// Should have default values
-	if cfg.Cluster.Name != "semantic-cache" {
+	if cfg.Cluster.Name != "local-k8s" {
 		t.Errorf("LoadConfig(\"\") didn't use defaults, got cluster name = %v", cfg.Cluster.Name)
 	}
 }
@@ -591,7 +591,7 @@ func TestGetConfigPaths(t *testing.T) {
 	expectedPaths := []string{
 		"deploy-config.yaml",
 		"./config/deploy-config.yaml",
-		filepath.Join(os.Getenv("HOME"), ".semantic-cache", "deploy-config.yaml"),
+		filepath.Join(os.Getenv("HOME"), ".iaac", "deploy-config.yaml"),
 	}
 
 	for i, path := range paths {

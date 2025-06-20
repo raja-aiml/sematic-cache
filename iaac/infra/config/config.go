@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -130,18 +131,18 @@ func DefaultConfig() *Config {
 		LogFile: "",
 		App: AppConfig{
 			Name:          getEnvOrDefault("IAAC_APP_NAME", "myapp"),
-			SecretName:    getEnvOrDefault("IAAC_SECRET_NAME", "app-secrets"),
-			BlueprintPath: getEnvOrDefault("IAAC_BLUEPRINT_PATH", "iaac/blueprint"),
-			DatabaseName:  getEnvOrDefault("IAAC_DATABASE_NAME", "appdb"),
+			SecretName:    getEnvOrDefault("IAAC_SECRET_NAME", constants.AppSecretName),
+			BlueprintPath: getEnvOrDefault("IAAC_BLUEPRINT_PATH", constants.DefaultBlueprintPath),
+			DatabaseName:  getEnvOrDefault("IAAC_DATABASE_NAME", "semantic_cache"),
 		},
 		Cluster: ClusterConfig{
-			Name:        getEnvOrDefault("IAAC_CLUSTER_NAME", "local-k8s"),
-			APIPort:     getEnvOrDefault("IAAC_API_PORT", "6550"),
-			HTTPPort:    getEnvOrDefault("IAAC_HTTP_PORT", "8080:80"),
-			HTTPSPort:   getEnvOrDefault("IAAC_HTTPS_PORT", "8443:443"),
+			Name:        getEnvOrDefault("IAAC_CLUSTER_NAME", constants.DefaultClusterName),
+			APIPort:     getEnvOrDefault("IAAC_API_PORT", constants.DefaultAPIPort),
+			HTTPPort:    getEnvOrDefault("IAAC_HTTP_PORT", constants.HTTPPort),
+			HTTPSPort:   getEnvOrDefault("IAAC_HTTPS_PORT", constants.HTTPSPort),
 			Servers:     1,
 			Agents:      0,
-			Timeout:     5 * time.Minute,
+			Timeout:     constants.DefaultTimeout,
 			WaitTime:    10 * time.Second,
 			AutoRestart: false,
 			ResourceLimits: ResourceLimits{
@@ -150,10 +151,10 @@ func DefaultConfig() *Config {
 			},
 		},
 		Build: BuildConfig{
-			ImageName:  getEnvOrDefault("IAAC_IMAGE_NAME", "app:local"),
+			ImageName:  getEnvOrDefault("IAAC_IMAGE_NAME", constants.DefaultImageName),
 			Dockerfile: getEnvOrDefault("IAAC_DOCKERFILE", "Dockerfile"),
 			Context:    getEnvOrDefault("IAAC_BUILD_CONTEXT", "."),
-			Timeout:    10 * time.Minute,
+			Timeout:    constants.DefaultBuildTimeout,
 			NoCache:    false,
 			BuildArgs:  []string{},
 			CacheFrom:  []string{},

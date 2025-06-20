@@ -14,11 +14,15 @@ type WorkflowManager struct {
 	logger      *utils.Logger
 	clusterName string
 	imageName   string
+	scenario    string
+	overlay     string
 }
 
 func WorkflowCmd() *cobra.Command {
 	var clusterName string
 	var imageName string
+	var scenario string
+	var overlay string
 
 	cmd := &cobra.Command{
 		Use:   "workflow",
@@ -28,11 +32,15 @@ func WorkflowCmd() *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&clusterName, "cluster", "c", constants.DefaultClusterName, "k3d cluster name")
 	cmd.PersistentFlags().StringVarP(&imageName, "image", "i", constants.DefaultImageName, "Docker image name")
+	cmd.PersistentFlags().StringVarP(&scenario, "scenario", "s", constants.ScenarioDevelopment, "Blueprint scenario to deploy")
+	cmd.PersistentFlags().StringVarP(&overlay, "overlay", "o", "local", "Overlay to use (local, dev)")
 
 	wm := &WorkflowManager{
 		logger:      utils.NewLogger("workflow"),
 		clusterName: clusterName,
 		imageName:   imageName,
+		scenario:    scenario,
+		overlay:     overlay,
 	}
 
 	cmd.AddCommand(workflowFullCmd(wm))
@@ -81,7 +89,11 @@ func workflowFullCmd(wm *WorkflowManager) *cobra.Command {
 			}
 
 			wm.logger.Info("Workflow completed successfully!")
-			wm.logger.Info("Access the application at: http://localhost:8080")
+			if wm.scenario == constants.ScenarioMinimal {
+				wm.logger.Info("Infrastructure components are ready!")
+			} else {
+				wm.logger.Info("Access the application at: http://localhost:8080")
+			}
 
 			return nil
 		},
@@ -213,8 +225,10 @@ func runSetup(_ context.Context, wm *WorkflowManager) error {
 
 	// Create cluster
 	clusterName := wm.clusterName
+	scenario := wm.scenario
+	overlay := wm.overlay
 	kustomizePath := ""
-	clusterUp := clusterUpCmd(&clusterName, &kustomizePath)
+	clusterUp := clusterUpCmd(&clusterName, &scenario, &overlay, &kustomizePath)
 	if err := clusterUp.RunE(clusterUp, []string{}); err != nil {
 		return fmt.Errorf("cluster setup failed: %w", err)
 	}

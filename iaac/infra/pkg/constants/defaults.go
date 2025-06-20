@@ -8,7 +8,7 @@ const (
 	DefaultAPIPort     = "6550"
 
 	// Container defaults
-	DefaultImageName = "app:local"
+	DefaultImageName = "semantic-cache:local"
 
 	// Namespace defaults
 	AppNamespace   = "app"
@@ -25,10 +25,10 @@ const (
 	HTTPSPort = "8443:443"
 
 	// Secret names
-	AppSecretName = "app-secrets"
+	AppSecretName = "semantic-cache-secrets"
 
 	// Default database URL for local deployment
-	DefaultDatabaseURL = "postgres://postgres:postgres@postgres.infra.svc.cluster.local:5432/appdb?sslmode=disable"
+	DefaultDatabaseURL = "postgres://postgres:postgres@postgres.infra.svc.cluster.local:5432/semantic_cache?sslmode=disable"
 
 	// Blueprint path defaults
 	DefaultBlueprintPath = "iaac/blueprint"

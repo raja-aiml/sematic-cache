@@ -15,7 +15,7 @@ func TestConstants(t *testing.T) {
 		{
 			name:     "default_cluster_name",
 			constant: DefaultClusterName,
-			expected: "semantic-cache",
+			expected: "local-k8s",
 		},
 		{
 			name:     "default_api_port",

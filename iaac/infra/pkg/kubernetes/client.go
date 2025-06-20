@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -175,4 +176,31 @@ func (c *Client) PortForward(ctx context.Context, namespace, podName string, loc
 	// For now, we'll use kubectl port-forward via exec
 	cmd := fmt.Sprintf("kubectl port-forward -n %s %s %d:%d", namespace, podName, localPort, remotePort)
 	return fmt.Errorf("port forwarding not implemented - use: %s", cmd)
+}
+
+func (c *Client) GetDeployments(ctx context.Context, namespace string) ([]appsv1.Deployment, error) {
+	deploymentList, err := c.clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list deployments: %w", err)
+	}
+	return deploymentList.Items, nil
+}
+
+func (c *Client) GetStatefulSets(ctx context.Context, namespace string) ([]appsv1.StatefulSet, error) {
+	statefulSetList, err := c.clientset.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list statefulsets: %w", err)
+	}
+	return statefulSetList.Items, nil
+}
+
+func (c *Client) NamespaceExists(ctx context.Context, namespace string) (bool, error) {
+	_, err := c.clientset.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
