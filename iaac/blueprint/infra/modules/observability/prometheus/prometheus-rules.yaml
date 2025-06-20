@@ -1,0 +1,187 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  infrastructure.yml: |
+    groups:
+    - name: infrastructure
+      interval: 30s
+      rules:
+      # Node alerts
+      - alert: NodeDown
+        expr: up{job="kubernetes-nodes"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: node
+        annotations:
+          summary: "Node {{ $labels.instance }} is down"
+          description: "Node {{ $labels.instance }} has been down for more than 5 minutes."
+
+      - alert: NodeMemoryPressure
+        expr: kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "Node {{ $labels.node }} under memory pressure"
+          description: "Node {{ $labels.node }} has been under memory pressure for more than 5 minutes."
+
+      - alert: NodeDiskPressure
+        expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "Node {{ $labels.node }} under disk pressure"
+          description: "Node {{ $labels.node }} has been under disk pressure for more than 5 minutes."
+
+      # Pod alerts
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: pod
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been crash looping for more than 5 minutes."
+
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{condition="true"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: pod
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is not ready"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been not ready for more than 5 minutes."
+
+  postgres.yml: |
+    groups:
+    - name: postgres
+      interval: 30s
+      rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance {{ $labels.instance }} is down."
+
+      - alert: PostgresConnectionsHigh
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "PostgreSQL connections are high"
+          description: "PostgreSQL instance {{ $labels.instance }} is using more than 80% of max connections."
+
+      - alert: PostgresReplicationLag
+        expr: pg_replication_lag > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "PostgreSQL replication lag is high"
+          description: "PostgreSQL replication lag is {{ $value }} seconds on {{ $labels.instance }}."
+
+      - alert: PostgresDeadlocks
+        expr: rate(pg_stat_database_deadlocks[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "PostgreSQL deadlocks detected"
+          description: "PostgreSQL instance {{ $labels.instance }} has deadlocks."
+
+  redis.yml: |
+    groups:
+    - name: redis
+      interval: 30s
+      rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance {{ $labels.instance }} is down."
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis instance {{ $labels.instance }} is using more than 90% of max memory."
+
+      - alert: RedisConnectionsHigh
+        expr: redis_connected_clients / redis_config_maxclients > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis connections are high"
+          description: "Redis instance {{ $labels.instance }} is using more than 90% of max connections."
+
+      - alert: RedisRejectedConnections
+        expr: rate(redis_rejected_connections_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis is rejecting connections"
+          description: "Redis instance {{ $labels.instance }} is rejecting connections."
+
+  istio.yml: |
+    groups:
+    - name: istio
+      interval: 30s
+      rules:
+      - alert: IstioHighRequestRate
+        expr: sum(rate(istio_request_total[5m])) by (destination_service_name, destination_service_namespace) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: istio
+        annotations:
+          summary: "High request rate to {{ $labels.destination_service_name }}"
+          description: "Service {{ $labels.destination_service_namespace }}/{{ $labels.destination_service_name }} is receiving {{ $value }} requests per second."
+
+      - alert: IstioHighErrorRate
+        expr: sum(rate(istio_request_total{response_code=~"5.."}[5m])) by (destination_service_name, destination_service_namespace) / sum(rate(istio_request_total[5m])) by (destination_service_name, destination_service_namespace) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: istio
+        annotations:
+          summary: "High error rate for {{ $labels.destination_service_name }}"
+          description: "Service {{ $labels.destination_service_namespace }}/{{ $labels.destination_service_name }} has {{ $value | humanizePercentage }} error rate."
+
+      - alert: IstioHighLatency
+        expr: histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket[5m])) by (destination_service_name, destination_service_namespace, le)) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: istio
+        annotations:
+          summary: "High latency for {{ $labels.destination_service_name }}"
+          description: "99th percentile latency for {{ $labels.destination_service_namespace }}/{{ $labels.destination_service_name }} is {{ $value }}ms."

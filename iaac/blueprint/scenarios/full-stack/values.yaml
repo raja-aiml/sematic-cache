@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: full-stack-values
+data:
+  # PostgreSQL HA Configuration
+  postgres.replicas: "2"
+  postgres.resources.requests.cpu: "1000m"
+  postgres.resources.requests.memory: "2Gi"
+  postgres.resources.limits.cpu: "4000m"
+  postgres.resources.limits.memory: "8Gi"
+  postgres.storage.size: "100Gi"
+  postgres.storage.class: "fast-ssd"
+  postgres.backup.enabled: "true"
+  postgres.backup.schedule: "0 */6 * * *"
+  postgres.maxConnections: "500"
+  postgres.sharedBuffers: "2GB"
+  
+  # Redis Cluster Configuration
+  redis.replicas: "3"
+  redis.resources.requests.cpu: "500m"
+  redis.resources.requests.memory: "1Gi"
+  redis.resources.limits.cpu: "2000m"
+  redis.resources.limits.memory: "4Gi"
+  redis.storage.size: "50Gi"
+  redis.storage.class: "fast-ssd"
+  redis.maxMemory: "3gb"
+  redis.cluster.enabled: "true"
+  
+  # Istio Production Configuration
+  istio.profile: "production"
+  istio.pilot.resources.requests.cpu: "500m"
+  istio.pilot.resources.requests.memory: "2Gi"
+  istio.proxy.resources.requests.cpu: "100m"
+  istio.proxy.resources.requests.memory: "128Mi"
+  istio.proxy.resources.limits.cpu: "2000m"
+  istio.proxy.resources.limits.memory: "1Gi"
+  
+  # Prometheus Production Configuration
+  prometheus.retention: "90d"
+  prometheus.storage.size: "500Gi"
+  prometheus.storage.class: "standard"
+  prometheus.replicas: "2"
+  prometheus.resources.requests.cpu: "2000m"
+  prometheus.resources.requests.memory: "8Gi"
+  prometheus.resources.limits.cpu: "4000m"
+  prometheus.resources.limits.memory: "16Gi"
+  prometheus.remoteWrite.enabled: "true"
+  prometheus.remoteWrite.url: "https://prometheus-backup.example.com/api/v1/write"
+  
+  # Grafana Production Configuration
+  grafana.replicas: "2"
+  grafana.resources.requests.cpu: "500m"
+  grafana.resources.requests.memory: "1Gi"
+  grafana.resources.limits.cpu: "2000m"
+  grafana.resources.limits.memory: "2Gi"
+  grafana.persistence.enabled: "true"
+  grafana.persistence.size: "20Gi"
+  grafana.ha.enabled: "true"
+  
+  # Loki Production Configuration
+  loki.replicas: "3"
+  loki.retention: "30d"
+  loki.storage.size: "1Ti"
+  loki.storage.class: "standard"
+  loki.resources.requests.cpu: "1000m"
+  loki.resources.requests.memory: "2Gi"
+  loki.resources.limits.cpu: "4000m"
+  loki.resources.limits.memory: "8Gi"
+  
+  # Security Configuration
+  security.podSecurityPolicy.enabled: "true"
+  security.networkPolicies.enabled: "true"
+  security.rbac.enabled: "true"
+  security.tls.enabled: "true"
+  security.secrets.encryption: "true"
+  
+  # High Availability Configuration
+  ha.enabled: "true"
+  ha.minAvailable: "1"
+  ha.maxUnavailable: "1"
+  
+  # Autoscaling Configuration
+  autoscaling.enabled: "true"
+  autoscaling.minReplicas: "2"
+  autoscaling.maxReplicas: "10"
+  autoscaling.targetCPU: "70"
+  autoscaling.targetMemory: "80"

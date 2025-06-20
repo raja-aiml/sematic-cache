@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-visualizer
+  namespace: tracing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-visualizer
+  template:
+    metadata:
+      labels:
+        app: otel-visualizer
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.52
+        env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        - name: SPAN_STORAGE_TYPE
+          value: memory
+        - name: QUERY_BASE_PATH
+          value: /jaeger
+        ports:
+        - containerPort: 16686
+          name: web
+        - containerPort: 14268
+          name: collector
+        - containerPort: 4317
+          name: otlp-grpc
+        - containerPort: 4318
+          name: otlp-http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

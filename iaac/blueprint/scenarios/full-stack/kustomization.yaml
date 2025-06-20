@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: full-stack-scenario
+
+resources:
+- ../../infra/base
+- ../../infra/modules/istio
+- ../../infra/modules/observability
+- ../../infra/modules/security
+- production-config.yaml
+
+patchesStrategicMerge:
+- values.yaml
+
+namespace: production
+
+commonLabels:
+  scenario: full-stack
+  environment: production
+
+replicas:
+- name: postgres
+  count: 2
+- name: redis
+  count: 3

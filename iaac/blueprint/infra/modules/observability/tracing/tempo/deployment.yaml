@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  namespace: tracing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tempo
+  template:
+    metadata:
+      labels:
+        app: tempo
+    spec:
+      containers:
+      - name: tempo
+        image: grafana/tempo:2.3.1
+        args:
+        - -config.file=/etc/tempo/tempo.yaml
+        ports:
+        - containerPort: 3200
+          name: http
+        - containerPort: 4317
+          name: otlp-grpc
+        - containerPort: 9095
+          name: grpc
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/tempo
+        - name: storage
+          mountPath: /var/tempo
+      volumes:
+      - name: config
+        configMap:
+          name: tempo-config
+      - name: storage
+        persistentVolumeClaim:
+          claimName: tempo-pvc

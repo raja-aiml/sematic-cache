@@ -1,0 +1,93 @@
+{
+  "trace_examples": [
+    {
+      "trace_id": "4bf4c8e9d9f0a3e1b8c7d6f5e4d3c2b1",
+      "span_id": "a1b2c3d4e5f6g7h8",
+      "operation_name": "semantic_cache_lookup",
+      "service_name": "semantic-cache",
+      "duration_ms": 45,
+      "status": "ok",
+      "attributes": {
+        "cache.hit": true,
+        "cache.key": "query_hash_123abc",
+        "similarity_threshold": 0.95
+      },
+      "events": [
+        {
+          "timestamp": "2024-01-20T10:30:00Z",
+          "name": "cache_lookup_start"
+        },
+        {
+          "timestamp": "2024-01-20T10:30:00.045Z",
+          "name": "cache_lookup_complete"
+        }
+      ]
+    },
+    {
+      "trace_id": "5cf5d9f0b4e2a4f2c9d8e7f6f5e4d3c2",
+      "span_id": "b2c3d4e5f6g7h8i9",
+      "operation_name": "postgres_query",
+      "service_name": "semantic-cache",
+      "duration_ms": 120,
+      "status": "ok",
+      "parent_span_id": "a1b2c3d4e5f6g7h8",
+      "attributes": {
+        "db.system": "postgresql",
+        "db.name": "semantic_cache",
+        "db.operation": "SELECT",
+        "db.statement": "SELECT * FROM cache_entries WHERE similarity > $1"
+      }
+    },
+    {
+      "trace_id": "6df6eaf1c5f3b5g3dae9f8g7g6f5e4d3",
+      "span_id": "c3d4e5f6g7h8i9j0",
+      "operation_name": "redis_get",
+      "service_name": "semantic-cache",
+      "duration_ms": 5,
+      "status": "ok",
+      "attributes": {
+        "redis.command": "GET",
+        "redis.key": "session:user123"
+      }
+    }
+  ],
+  "span_metrics": {
+    "semantic_cache_lookup": {
+      "count": 10000,
+      "error_count": 23,
+      "p50_latency_ms": 25,
+      "p95_latency_ms": 75,
+      "p99_latency_ms": 150
+    },
+    "postgres_query": {
+      "count": 3500,
+      "error_count": 5,
+      "p50_latency_ms": 50,
+      "p95_latency_ms": 200,
+      "p99_latency_ms": 500
+    },
+    "redis_operation": {
+      "count": 25000,
+      "error_count": 2,
+      "p50_latency_ms": 2,
+      "p95_latency_ms": 5,
+      "p99_latency_ms": 10
+    }
+  },
+  "service_map": {
+    "services": [
+      {
+        "name": "semantic-cache",
+        "dependencies": ["postgres", "redis"]
+      },
+      {
+        "name": "postgres",
+        "dependencies": []
+      },
+      {
+        "name": "redis",
+        "dependencies": []
+      }
+    ]
+  }
+}

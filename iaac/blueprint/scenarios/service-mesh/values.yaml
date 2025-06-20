@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-mesh-values
+data:
+  # Istio Configuration
+  istio.profile: "demo"
+  istio.mtls.mode: "STRICT"
+  istio.tracing.sampling: "100.0"
+  istio.telemetry.v2.enabled: "true"
+  
+  # Sidecar Resources
+  sidecar.resources.requests.cpu: "50m"
+  sidecar.resources.requests.memory: "64Mi"
+  sidecar.resources.limits.cpu: "200m"
+  sidecar.resources.limits.memory: "256Mi"
+  
+  # Observability
+  prometheus.retention: "7d"
+  grafana.dashboards.istio: "enabled"
+  
+  # Traffic Management
+  circuit.breaker.enabled: "true"
+  retry.policy.enabled: "true"
+  timeout.default: "30s"

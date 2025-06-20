@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stress-test
+  namespace: default
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: k6-stress-test
+        image: grafana/k6:latest
+        command: ["k6", "run", "-"]
+        stdin: true
+        args:
+        - |
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+
+          export let options = {
+            stages: [
+              { duration: '2m', target: 100 },  // Ramp up to 100 users
+              { duration: '5m', target: 200 },  // Ramp up to 200 users
+              { duration: '2m', target: 300 },  // Ramp up to 300 users
+              { duration: '5m', target: 300 },  // Stay at 300 users
+              { duration: '2m', target: 0 },    // Ramp down to 0 users
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<1000'], // 95% of requests under 1s
+              http_req_failed: ['rate<0.2'],     // Error rate under 20%
+            },
+          };
+
+          export default function() {
+            let endpoints = [
+              'http://semantic-cache:8080/api/v1/status',
+              'http://semantic-cache:8080/api/health/postgres',
+              'http://semantic-cache:8080/api/health/redis',
+            ];
+
+            let endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
+            let response = http.get(endpoint);
+            
+            check(response, {
+              'status is 200': (r) => r.status === 200,
+            });
+            
+            sleep(Math.random() * 2);
+          }

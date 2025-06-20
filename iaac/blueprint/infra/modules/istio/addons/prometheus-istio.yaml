@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: istio-component-monitor
+  namespace: istio-system
+  labels:
+    monitoring: istio-components
+    release: prometheus
+spec:
+  jobLabel: istio
+  targetLabels: [app]
+  selector:
+    matchExpressions:
+    - {key: istio, operator: In, values: [pilot]}
+  namespaceSelector:
+    matchNames:
+    - istio-system
+  endpoints:
+  - port: http-monitoring
+    interval: 15s
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: istio-mesh-metrics
+  namespace: istio-system
+  labels:
+    monitoring: istio-proxies
+    release: prometheus
+spec:
+  selector:
+    matchExpressions:
+    - {key: istio-prometheus-ignore, operator: DoesNotExist}
+  namespaceSelector:
+    any: true
+  jobLabel: envoy-stats
+  endpoints:
+  - path: /stats/prometheus
+    targetPort: 15090
+    interval: 15s
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_container_name]
+      action: drop
+      regex: istio-proxy
+    - sourceLabels: [__meta_kubernetes_pod_label_istio_io_rev, __meta_kubernetes_pod_label_istio_io_version]
+      action: keep
+      regex: ^(sidecar@)?[0-9]+\.[0-9]+\.[0-9]+.*$
+    - sourceLabels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+      action: drop
+      regex: ^istio-pilot;http-monitoring$

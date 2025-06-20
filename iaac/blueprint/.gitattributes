@@ -1,29 +1,32 @@
-# Auto detect text files and perform LF normalization
+# Git attributes for K3D Blueprint
+
+# Ensure consistent line endings
 * text=auto
-
-# Shell scripts
 *.sh text eol=lf
-
-# YAML files
 *.yaml text eol=lf
 *.yml text eol=lf
-
-# JSON files
-*.json text eol=lf
-
-# Markdown files
 *.md text eol=lf
+*.json text eol=lf
+*.sql text eol=lf
 
-# Dockerfile
-Dockerfile text eol=lf
-
-# Go files
-*.go text eol=lf
-
-# Binary files
+# Mark binary files
+*.png binary
 *.jpg binary
 *.jpeg binary
-*.png binary
 *.gif binary
-*.ico binary
-*.svg binary
+*.pdf binary
+*.tar binary
+*.gz binary
+*.zip binary
+
+# Diff settings
+*.md diff=markdown
+*.yaml diff=yaml
+*.json diff=json
+
+# Export ignore (files to exclude from archives)
+.gitignore export-ignore
+.gitattributes export-ignore
+.env.example export-ignore
+/validation-kit export-ignore
+/hack export-ignore

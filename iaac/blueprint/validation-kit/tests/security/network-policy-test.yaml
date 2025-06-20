@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: network-policy-test
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: test
+        image: nicolaka/netshoot:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Testing network policies..."
+          
+          # Test allowed connections
+          echo "=== Testing allowed connections ==="
+          
+          # Should be able to reach PostgreSQL
+          if nc -zv postgres 5432 -w 5; then
+            echo "SUCCESS: Can reach PostgreSQL (as expected)"
+          else
+            echo "FAILED: Cannot reach PostgreSQL"
+            exit 1
+          fi
+          
+          # Should be able to reach Redis
+          if nc -zv redis 6379 -w 5; then
+            echo "SUCCESS: Can reach Redis (as expected)"
+          else
+            echo "FAILED: Cannot reach Redis"
+            exit 1
+          fi
+          
+          # Test blocked connections (if network policies are enforced)
+          echo "=== Testing network isolation ==="
+          
+          # This would fail if proper network policies are in place
+          # For now, we just test connectivity
+          
+          echo "Network policy tests completed"

@@ -1,0 +1,52 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: istio-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: istio-gateway-tls
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: default-routes
+  namespace: istio-system
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - istio-gateway
+  http:
+  - match:
+    - uri:
+        prefix: "/postgres"
+    route:
+    - destination:
+        host: postgres.infra.svc.cluster.local
+        port:
+          number: 5432
+  - match:
+    - uri:
+        prefix: "/redis"
+    route:
+    - destination:
+        host: redis.infra.svc.cluster.local
+        port:
+          number: 6379

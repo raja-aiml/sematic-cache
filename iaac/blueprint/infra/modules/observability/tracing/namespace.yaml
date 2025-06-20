@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tracing
+  labels:
+    name: tracing
+    istio-injection: disabled

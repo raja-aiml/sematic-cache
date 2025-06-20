@@ -1,0 +1,125 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-collector
+  namespace: tracing
+spec:
+  mode: deployment
+  replicas: 1
+  image: otel/opentelemetry-collector-contrib:0.91.0
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      prometheus:
+        config:
+          scrape_configs:
+          - job_name: 'otel-collector'
+            scrape_interval: 10s
+            static_configs:
+            - targets: ['0.0.0.0:8888']
+      zipkin:
+        endpoint: 0.0.0.0:9411
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:14250
+          thrift_http:
+            endpoint: 0.0.0.0:14268
+          thrift_compact:
+            endpoint: 0.0.0.0:6831
+          thrift_binary:
+            endpoint: 0.0.0.0:6832
+
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 512
+      attributes:
+        actions:
+        - key: cluster
+          value: k3d-blueprint
+          action: insert
+        - key: environment
+          value: local
+          action: insert
+      resource:
+        attributes:
+        - key: service.instance.id
+          from_attribute: k8s.pod.name
+          action: insert
+
+    exporters:
+      tempo:
+        endpoint: tempo:4317
+        tls:
+          insecure: true
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+        namespace: otel
+      logging:
+        loglevel: debug
+      otlp:
+        endpoint: tempo:4317
+        tls:
+          insecure: true
+
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      pprof:
+        endpoint: 0.0.0.0:1777
+      zpages:
+        endpoint: 0.0.0.0:55679
+
+    service:
+      extensions: [health_check, pprof, zpages]
+      pipelines:
+        traces:
+          receivers: [otlp, zipkin, jaeger]
+          processors: [memory_limiter, batch, attributes, resource]
+          exporters: [tempo, logging]
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, batch, attributes]
+          exporters: [prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, attributes]
+          exporters: [logging]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: tracing
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: otel-collector
+  ports:
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
+  - name: zipkin
+    port: 9411
+    targetPort: 9411
+  - name: jaeger-grpc
+    port: 14250
+    targetPort: 14250
+  - name: jaeger-thrift-http
+    port: 14268
+    targetPort: 14268
+  - name: metrics
+    port: 8889
+    targetPort: 8889

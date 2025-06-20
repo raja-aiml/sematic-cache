@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: postgres-client
+  labels:
+    app: postgres-client
+spec:
+  containers:
+  - name: postgres-client
+    image: postgres:15-alpine
+    command: ["sleep", "3600"]
+    env:
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-secret
+          key: password
+    - name: PGUSER
+      value: postgres
+    - name: PGHOST
+      value: postgres
+    - name: PGDATABASE
+      value: semantic_cache
+  restartPolicy: Never

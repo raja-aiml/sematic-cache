@@ -12,7 +12,15 @@ labels:
       environment: local
 
 # Local development specific configurations
-patches: []
+patches:
+- path: resource-limits.yaml
+- path: storage-patch.yaml
+- path: postgres-patch.yaml
+- path: redis-patch.yaml
 
-# No replicas scaling for local development
-replicas: []
+# Fixed replicas for local development
+replicas:
+- name: postgres
+  count: 1
+- name: redis
+  count: 1

@@ -1,0 +1,182 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    environment: production
+    istio-injection: enabled
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  namespace: infra
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: postgres
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-pdb
+  namespace: infra
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: redis
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: production-alerts
+  namespace: monitoring
+data:
+  alerts.yaml: |
+    groups:
+    - name: production-critical
+      interval: 30s
+      rules:
+      - alert: ServiceDown
+        expr: up{environment="production"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          environment: production
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+          runbook_url: "https://wiki.example.com/runbooks/service-down"
+      
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5..",environment="production"}[5m])) by (service)
+            /
+            sum(rate(http_requests_total{environment="production"}[5m])) by (service)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          environment: production
+        annotations:
+          summary: "High error rate for {{ $labels.service }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.service }}"
+      
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{environment="production"}[5m])) by (service, le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          environment: production
+        annotations:
+          summary: "High latency for {{ $labels.service }}"
+          description: "99th percentile latency is {{ $value }}s for service {{ $labels.service }}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backup-credentials
+  namespace: infra
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "your-access-key"
+  AWS_SECRET_ACCESS_KEY: "your-secret-key"
+  S3_BUCKET: "production-backups"
+  S3_REGION: "us-east-1"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: infra
+spec:
+  schedule: "0 */6 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: postgres:16-alpine
+            command:
+            - /bin/bash
+            - -c
+            - |
+              DATE=$(date +%Y%m%d_%H%M%S)
+              PGPASSWORD=$POSTGRES_PASSWORD pg_dump \
+                -h postgres.infra \
+                -U postgres \
+                -d postgres \
+                | gzip > /tmp/backup_$DATE.sql.gz
+              
+              aws s3 cp /tmp/backup_$DATE.sql.gz \
+                s3://$S3_BUCKET/postgres/backup_$DATE.sql.gz
+              
+              # Keep only last 30 days of backups
+              aws s3 ls s3://$S3_BUCKET/postgres/ \
+                | awk '{print $4}' \
+                | sort -r \
+                | tail -n +31 \
+                | xargs -I {} aws s3 rm s3://$S3_BUCKET/postgres/{}
+            env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+            envFrom:
+            - secretRef:
+                name: backup-credentials

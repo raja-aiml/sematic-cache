@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: load-generator
+  labels:
+    app: load-generator
+spec:
+  selector:
+    app: load-generator
+  ports:
+  - name: http
+    port: 6565
+    targetPort: 6565
+    protocol: TCP
+  type: ClusterIP

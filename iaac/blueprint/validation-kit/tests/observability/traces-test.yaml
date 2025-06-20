@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: traces-test
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: test
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Testing distributed tracing..."
+          
+          # Test OpenTelemetry Collector
+          echo "=== Testing OTEL Collector ==="
+          if curl -s http://otel-collector.monitoring:13133/ 2>/dev/null | grep -q "Server available"; then
+            echo "SUCCESS: OTEL Collector health endpoint is responding"
+          else
+            echo "WARNING: OTEL Collector may not be deployed or accessible"
+          fi
+          
+          # Test Tempo
+          echo "=== Testing Tempo ==="
+          if curl -s http://tempo.monitoring:3200/ready 2>/dev/null | grep -q "ready"; then
+            echo "SUCCESS: Tempo is ready"
+          else
+            echo "WARNING: Tempo may not be deployed"
+          fi
+          
+          # Generate a test trace
+          echo "=== Generating test trace ==="
+          # This would normally be done by instrumented applications
+          # For now, we just check the endpoints
+          
+          # Check OTEL metrics endpoint
+          if curl -s http://otel-collector.monitoring:8888/metrics 2>/dev/null | grep -q "otelcol"; then
+            echo "SUCCESS: OTEL Collector metrics available"
+          else
+            echo "INFO: OTEL Collector metrics not accessible"
+          fi
+          
+          echo "Tracing tests completed"

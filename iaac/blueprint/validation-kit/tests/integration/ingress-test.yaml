@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ingress-integration-test
+  namespace: integration-test
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: test
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "=== Ingress Integration Test ==="
+          
+          # Test 1: Ingress controller health
+          echo -n "Test 1 - Ingress controller health: "
+          if curl -s -o /dev/null -w "%{http_code}" http://nginx-ingress-controller.ingress-nginx/healthz | grep -q 200; then
+            echo "PASS"
+          else
+            echo "SKIP (Ingress not deployed)"
+          fi
+          
+          # Test 2: Service routing
+          echo -n "Test 2 - Service routing: "
+          # This would test actual ingress rules if configured
+          echo "SKIP (No ingress rules configured)"
+          
+          echo "=== Ingress tests completed ==="

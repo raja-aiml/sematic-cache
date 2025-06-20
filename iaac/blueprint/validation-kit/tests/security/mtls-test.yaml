@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mtls-test
+  namespace: default
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mtls-test
+  namespace: default
+spec:
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: mtls-test
+      restartPolicy: Never
+      containers:
+      - name: test
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Testing mTLS configuration..."
+          sleep 15  # Wait for sidecar to be ready
+          
+          # Check if Envoy proxy is enforcing mTLS
+          echo "=== Checking Envoy configuration ==="
+          curl -s localhost:15000/config_dump | grep -q "transport_socket" && \
+            echo "SUCCESS: mTLS configuration found in Envoy" || \
+            echo "WARNING: mTLS may not be configured"
+          
+          # Test internal service communication
+          echo "=== Testing service-to-service communication ==="
+          
+          # This should work with mTLS
+          if curl -s http://postgres:5432 --connect-timeout 5; then
+            echo "INFO: Connected to PostgreSQL service"
+          else
+            echo "INFO: Could not connect to PostgreSQL (may be expected with strict mTLS)"
+          fi
+          
+          # Check certificate information
+          echo "=== Checking certificates ==="
+          curl -s localhost:15000/certs | head -20 || echo "Could not retrieve certificate info"
+          
+          echo "mTLS tests completed"

@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark-test
+  namespace: default
+spec:
+  parallelism: 1
+  completions: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: benchmark
+        image: nicolaka/netshoot:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Running performance benchmarks..."
+          
+          # PostgreSQL benchmark
+          echo "=== PostgreSQL Benchmark ==="
+          apt-get update && apt-get install -y postgresql-client
+          
+          export PGPASSWORD=postgres
+          pgbench -i -h postgres -U postgres semantic_cache || true
+          pgbench -c 10 -j 2 -t 1000 -h postgres -U postgres semantic_cache || true
+          
+          # Redis benchmark
+          echo "=== Redis Benchmark ==="
+          apt-get install -y redis-tools
+          redis-benchmark -h redis -p 6379 -q -n 10000 || true
+          
+          # HTTP endpoint benchmark
+          echo "=== HTTP Endpoint Benchmark ==="
+          ab -n 1000 -c 10 http://semantic-cache:8080/api/v1/status || true
+          
+          echo "Benchmark tests completed"

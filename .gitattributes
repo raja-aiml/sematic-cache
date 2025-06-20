@@ -1,0 +1,57 @@
+# Git attributes for k3d-blueprint
+
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Force Unix-style line endings for shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# YAML files
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Dockerfiles
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+
+# Configuration files
+*.conf text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
+*.toml text eol=lf
+
+# JSON files
+*.json text eol=lf
+
+# SQL files
+*.sql text eol=lf
+
+# Go files
+*.go text eol=lf diff=golang
+*.mod text eol=lf
+*.sum text eol=lf
+
+# Don't diff generated files
+*.generated.yaml -diff
+*.rendered.yaml -diff
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+
+# Linguist overrides
+*.yaml linguist-detectable=true
+*.sh linguist-detectable=true
+docs/* linguist-documentation

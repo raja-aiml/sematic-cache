@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: metrics-test
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: test
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Testing metrics collection..."
+          
+          # Test Prometheus metrics endpoint
+          echo "=== Testing Prometheus metrics ==="
+          if curl -s http://prometheus.monitoring:9090/api/v1/query?query=up | grep -q "success"; then
+            echo "SUCCESS: Prometheus API is working"
+          else
+            echo "FAILED: Prometheus API not responding"
+            exit 1
+          fi
+          
+          # Check if key targets are up
+          echo "=== Checking monitored targets ==="
+          targets=$(curl -s http://prometheus.monitoring:9090/api/v1/targets | grep -o '"health":"up"' | wc -l)
+          echo "Active targets: $targets"
+          
+          if [ "$targets" -gt 0 ]; then
+            echo "SUCCESS: Found $targets healthy targets"
+          else
+            echo "WARNING: No healthy targets found"
+          fi
+          
+          # Test some common metrics
+          echo "=== Testing common metrics ==="
+          metrics=(
+            "container_memory_usage_bytes"
+            "container_cpu_usage_seconds_total"
+            "kube_pod_info"
+            "up"
+          )
+          
+          for metric in "${metrics[@]}"; do
+            if curl -s "http://prometheus.monitoring:9090/api/v1/query?query=$metric" | grep -q "success"; then
+              echo "SUCCESS: Metric $metric is available"
+            else
+              echo "WARNING: Metric $metric not found"
+            fi
+          done
+          
+          echo "Metrics tests completed"

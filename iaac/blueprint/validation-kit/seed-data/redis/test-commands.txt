@@ -1,0 +1,58 @@
+# Redis test commands for validation
+
+# Basic connectivity
+PING
+
+# Server info
+INFO server
+
+# Memory info
+INFO memory
+
+# Check if any keys exist
+DBSIZE
+
+# List all keys (use with caution in production)
+KEYS *
+
+# Test string operations
+SET test:key "Hello Redis"
+GET test:key
+DEL test:key
+
+# Test hash operations
+HSET test:user:1 name "Test User" email "test@example.com"
+HGETALL test:user:1
+HDEL test:user:1 name email
+
+# Test list operations
+LPUSH test:queue "item1" "item2" "item3"
+LRANGE test:queue 0 -1
+LPOP test:queue
+DEL test:queue
+
+# Test set operations
+SADD test:tags "cache" "redis" "performance"
+SMEMBERS test:tags
+SREM test:tags "cache" "redis" "performance"
+
+# Test sorted set operations
+ZADD test:scores 100 "player1" 85 "player2" 95 "player3"
+ZRANGE test:scores 0 -1 WITHSCORES
+DEL test:scores
+
+# Test expiration
+SET test:temp "temporary value"
+EXPIRE test:temp 60
+TTL test:temp
+DEL test:temp
+
+# Monitor commands (run separately)
+# MONITOR
+
+# Check persistence
+CONFIG GET save
+CONFIG GET appendonly
+
+# Performance benchmark
+# redis-benchmark -h localhost -p 6379 -n 10000 -q

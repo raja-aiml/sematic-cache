@@ -1,34 +1,46 @@
-# Build artifacts
-bin/
-build/
-dist/
-
-# Logs
+# Generated files
 *.log
-logs/
-
-# Temporary files
 *.tmp
-.DS_Store
-.vscode/
-.idea/
+*.bak
+*~
 
-# Environment and secrets
+# Kubernetes secrets
+*secret*.yaml
+!*secret*.yaml.example
+
+# Local environment files
 .env
-*.secret
-secrets/
+.env.local
+.env.*.local
 
-# Testing
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test outputs
 test-results/
 coverage/
+*.test
 
-# Kubernetes
-kubeconfig*
-*.kubeconfig
+# Temporary files
+tmp/
+temp/
 
-# Backup files
-backups/
-*.backup
+# Build artifacts
+bin/
+dist/
+build/
 
-# Local development
-local-*
+# Validation reports
+validation-report.md
+validation-report-*.md
+
+# Local override files
+*-local.yaml
+override-*.yaml

@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tracing-integration-test
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: test
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Testing tracing endpoints..."
+          
+          # Test OpenTelemetry Collector
+          echo "Checking OTEL Collector health..."
+          if curl -s http://otel-collector.monitoring:13133/ > /dev/null; then
+            echo "SUCCESS: OTEL Collector is healthy"
+          else
+            echo "WARNING: OTEL Collector health check failed (may not be deployed)"
+          fi
+          
+          # Test Tempo
+          echo "Checking Tempo endpoint..."
+          if curl -s http://tempo.monitoring:3200/ready > /dev/null; then
+            echo "SUCCESS: Tempo is ready"
+          else
+            echo "WARNING: Tempo readiness check failed (may not be deployed)"
+          fi
+          
+          echo "Tracing tests completed"

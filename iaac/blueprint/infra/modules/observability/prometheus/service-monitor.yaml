@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-operated
+  namespace: monitoring
+  labels:
+    app: prometheus
+    prometheus: kube-prometheus
+spec:
+  ports:
+  - name: web
+    port: 9090
+    targetPort: web
+  selector:
+    app: prometheus
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+  endpoints:
+  - port: web
+    interval: 30s
+    path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app: alertmanager
+spec:
+  selector:
+    matchLabels:
+      app: alertmanager
+  endpoints:
+  - port: web
+    interval: 30s
+    path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres-exporter
+  namespace: infra
+  labels:
+    app: postgres
+    component: exporter
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+      component: metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: infra
+  labels:
+    app: redis
+    component: exporter
+spec:
+  selector:
+    matchLabels:
+      app: redis
+      component: metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

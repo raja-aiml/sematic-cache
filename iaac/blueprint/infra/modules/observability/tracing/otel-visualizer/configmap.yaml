@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-visualizer-config
+  namespace: tracing
+data:
+  config.yaml: |
+    # OpenTelemetry Visualizer Configuration
+    # This configures the Jaeger UI to work with OTEL data
+    
+    ui:
+      config:
+        dependencies:
+          menuEnabled: true
+        archiveEnabled: false
+        tracking:
+          gaID: ""
+    
+    # Service dependencies configuration
+    dependencies:
+      datasource: prometheus
+      prometheus:
+        server: http://prometheus.monitoring:9090
+    
+    # Additional UI customizations
+    ui_config: |
+      {
+        "monitor": {
+          "menuEnabled": true
+        },
+        "dependencies": {
+          "menuEnabled": true
+        },
+        "search": {
+          "maxLookback": {
+            "label": "2 Days",
+            "value": "2d"
+          },
+          "maxDuration": {
+            "label": "1 Hour", 
+            "value": "1h"
+          }
+        }
+      }

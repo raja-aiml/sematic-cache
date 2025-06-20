@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: infra
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: redis
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        args:
+        - redis-server
+        - --maxmemory 256mb
+        - --maxmemory-policy allkeys-lru
+        - --save ""
+      - name: redis-exporter
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi

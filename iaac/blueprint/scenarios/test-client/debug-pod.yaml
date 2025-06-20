@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-pod
+  labels:
+    app: debug-pod
+spec:
+  containers:
+  - name: debug
+    image: nicolaka/netshoot:latest
+    command: ["sleep", "3600"]
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+        - NET_RAW
+  restartPolicy: Never

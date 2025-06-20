@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rbac-test-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: default
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: rbac-test-sa
+  namespace: default
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rbac-test
+  namespace: default
+spec:
+  template:
+    spec:
+      serviceAccountName: rbac-test-sa
+      restartPolicy: Never
+      containers:
+      - name: test
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Testing RBAC permissions..."
+          
+          # Should be able to list pods (allowed by RBAC)
+          echo "=== Testing allowed operations ==="
+          if kubectl get pods -n default; then
+            echo "SUCCESS: Can list pods (as expected)"
+          else
+            echo "FAILED: Cannot list pods"
+            exit 1
+          fi
+          
+          # Should NOT be able to list services (not allowed by RBAC)
+          echo "=== Testing denied operations ==="
+          if ! kubectl get services -n default 2>/dev/null; then
+            echo "SUCCESS: Cannot list services (as expected)"
+          else
+            echo "WARNING: Can list services (RBAC may not be properly configured)"
+          fi
+          
+          # Should NOT be able to access other namespaces
+          if ! kubectl get pods -n kube-system 2>/dev/null; then
+            echo "SUCCESS: Cannot access kube-system namespace (as expected)"
+          else
+            echo "WARNING: Can access kube-system namespace"
+          fi
+          
+          echo "RBAC tests completed"

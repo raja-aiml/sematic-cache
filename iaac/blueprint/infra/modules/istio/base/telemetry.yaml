@@ -1,0 +1,42 @@
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: default-metrics
+  namespace: istio-system
+spec:
+  metrics:
+  - providers:
+    - name: prometheus
+    overrides:
+    - match:
+        metric: ALL_METRICS
+      tagOverrides:
+        destination_service_name:
+          value: destination.workload.name | "unknown"
+        destination_service_namespace:
+          value: destination.workload.namespace | "unknown"
+        request_protocol:
+          value: request.protocol | "unknown"
+        response_code:
+          value: response.code | 200
+---
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: default-tracing
+  namespace: istio-system
+spec:
+  tracing:
+  - providers:
+    - name: otel
+    randomSamplingPercentage: 100.0
+---
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: default-access-logging
+  namespace: istio-system
+spec:
+  accessLogging:
+  - providers:
+    - name: loki

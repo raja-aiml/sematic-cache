@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redis-client
+  namespace: default
+  labels:
+    app: redis-client
+    purpose: testing
+spec:
+  containers:
+  - name: redis-client
+    image: redis:7-alpine
+    command: ["sleep", "infinity"]
+    env:
+    - name: REDIS_HOST
+      value: redis
+    - name: REDIS_PORT
+      value: "6379"
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
