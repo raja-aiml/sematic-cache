@@ -1,5 +1,10 @@
 version: '3'
 
+includes:
+  common:
+    taskfile: ../../build/Taskfile.common.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+
 vars:
   BINARY_NAME: semantic-cache-deploy
   BINARY_DIR: bin
@@ -27,9 +32,10 @@ tasks:
   build:
     desc: Build the binary
     cmds:
-      - mkdir -p {{.BINARY_DIR}}
-      - "{{.GOBUILD}} {{.LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}} ."
-      - echo "Binary built{{":"}} {{.BINARY_DIR}}/{{.BINARY_NAME}}"
+      - task: common:build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          BINARY_DIR: '{{.BINARY_DIR}}'
 
   build-all:
     desc: Build for all platforms
@@ -56,36 +62,57 @@ tasks:
       - rm -f coverage.out coverage.html
 
   test:
-    desc: Run tests
+    desc: Run all tests
     cmds:
-      - |
-        set -o pipefail
-        {{.GOTEST}} -v -race -coverprofile=coverage.out ./... 2>&1 | \
-        grep -v "ld: warning: -bind_at_load is deprecated" | \
-        grep -v "ld: warning: .* has malformed LC_DYSYMTAB" | \
-        grep -v "Neither --kubeconfig nor --master was specified" | \
-        grep -v "error creating inClusterConfig" | \
-        grep -v "KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined"
-    env:
-      CGO_ENABLED: "1"
-      KUBERNETES_SERVICE_HOST: ""
-      KUBERNETES_SERVICE_PORT: ""
+      - task: common:test
 
-  test-quiet:
-    desc: Run tests with minimal output (no verbose, no warnings)
+  test:quick:
+    desc: Run short tests quickly
     cmds:
-      - "{{.GOTEST}} -race -coverprofile=coverage.out ./... 2>&1 | grep -v 'ld: warning' | grep -v 'client_config.go' || true"
-    env:
-      CGO_ENABLED: "1"
-      KUBERNETES_SERVICE_HOST: ""
-      KUBERNETES_SERVICE_PORT: ""
+      - task: common:test:short
 
-  test-coverage:
+  test:cover:
     desc: Run tests with coverage report
-    deps: [test]
     cmds:
-      - go tool cover -html=coverage.out -o coverage.html
-      - echo "Coverage report{{":"}} coverage.html"
+      - task: common:test:coverage
+
+  test:watch:
+    desc: Run tests in watch mode (auto-rerun on changes)
+    cmds:
+      - echo "💡 Watch mode requires external tools like watchexec or entr"
+      - echo "💡 Example - watchexec -e go task test:quick"
+
+  test:ci:
+    desc: Run tests for CI/CD with JUnit output
+    cmds:
+      - task: common:test
+        vars:
+          TEST_ARGS: "-json"
+
+  test:bench:
+    desc: Run benchmarks
+    cmds:
+      - task: common:test:bench
+
+  test:verbose:
+    desc: Run tests with detailed output
+    cmds:
+      - task: common:test
+        vars:
+          TEST_ARGS: "-v"
+
+  test:pkg:
+    desc: Run tests for a specific package
+    cmds:
+      - task: common:test
+        vars:
+          PACKAGES: "{{.CLI_ARGS}}"
+
+  test:install-tools:
+    desc: Install required test tools (gotestsum, etc.)
+    cmds:
+      - go install gotest.tools/gotestsum@latest
+      - echo "✅ Test tools installed"
 
   benchmark:
     desc: Run benchmarks

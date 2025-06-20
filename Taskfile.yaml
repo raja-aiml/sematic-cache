@@ -1,7 +1,20 @@
 version: '3'
 
+includes:
+  # Include common build tasks
+  common:
+    taskfile: ./build/Taskfile.common.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+  
+  # Include deploy tasks
+  deploy:
+    taskfile: ./deploy/Taskfile.yaml
+    dir: ./deploy
+
 vars:
   DEPLOY_DIR: ./deploy
+  TEST_RUNNER: ./build/test.sh
+  BUILD_DIR: ./build
 
 tasks:
   default:
@@ -38,79 +51,185 @@ tasks:
         echo "📁 Deploy-specific tasks: task -d deploy --list"
     silent: true
 
+  # Build Tasks (using common)
+  build:
+    desc: Build the semantic cache server
+    cmds:
+      - task: common:build
+        vars:
+          BINARY_NAME: semantic-cache
+          MAIN: ./cmd/server
+
+  build:all:
+    desc: Build for all platforms
+    cmds:
+      - task: common:build:all
+        vars:
+          BINARY_NAME: semantic-cache
+          MAIN: ./cmd/server
+
+  build:local:
+    desc: Build the local deployment tool
+    cmds:
+      - |
+        cd ./deploy/local && \
+        task build
+
+  # Testing Tasks
+  test:
+    desc: Run all tests in the project
+    cmds:
+      - task: common:test
+
+  test:local:
+    desc: Run tests in deploy/local directory
+    cmds:
+      - task: common:test
+        vars:
+          DIR: ./deploy/local
+
+  test:server:
+    desc: Run tests in server directory
+    cmds:
+      - task: common:test
+        vars:
+          DIR: ./server
+
+  test:core:
+    desc: Run tests in core directory  
+    cmds:
+      - task: common:test
+        vars:
+          DIR: ./core
+
+  test:coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - task: common:test:coverage
+
+  test:bench:
+    desc: Run benchmarks
+    cmds:
+      - task: common:test:bench
+
+  # Code Quality Tasks
+  fmt:
+    desc: Format all Go code
+    cmds:
+      - task: common:fmt
+
+  lint:
+    desc: Run linting
+    cmds:
+      - task: common:lint
+
+  check:
+    desc: Run all checks (fmt, vet, lint, test)
+    cmds:
+      - task: common:check
+
+  # Clean Tasks
+  clean:
+    desc: Clean all build artifacts
+    cmds:
+      - task: common:clean
+      - cd ./deploy/local && task clean
+
   # Core Workflows
   full:
     desc: Complete production workflow (setup → build → deploy → test)
     cmds:
-      - task -d {{.DEPLOY_DIR}} full
+      - task: deploy:full
 
   quick:
-    desc: Quick development workflow with essential tests
+    desc: Quick development workflow with essential tests  
     cmds:
-      - task -d {{.DEPLOY_DIR}} quick
+      - task: deploy:quick
 
   reset:
     desc: Complete reset (cleanup → setup → build → deploy)
     cmds:
       - task -d {{.DEPLOY_DIR}} reset
 
-  # Individual Steps
+  # Docker Tasks
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - task: common:docker:build
+        vars:
+          IMAGE_NAME: semantic-cache
+
+  docker:push:
+    desc: Push Docker image
+    cmds:
+      - task: common:docker:push
+        vars:
+          IMAGE_NAME: semantic-cache
+
+  # Deployment Tasks
   setup:
     desc: Create k3d cluster and deploy infrastructure
     cmds:
-      - task -d {{.DEPLOY_DIR}} setup
-
-  build:
-    desc: Build Docker image and import to cluster
-    cmds:
-      - task -d {{.DEPLOY_DIR}} build
+      - task: deploy:setup
 
   deploy:
-    desc: Deploy application to cluster
+    desc: Deploy application to cluster  
     cmds:
-      - task -d {{.DEPLOY_DIR}} deploy
+      - task: deploy:deploy
 
-  test:
-    desc: Run comprehensive end-to-end tests
+  verify:
+    desc: Verify deployment
     cmds:
-      - task -d {{.DEPLOY_DIR}} test
+      - task: deploy:verify
 
   # Monitoring
   status:
     desc: Show current deployment status
     cmds:
-      - task -d {{.DEPLOY_DIR}} status
+      - task: deploy:status
 
   logs:
     desc: Show application logs
     cmds:
-      - task -d {{.DEPLOY_DIR}} logs
+      - task: deploy:logs
 
   health:
-    desc: Quick health check of all services
+    desc: Quick health check of all services  
     cmds:
-      - task -d {{.DEPLOY_DIR}} health
+      - task: deploy:health
 
   metrics:
     desc: Show API metrics
     cmds:
-      - task -d {{.DEPLOY_DIR}} metrics
+      - task: deploy:metrics
 
   # Development
   dev:
     desc: Development cycle (build → deploy → quick-test)
     cmds:
-      - task -d {{.DEPLOY_DIR}} dev
+      - task: build
+      - task: deploy:dev
 
-  redeploy:
-    desc: Quick redeploy (build → deploy)
+  dev:watch:
+    desc: Development with file watching
     cmds:
-      - task -d {{.DEPLOY_DIR}} redeploy
+      - task: common:test
+        vars:
+          TEST_ARGS: "-w"
 
-  restart:
-    desc: Restart application deployment
+  # CI/CD Tasks
+  ci:
+    desc: Run CI pipeline
     cmds:
-      - task -d {{.DEPLOY_DIR}} restart
+      - task: common:ci
+
+  release:
+    desc: Create release artifacts
+    cmds:
+      - task: common:release
+        vars:
+          BINARY_NAME: semantic-cache
+          MAIN: ./cmd/server
 
   # Testing Suites
   test:api:
@@ -175,12 +294,13 @@ tasks:
   cleanup:
     desc: Destroy cluster and cleanup all resources
     cmds:
-      - task -d {{.DEPLOY_DIR}} cleanup
+      - task: deploy:cleanup
 
-  clean:
-    desc: Alias for cleanup
+  cleanup:all:
+    desc: Clean everything including build artifacts
     cmds:
-      - task cleanup
+      - task: cleanup
+      - task: clean
 
   # Advanced Workflows
   production-ready:
@@ -209,31 +329,23 @@ tasks:
     cmds:
       - task -d {{.DEPLOY_DIR}} port-forward:postgres
 
-  # Project Operations
-  lint:
-    desc: Run code linting (if available)
+  # Utility Tasks
+  deps:
+    desc: Download and tidy dependencies
     cmds:
-      - echo "🔍 Running code linting..."
-      - |
-        if [ -f "go.mod" ]; then
-          echo "Running Go linting..."
-          go fmt ./...
-          go vet ./...
-        else
-          echo "No Go module found, skipping Go linting"
-        fi
+      - task: common:deps
+      - task: common:deps:tidy
 
-  test:unit:
-    desc: Run unit tests (if available)
+  info:
+    desc: Show project and build information
     cmds:
-      - echo "🧪 Running unit tests..."
+      - task: common:info
       - |
-        if [ -f "go.mod" ]; then
-          echo "Running Go unit tests..."
-          go test ./... -v
-        else
-          echo "No Go module found, skipping unit tests"
-        fi
+        echo ""
+        echo "📦 Semantic Cache Specific:"
+        echo "Deploy Directory: {{.DEPLOY_DIR}}"
+        echo "Build Directory: {{.BUILD_DIR}}"
+        echo "Test Runner: {{.TEST_RUNNER}}"
 
   docs:
     desc: Show project documentation
@@ -253,23 +365,12 @@ tasks:
         echo "  task status    # Check status"
         echo "  task logs      # View logs"
 
-  info:
-    desc: Show project and deployment information
+  # Install all tools
+  install:tools:
+    desc: Install all required tools
     cmds:
+      - "{{.TEST_RUNNER}} --install-tools"
       - |
-        echo "🚀 Semantic Cache Project Information"
-        echo "====================================="
-        echo "Project Root: $(pwd)"
-        echo "Deploy Directory: {{.DEPLOY_DIR}}"
-        echo ""
-        echo "Available workflows:"
-        echo "  task full           # Complete production workflow"
-        echo "  task quick          # Quick development cycle"
-        echo "  task production-ready  # Full validation"
-        echo ""
-        echo "Monitoring:"
-        echo "  task status         # Deployment status"
-        echo "  task health         # Health checks"
-        echo "  task logs           # Application logs"
-        echo ""
-        echo "For detailed help: task --list"
+        echo "📦 Installing additional tools..."
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        echo "✅ All tools installed"

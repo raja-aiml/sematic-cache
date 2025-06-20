@@ -1,0 +1,95 @@
+# Example Taskfile showing how to use the common build tasks
+# This demonstrates how any Go project can use the common tasks
+
+version: '3'
+
+includes:
+  common:
+    taskfile: ./Taskfile.common.yaml
+    dir: '{{.DIR | default "."}}'  # Allow directory override
+
+vars:
+  # Project-specific variables
+  BINARY_NAME: my-app
+  BINARY_DIR: ./bin
+  
+  # Custom ldflags for this project
+  CUSTOM_LDFLAGS: -X main.customVar=value
+
+tasks:
+  # Default task
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # Build with project defaults
+  build:
+    desc: Build the application
+    cmds:
+      - task: common:build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          LDFLAGS: '{{.CUSTOM_LDFLAGS}}'
+
+  # Build all platforms
+  build:all:
+    desc: Build for all platforms
+    cmds:
+      - task: common:build:all
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          LDFLAGS: '{{.CUSTOM_LDFLAGS}}'
+
+  # Run tests
+  test:
+    desc: Run tests
+    cmds:
+      - task: common:test
+
+  # Run tests with coverage
+  test:coverage:
+    desc: Run tests with coverage
+    cmds:
+      - task: common:test:coverage
+
+  # Clean build artifacts
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - task: common:clean
+
+  # Run all checks
+  check:
+    desc: Run all checks
+    cmds:
+      - task: common:check
+
+  # CI pipeline
+  ci:
+    desc: Run CI pipeline
+    cmds:
+      - task: common:ci
+
+  # Docker build
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - task: common:docker:build
+        vars:
+          IMAGE_NAME: '{{.BINARY_NAME}}'
+
+  # Show project info
+  info:
+    desc: Show project information
+    cmds:
+      - task: common:info
+
+# Example of a custom task that uses common tasks
+  release:
+    desc: Create a release
+    cmds:
+      - task: common:clean
+      - task: test
+      - task: build:all
+      - echo "🎉 Release ready!"
