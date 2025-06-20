@@ -12,6 +12,17 @@ go vet ./...            # Static analysis (MANDATORY before commit)
 go run cmd/server/main.go -config config.yml  # Run server
 ```
 
+### Git Commit Shortcut
+When you need to quickly stage all changes and commit with an auto-generated message, use this instruction:
+```
+"git add, generate git commit message and commit"
+```
+This will:
+1. Check git status to understand changes
+2. Stage all modified and new files
+3. Generate a descriptive commit message following conventional commits format
+4. Create the commit with co-authorship attribution
+
 ### Key Principles to Follow
 1. **KISS**: Keep implementations simple and readable
 2. **DRY**: Don't repeat code - extract common functionality
