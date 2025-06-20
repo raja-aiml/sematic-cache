@@ -19,11 +19,28 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+// DockerClient is an interface that wraps the Docker client methods we use
+type DockerClient interface {
+	Ping(ctx context.Context) (types.Ping, error)
+	ImageBuild(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error)
+	ImageTag(ctx context.Context, source, target string) error
+	ImagePush(ctx context.Context, image string, options image.PushOptions) (io.ReadCloser, error)
+	ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
+	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
+	ContainerStop(ctx context.Context, containerID string, options container.StopOptions) error
+	ContainerRemove(ctx context.Context, containerID string, options container.RemoveOptions) error
+	ContainerWait(ctx context.Context, containerID string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error)
+	ContainerLogs(ctx context.Context, container string, options container.LogsOptions) (io.ReadCloser, error)
+	Close() error
+}
 
 // SDKBuilder implements Docker operations using the Docker SDK
 type SDKBuilder struct {
-	client *client.Client
+	client DockerClient
 	logger *utils.Logger
 }
 
@@ -142,10 +159,7 @@ func (b *SDKBuilder) Run(ctx context.Context, imageName string, opts *RunOptions
 			hostConfig.PortBindings = make(nat.PortMap)
 
 			for hostPort, containerPort := range opts.Ports {
-				port, err := nat.NewPort("tcp", containerPort)
-				if err != nil {
-					return "", fmt.Errorf("invalid port: %w", err)
-				}
+				port := nat.Port(fmt.Sprintf("%s/tcp", containerPort))
 				config.ExposedPorts[port] = struct{}{}
 				hostConfig.PortBindings[port] = []nat.PortBinding{
 					{HostPort: hostPort},
@@ -254,7 +268,7 @@ func (b *SDKBuilder) ListImages(ctx context.Context) ([]image.Summary, error) {
 
 // Helper functions
 
-func createTarArchive(contextPath, dockerfilePath string) (io.Reader, error) {
+func createTarArchive(contextPath, _ string) (io.Reader, error) {
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
 	defer tw.Close()
