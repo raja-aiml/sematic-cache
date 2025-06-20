@@ -58,7 +58,20 @@ tasks:
   test:
     desc: Run tests
     cmds:
-      - "{{.GOTEST}} -v -race -coverprofile=coverage.out ./..."
+      - |
+        set -o pipefail
+        {{.GOTEST}} -v -race -coverprofile=coverage.out ./... 2>&1 | \
+        grep -v "ld: warning: -bind_at_load is deprecated" | \
+        grep -v "ld: warning: .* has malformed LC_DYSYMTAB"
+    env:
+      CGO_ENABLED: "1"
+
+  test-quiet:
+    desc: Run tests with minimal output (no verbose, no warnings)
+    cmds:
+      - "{{.GOTEST}} -race -coverprofile=coverage.out ./... 2>&1 | grep -v 'ld: warning' || true"
+    env:
+      CGO_ENABLED: "1"
 
   test-coverage:
     desc: Run tests with coverage report

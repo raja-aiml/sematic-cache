@@ -174,18 +174,66 @@ This allows the tool to share code and dependencies with the main project while 
 
 ## Development
 
+### Building
+
 ```bash
-# Run tests
-go test ./...
+# Build using Task
+task build
 
+# Build for all platforms
+task build-all
+
+# Build directly with go
+go build -o bin/semantic-cache-deploy .
+```
+
+### Testing
+
+See [TEST_GUIDE.md](TEST_GUIDE.md) for comprehensive testing documentation.
+
+```bash
+# Run tests (filters macOS warnings)
+task test
+
+# Run tests quietly
+task test-quiet
+
+# Generate coverage report
+task test-coverage
+
+# Use the test script
+./scripts/test.sh --coverage
+```
+
+### Code Quality
+
+```bash
 # Format code
-gofmt -w .
+task fmt
 
-# Lint
-go vet ./...
+# Check formatting
+task fmt-check
 
-# Build
-go build -o semantic-cache-deploy .
+# Run linter
+task lint
+
+# Run go vet
+task vet
+
+# Run all checks
+task check
+```
+
+### Development with Task
+
+This project uses [Task](https://taskfile.dev/) for build automation. See [TASKFILE_USAGE.md](TASKFILE_USAGE.md) for details.
+
+```bash
+# List all available tasks
+task --list-all
+
+# Run CI pipeline
+task ci
 ```
 
 ## Future Enhancements
