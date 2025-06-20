@@ -1,0 +1,264 @@
+# Example Taskfile showing how to use DevOps common tasks
+# Copy this file to your project and customize as needed
+
+version: '3'
+
+includes:
+  # Include build tasks for Go operations
+  build:
+    taskfile: ./devops/Taskfile.build.common.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+  
+  # Include deploy tasks for Kubernetes operations
+  deploy:
+    taskfile: ./devops/Taskfile.deploy.common.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+
+vars:
+  # Project configuration
+  PROJECT_NAME: my-project
+  BINARY_NAME: my-app
+  BINARY_DIR: ./bin
+  
+  # Build configuration
+  MAIN: ./cmd/server
+  LDFLAGS: -X main.version={{.VERSION}} -X main.project={{.PROJECT_NAME}}
+  
+  # Deploy configuration
+  CLUSTER_NAME: my-cluster
+  API_URL: http://localhost:8080/api
+  APP_NAMESPACE: app
+  WORKFLOW_SCRIPT: ./scripts/deploy.sh
+
+tasks:
+  # === PROJECT-SPECIFIC TASKS ===
+  default:
+    desc: Show available tasks
+    cmds:
+      - |
+        echo "🚀 {{.PROJECT_NAME}} Task Runner"
+        echo "================================"
+        echo ""
+        echo "Build Commands:"
+        echo "  task build           # Build application"
+        echo "  task test            # Run tests"
+        echo "  task ci              # Run CI pipeline"
+        echo ""
+        echo "Deploy Commands:"
+        echo "  task setup           # Setup cluster"
+        echo "  task deploy          # Deploy application"
+        echo "  task status          # Check status"
+        echo ""
+        echo "For all tasks: task --list"
+
+  # === BUILD TASKS (using build commons) ===
+  build:
+    desc: Build the application
+    cmds:
+      - task: build:build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          MAIN: '{{.MAIN}}'
+          LDFLAGS: '{{.LDFLAGS}}'
+
+  build:all:
+    desc: Build for all platforms
+    cmds:
+      - task: build:build:all
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          MAIN: '{{.MAIN}}'
+
+  test:
+    desc: Run tests
+    cmds:
+      - task: build:test
+
+  test:coverage:
+    desc: Run tests with coverage
+    cmds:
+      - task: build:test:coverage
+
+  fmt:
+    desc: Format code
+    cmds:
+      - task: build:fmt
+
+  lint:
+    desc: Run linting
+    cmds:
+      - task: build:lint
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - task: build:clean
+
+  ci:
+    desc: Run CI pipeline
+    cmds:
+      - task: build:ci
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          MAIN: '{{.MAIN}}'
+
+  # === DEPLOY TASKS (using deploy commons) ===
+  setup:
+    desc: Setup cluster and infrastructure
+    cmds:
+      - task: deploy:setup
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  deploy-app:
+    desc: Deploy application to cluster
+    cmds:
+      - task: deploy:deploy
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  status:
+    desc: Show deployment status
+    cmds:
+      - task: deploy:status
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  logs:
+    desc: Show application logs
+    cmds:
+      - task: deploy:logs
+        vars:
+          APP_NAMESPACE: '{{.APP_NAMESPACE}}'
+
+  health:
+    desc: Check application health
+    cmds:
+      - task: deploy:health
+        vars:
+          API_URL: '{{.API_URL}}'
+
+  cleanup:
+    desc: Cleanup resources
+    cmds:
+      - task: deploy:cleanup
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  # === COMPOSITE WORKFLOWS ===
+  full:
+    desc: Complete workflow (build → deploy → test)
+    deps: [build, deploy-app]
+    cmds:
+      - task: deploy:test:api
+        vars:
+          API_URL: '{{.API_URL}}'
+      - echo "✅ Full workflow completed!"
+
+  quick:
+    desc: Quick development workflow
+    deps: [build]
+    cmds:
+      - task: deploy-app
+      - task: health
+      - echo "⚡ Quick workflow completed!"
+
+  # === DOCKER TASKS ===
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - task: build:docker:build
+        vars:
+          IMAGE_NAME: '{{.PROJECT_NAME}}'
+          IMAGE_TAG: latest
+
+  # === DEVELOPMENT HELPERS ===
+  dev:
+    desc: Development cycle
+    cmds:
+      - task: build
+      - task: deploy-app
+      - task: health
+
+  dev:watch:
+    desc: Watch for changes and rebuild
+    cmds:
+      - echo "💡 Use external tools for watch mode:"
+      - echo "💡 watchexec -e go 'task dev'"
+
+  # === DEBUG & TROUBLESHOOTING ===
+  debug:
+    desc: Debug deployment issues
+    cmds:
+      - task: deploy:debug
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  debug:pods:
+    desc: Debug pod issues
+    cmds:
+      - task: deploy:debug:pods
+        vars:
+          APP_NAMESPACE: '{{.APP_NAMESPACE}}'
+
+  # === CUSTOM PROJECT TASKS ===
+  migrate:
+    desc: Run database migrations (example custom task)
+    cmds:
+      - echo "🔄 Running database migrations..."
+      - ./scripts/migrate.sh
+
+  seed:
+    desc: Seed database with test data (example custom task)
+    cmds:
+      - echo "🌱 Seeding database..."
+      - ./scripts/seed.sh
+
+  backup:
+    desc: Backup application data (example custom task)
+    cmds:
+      - echo "💾 Creating backup..."
+      - ./scripts/backup.sh
+
+  # === SCALING OPERATIONS ===
+  scale:up:
+    desc: Scale application up
+    cmds:
+      - task: deploy:scale:up
+        vars:
+          APP_NAMESPACE: '{{.APP_NAMESPACE}}'
+
+  scale:down:
+    desc: Scale application down
+    cmds:
+      - task: deploy:scale:down
+        vars:
+          APP_NAMESPACE: '{{.APP_NAMESPACE}}'
+
+  # === INFORMATIONAL TASKS ===
+  info:
+    desc: Show project information
+    cmds:
+      - task: build:info
+      - echo ""
+      - echo "Project: {{.PROJECT_NAME}}"
+      - echo "Binary: {{.BINARY_NAME}}"
+      - echo "Cluster: {{.CLUSTER_NAME}}"
+      - echo "API URL: {{.API_URL}}"
+
+  # === CI/CD HELPERS ===
+  ci:full:
+    desc: Full CI pipeline
+    cmds:
+      - task: ci
+      - task: deploy:ci:test
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  release:
+    desc: Create release
+    cmds:
+      - task: build:release
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+      - echo "🎉 Release created!"

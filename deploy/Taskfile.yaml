@@ -4,6 +4,11 @@ version: '3'
 # 🚀 SEMANTIC CACHE DEPLOYMENT TASKS
 # =====================================
 
+includes:
+  deploy:
+    taskfile: ../devops/Taskfile.deploy.common.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+
 vars:
   CLUSTER_NAME: sematic-cache
   WORKFLOW_SCRIPT: ./workflow.sh
@@ -35,27 +40,23 @@ tasks:
   full:
     desc: Complete production workflow (setup → build → deploy → test)
     cmds:
-      - echo "🚀 Running complete production workflow..."
-      - "{{.WORKFLOW_SCRIPT}} full"
+      - task: deploy:full
 
   quick:
     desc: Quick development workflow with essential tests only
     cmds:
-      - echo "⚡ Running quick development workflow..."
-      - "{{.WORKFLOW_SCRIPT}} --quick full"
+      - task: deploy:quick
 
   reset:
     desc: Complete reset (cleanup → setup → build → deploy)
     cmds:
-      - echo "🔄 Resetting entire deployment..."
-      - "{{.WORKFLOW_SCRIPT}} reset"
+      - task: deploy:reset
 
   # === INDIVIDUAL STEPS ===
   setup:
     desc: Create k3d cluster and deploy infrastructure
     cmds:
-      - echo "🏗️  Setting up cluster and infrastructure..."
-      - "{{.WORKFLOW_SCRIPT}} setup"
+      - task: deploy:setup
 
   build:
     desc: Build Docker image and import to cluster
@@ -66,84 +67,66 @@ tasks:
   deploy:
     desc: Deploy application to cluster
     cmds:
-      - echo "🚀 Deploying application..."
-      - "{{.WORKFLOW_SCRIPT}} deploy"
+      - task: deploy:deploy
 
   test:
     desc: Run comprehensive end-to-end tests
     cmds:
-      - echo "🧪 Running comprehensive tests..."
-      - "{{.WORKFLOW_SCRIPT}} test"
+      - task: deploy:test
 
   test:quick:
     desc: Run essential tests only (faster)
     cmds:
-      - echo "⚡ Running quick tests..."
-      - "{{.WORKFLOW_SCRIPT}} quick-test"
+      - task: deploy:test:quick
 
   # === MONITORING & MAINTENANCE ===
   status:
     desc: Show current deployment status
     cmds:
-      - echo "📊 Checking deployment status..."
-      - "{{.WORKFLOW_SCRIPT}} status"
+      - task: deploy:status
 
   logs:
     desc: Show application logs
     cmds:
-      - echo "📜 Showing application logs..."
-      - "{{.WORKFLOW_SCRIPT}} logs"
+      - task: deploy:logs
 
   health:
     desc: Quick health check of all services
     cmds:
-      - echo "❤️  Performing health check..."
-      - 'echo "API Health:"'
-      - curl -s {{.API_URL}}/health | jq . || echo "❌ API not responding"
-      - echo ""
-      - 'echo "Web Interface:"'
-      - curl -s {{.WEB_URL}}/ | head -1 || echo "❌ Web not responding"
+      - task: deploy:health
 
   metrics:
     desc: Show API metrics
     cmds:
-      - 'echo "📈 API Metrics:"'
-      - curl -s {{.API_URL}}/metrics | jq . || echo "❌ Metrics not available"
+      - task: deploy:metrics
 
   # === API TESTING ===
   api:test:
     desc: Test API endpoints with sample data
     cmds:
-      - echo "🔬 Testing API endpoints..."
-      - 'echo "Testing health endpoint:"'
-      - curl -s {{.API_URL}}/health
-      - echo ""
-      - 'echo "Testing cache SET:"'
-      - |
-        curl -s -X POST {{.API_URL}}/set \
-          -H "Content-Type: application/json" \
-          -d '{"prompt":"What is Kubernetes?","answer":"Container orchestration platform","modelName":"test"}'
-      - echo ""
-      - 'echo "Testing cache GET:"'
-      - |
-        curl -s -X POST {{.API_URL}}/get \
-          -H "Content-Type: application/json" \
-          -d '{"prompt":"What is Kubernetes?"}'
+      - task: deploy:test:api
 
   api:benchmark:
     desc: Run API performance benchmark
     cmds:
-      - echo "⚡ Running API performance benchmark..."
-      - echo "Making 50 concurrent requests to test performance..."
-      - |
-        seq 1 50 | xargs -P 10 -I {} curl -s -w "%{time_total}s\n" -o /dev/null {{.API_URL}}/health | sort -n | tail -10
+      - task: deploy:test:benchmark
+
+  # === CLUSTER MANAGEMENT ===
+  cluster:info:
+    desc: Show cluster information
+    cmds:
+      - task: deploy:cluster:info
+
+  cluster:events:
+    desc: Show recent cluster events
+    cmds:
+      - task: deploy:cluster:events
 
   # === CLEANUP ===
   cleanup:
     desc: Destroy cluster and cleanup all resources
     cmds:
-      - echo "🧹 Cleaning up all resources..."
-      - "{{.WORKFLOW_SCRIPT}} cleanup"
+      - task: deploy:cleanup
 
   clean:
     desc: Alias for cleanup
@@ -154,43 +137,23 @@ tasks:
   dev:
     desc: Development cycle (build → deploy → quick-test)
     cmds:
-      - echo "🔧 Running development cycle..."
-      - "{{.WORKFLOW_SCRIPT}} build deploy quick-test"
+      - task: deploy:dev
 
   redeploy:
     desc: Quick redeploy (build → deploy)
     cmds:
-      - echo "🔄 Redeploying application..."
-      - "{{.WORKFLOW_SCRIPT}} build deploy"
+      - task: deploy:redeploy
 
-  watch:pods:
-    desc: Watch pod status in real-time
+  # === VERIFICATION ===
+  verify:
+    desc: Verify deployment is working correctly
     cmds:
-      - echo "👀 Watching pods..."
-      - watch kubectl get pods -A
+      - task: deploy:verify
 
-  watch:logs:
-    desc: Watch application logs in real-time
+  validate:
+    desc: Validate configuration files
     cmds:
-      - echo "📜 Watching logs..."
-      - kubectl logs -n app -l app=sematic-cache -f
-
-  # === CLUSTER MANAGEMENT ===
-  cluster:info:
-    desc: Show cluster information
-    cmds:
-      - 'echo "🏗️  Cluster Information:"'
-      - k3d cluster list
-      - echo ""
-      - kubectl cluster-info
-      - echo ""
-      - kubectl get nodes
-
-  cluster:events:
-    desc: Show recent cluster events
-    cmds:
-      - 'echo "📅 Recent Cluster Events:"'
-      - kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
+      - task: deploy:validate
 
   # === TESTING SUITES ===
   test:infrastructure:
@@ -223,165 +186,59 @@ tasks:
       - echo "📊 Testing monitoring..."
       - ./tests/e2e.sh monitoring
 
-  # === VERIFICATION ===
-  verify:
-    desc: Verify deployment is working correctly
-    cmds:
-      - echo "✅ Verifying deployment..."
-      - 'echo "Checking cluster:"'
-      - k3d cluster list | grep {{.CLUSTER_NAME}} && echo "✅ Cluster exists" || echo "❌ Cluster missing"
-      - 'echo "Checking pods:"'
-      - kubectl get pods -A | grep -E "(Running|Ready)" && echo "✅ Pods running" || echo "❌ Pod issues"
-      - 'echo "Checking API:"'
-      - curl -s --max-time 5 {{.API_URL}}/health >/dev/null && echo "✅ API responding" || echo "❌ API not responding"
-      - 'echo "Checking web:"'
-      - curl -s --max-time 5 {{.WEB_URL}}/ >/dev/null && echo "✅ Web responding" || echo "❌ Web not responding"
-
-  validate:
-    desc: Validate configuration files
-    cmds:
-      - echo "✅ Validating configuration..."
-      - kubectl kustomize . >/dev/null && echo "✅ Root kustomization valid" || echo "❌ Root kustomization invalid"
-      - kubectl kustomize app/ >/dev/null && echo "✅ App kustomization valid" || echo "❌ App kustomization invalid"
-      - kubectl kustomize infra/ >/dev/null && echo "✅ Infra kustomization valid" || echo "❌ Infra kustomization invalid"
-
-  # === DOCUMENTATION ===
-  docs:
-    desc: Show deployment documentation
-    cmds:
-      - 'echo "📚 Deployment Documentation:"'
-      - 'echo "Main README: ../README.md"'
-      - 'echo "Deploy README: ./README.md"'
-      - 'echo "Test README: ./tests/README.md"'
-      - echo ""
-      - 'echo "Quick reference:"'
-      - 'echo "  Cluster: {{.CLUSTER_NAME}}"'
-      - 'echo "  API: {{.API_URL}}/"'
-      - 'echo "  Web: {{.WEB_URL}}/"'
-      - 'echo "  Logs: task logs"'
-      - 'echo "  Status: task status"'
-
-  # === DEBUGGING ===
-  debug:
-    desc: Debug deployment issues
-    cmds:
-      - 'echo "🐛 Debug Information:"'
-      - echo "=== Cluster Status ==="
-      - k3d cluster list
-      - echo ""
-      - echo "=== Pod Status ==="
-      - kubectl get pods -A -o wide
-      - echo ""
-      - echo "=== Service Status ==="
-      - kubectl get svc -A
-      - echo ""
-      - echo "=== Recent Events ==="
-      - kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -10
-      - echo ""
-      - echo "=== API Status ==="
-      - curl -I {{.API_URL}}/health 2>/dev/null || echo "API not accessible"
-
-  debug:pods:
-    desc: Debug pod issues
-    cmds:
-      - 'echo "🔍 Pod Debug Information:"'
-      - echo "=== Pod Status ==="
-      - kubectl get pods -A -o wide
-      - echo ""
-      - echo "=== Pod Descriptions ==="
-      - kubectl describe pods -n app
-      - echo ""
-      - echo "=== Pod Logs ==="
-      - 'echo "Sematic Cache logs:"'
-      - kubectl logs -n app -l app=sematic-cache --tail=20
-      - echo ""
-      - 'echo "Web service logs:"'
-      - kubectl logs -n app -l app=web --tail=20
-
-  debug:network:
-    desc: Debug network connectivity issues
-    cmds:
-      - 'echo "🌐 Network Debug Information:"'
-      - echo "=== Services ==="
-      - kubectl get svc -A
-      - echo ""
-      - echo "=== Endpoints ==="
-      - kubectl get endpoints -A
-      - echo ""
-      - echo "=== Ingress ==="
-      - kubectl get ingress -A
-      - echo ""
-      - echo "=== External Connectivity ==="
-      - 'echo "Testing API:"'
-      - curl -I {{.API_URL}}/health 2>/dev/null || echo "API not accessible"
-      - 'echo "Testing Web:"'
-      - curl -I {{.WEB_URL}}/ 2>/dev/null || echo "Web not accessible"
-
-  # === CI/CD HELPERS ===
-  ci:test:
-    desc: Run CI-friendly tests (no interactive prompts)
-    cmds:
-      - echo "🤖 Running CI tests..."
-      - "{{.WORKFLOW_SCRIPT}} --quick --skip-cleanup full"
-
-  ci:validate:
-    desc: Validate all configurations for CI
-    cmds:
-      - task: validate
-      - echo "Running quick smoke test..."
-      - ./tests/e2e.sh --quick infrastructure
-
   # === ADVANCED OPERATIONS ===
   scale:up:
     desc: Scale application to 2 replicas
     cmds:
-      - echo "📈 Scaling application up..."
-      - kubectl scale deployment sematic-cache --replicas=2 -n app
-      - echo "Waiting for scaling to complete..."
-      - kubectl rollout status deployment/sematic-cache -n app
+      - task: deploy:scale:up
 
   scale:down:
     desc: Scale application to 1 replica
     cmds:
-      - echo "📉 Scaling application down..."
-      - kubectl scale deployment sematic-cache --replicas=1 -n app
-      - echo "Waiting for scaling to complete..."
-      - kubectl rollout status deployment/sematic-cache -n app
+      - task: deploy:scale:down
 
   restart:
     desc: Restart application deployment
     cmds:
-      - echo "🔄 Restarting application..."
-      - kubectl rollout restart deployment/sematic-cache -n app
-      - kubectl rollout status deployment/sematic-cache -n app
+      - task: deploy:restart
 
   # === PORT FORWARDING ===
   port-forward:api:
     desc: Port forward to API service (localhost:8080)
     cmds:
-      - echo "🔗 Port forwarding to API service..."
-      - kubectl port-forward -n app svc/sematic-cache 8080:8080
+      - task: deploy:port-forward:api
 
   port-forward:postgres:
     desc: Port forward to PostgreSQL (localhost:5432)
     cmds:
-      - echo "🔗 Port forwarding to PostgreSQL..."
-      - kubectl port-forward -n infra svc/postgres 5432:5432
+      - task: deploy:port-forward:postgres
 
   port-forward:redis:
     desc: Port forward to Redis (localhost:6379)
     cmds:
-      - echo "🔗 Port forwarding to Redis..."
-      - kubectl port-forward -n infra svc/redis 6379:6379
+      - task: deploy:port-forward:redis
+
+  # === DEBUGGING ===
+  debug:
+    desc: Debug deployment issues
+    cmds:
+      - task: deploy:debug
+
+  debug:pods:
+    desc: Debug pod issues
+    cmds:
+      - task: deploy:debug:pods
+
+  debug:network:
+    desc: Debug network connectivity issues
+    cmds:
+      - task: deploy:debug:network
 
   # === RESOURCE MANAGEMENT ===
   resources:
     desc: Show resource usage across cluster
     cmds:
-      - 'echo "📊 Resource Usage:"'
-      - kubectl top nodes 2>/dev/null || echo "Metrics server not available"
-      - echo ""
-      - kubectl top pods -A 2>/dev/null || echo "Pod metrics not available"
+      - task: deploy:resources
 
   describe:api:
     desc: Describe API deployment and pods
@@ -391,6 +248,17 @@ tasks:
       - echo ""
       - 'echo "📋 API Pod Details:"'
       - kubectl describe pods -l app=sematic-cache -n app
+
+  # === CI/CD HELPERS ===
+  ci:test:
+    desc: Run CI-friendly tests (no interactive prompts)
+    cmds:
+      - task: deploy:ci:test
+
+  ci:validate:
+    desc: Validate all configurations for CI
+    cmds:
+      - task: deploy:ci:validate
 
   # === WORKFLOW COMBINATIONS ===
   quick-start:
@@ -430,3 +298,32 @@ tasks:
       - mkdir -p backups/$(date +%Y%m%d-%H%M%S)
       - kubectl get all -A -o yaml > backups/$(date +%Y%m%d-%H%M%S)/all-resources.yaml
       - echo "✅ Configuration backed up to backups/ directory"
+
+  # === WATCH OPERATIONS ===
+  watch:pods:
+    desc: Watch pod status in real-time
+    cmds:
+      - echo "👀 Watching pods..."
+      - watch kubectl get pods -A
+
+  watch:logs:
+    desc: Watch application logs in real-time
+    cmds:
+      - echo "📜 Watching logs..."
+      - kubectl logs -n app -l app=sematic-cache -f
+
+  # === DOCUMENTATION ===
+  docs:
+    desc: Show deployment documentation
+    cmds:
+      - 'echo "📚 Deployment Documentation:"'
+      - 'echo "Main README: ../README.md"'
+      - 'echo "Deploy README: ./README.md"'
+      - 'echo "Test README: ./tests/README.md"'
+      - echo ""
+      - 'echo "Quick reference:"'
+      - 'echo "  Cluster: {{.CLUSTER_NAME}}"'
+      - 'echo "  API: {{.API_URL}}/"'
+      - 'echo "  Web: {{.WEB_URL}}/"'
+      - 'echo "  Logs: task logs"'
+      - 'echo "  Status: task status"'

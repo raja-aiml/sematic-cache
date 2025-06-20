@@ -2,19 +2,23 @@ version: '3'
 
 includes:
   # Include common build tasks
-  common:
-    taskfile: ./build/Taskfile.common.yaml
+  build:
+    taskfile: ./devops/Taskfile.build.common.yaml
     dir: '{{.USER_WORKING_DIR}}'
   
-  # Include deploy tasks
+  # Include common deploy tasks
   deploy:
+    taskfile: ./devops/Taskfile.deploy.common.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+    
+  # Include deploy orchestration
+  deploy-ops:
     taskfile: ./deploy/Taskfile.yaml
     dir: ./deploy
 
 vars:
   DEPLOY_DIR: ./deploy
-  TEST_RUNNER: ./build/test.sh
-  BUILD_DIR: ./build
+  DEVOPS_DIR: ./devops
 
 tasks:
   default:
@@ -24,38 +28,36 @@ tasks:
         echo "🚀 Semantic Cache - Root Task Runner"
         echo "===================================="
         echo ""
-        echo "🎯 Quick Commands (from project root):"
+        echo "🎯 Quick Commands:"
         echo "  task full          # Complete production workflow"
         echo "  task quick         # Quick development workflow"
-        echo "  task status        # Check deployment status"
-        echo "  task test          # Run comprehensive tests"
-        echo "  task cleanup       # Clean up resources"
+        echo "  task build         # Build application"
+        echo "  task test          # Run tests"
+        echo "  task deploy        # Deploy to cluster"
         echo ""
         echo "🔧 Development Commands:"
         echo "  task dev           # Development cycle"
-        echo "  task build         # Build application"
-        echo "  task deploy        # Deploy to cluster"
+        echo "  task status        # Check deployment status"
         echo "  task logs          # View logs"
+        echo "  task health        # Health checks"
         echo ""
         echo "🧪 Testing Commands:"
+        echo "  task test:coverage # Test with coverage"
         echo "  task test:api      # Test API endpoints"
-        echo "  task test:perf     # Performance tests"
         echo "  task verify        # Verify deployment"
         echo ""
-        echo "🐛 Debug Commands:"
+        echo "🐛 Debug & Cleanup:"
         echo "  task debug         # Debug deployment"
-        echo "  task health        # Health checks"
-        echo "  task restart       # Restart services"
+        echo "  task cleanup       # Clean up resources"
         echo ""
-        echo "📚 For all available tasks: task --list"
-        echo "📁 Deploy-specific tasks: task -d deploy --list"
+        echo "📚 For all tasks: task --list"
     silent: true
 
-  # Build Tasks (using common)
+  # === BUILD TASKS ===
   build:
     desc: Build the semantic cache server
     cmds:
-      - task: common:build
+      - task: build:build
         vars:
           BINARY_NAME: semantic-cache
           MAIN: ./cmd/server
@@ -63,7 +65,7 @@ tasks:
   build:all:
     desc: Build for all platforms
     cmds:
-      - task: common:build:all
+      - task: build:build:all
         vars:
           BINARY_NAME: semantic-cache
           MAIN: ./cmd/server
@@ -71,118 +73,90 @@ tasks:
   build:local:
     desc: Build the local deployment tool
     cmds:
-      - |
-        cd ./deploy/local && \
-        task build
+      - cd ./deploy/local && task build
 
-  # Testing Tasks
+  # === TEST TASKS ===
   test:
     desc: Run all tests in the project
     cmds:
-      - task: common:test
-
-  test:local:
-    desc: Run tests in deploy/local directory
-    cmds:
-      - task: common:test
-        vars:
-          DIR: ./deploy/local
-
-  test:server:
-    desc: Run tests in server directory
-    cmds:
-      - task: common:test
-        vars:
-          DIR: ./server
-
-  test:core:
-    desc: Run tests in core directory  
-    cmds:
-      - task: common:test
-        vars:
-          DIR: ./core
+      - task: build:test
 
   test:coverage:
     desc: Run tests with coverage report
     cmds:
-      - task: common:test:coverage
+      - task: build:test:coverage
 
   test:bench:
     desc: Run benchmarks
     cmds:
-      - task: common:test:bench
+      - task: build:test:bench
 
-  # Code Quality Tasks
+  # === CODE QUALITY TASKS ===
   fmt:
     desc: Format all Go code
     cmds:
-      - task: common:fmt
+      - task: build:fmt
 
   lint:
     desc: Run linting
     cmds:
-      - task: common:lint
+      - task: build:lint
 
   check:
     desc: Run all checks (fmt, vet, lint, test)
     cmds:
-      - task: common:check
+      - task: build:check
 
-  # Clean Tasks
+  # === CLEAN TASKS ===
   clean:
     desc: Clean all build artifacts
     cmds:
-      - task: common:clean
+      - task: build:clean
       - cd ./deploy/local && task clean
 
-  # Core Workflows
+  # === CORE WORKFLOWS ===
   full:
     desc: Complete production workflow (setup → build → deploy → test)
     cmds:
       - task: deploy:full
 
   quick:
-    desc: Quick development workflow with essential tests  
+    desc: Quick development workflow with essential tests
     cmds:
       - task: deploy:quick
 
   reset:
     desc: Complete reset (cleanup → setup → build → deploy)
     cmds:
-      - task -d {{.DEPLOY_DIR}} reset
+      - task: deploy:reset
 
-  # Docker Tasks
+  # === DOCKER TASKS ===
   docker:build:
     desc: Build Docker image
     cmds:
-      - task: common:docker:build
+      - task: build:docker:build
         vars:
           IMAGE_NAME: semantic-cache
 
   docker:push:
     desc: Push Docker image
     cmds:
-      - task: common:docker:push
+      - task: build:docker:push
         vars:
           IMAGE_NAME: semantic-cache
 
-  # Deployment Tasks
+  # === DEPLOYMENT TASKS ===
   setup:
     desc: Create k3d cluster and deploy infrastructure
     cmds:
       - task: deploy:setup
 
   deploy:
-    desc: Deploy application to cluster  
+    desc: Deploy application to cluster
     cmds:
       - task: deploy:deploy
 
-  verify:
-    desc: Verify deployment
-    cmds:
-      - task: deploy:verify
-
-  # Monitoring
+  # === MONITORING TASKS ===
   status:
     desc: Show current deployment status
     cmds:
@@ -194,7 +168,7 @@ tasks:
       - task: deploy:logs
 
   health:
-    desc: Quick health check of all services  
+    desc: Quick health check of all services
     cmds:
       - task: deploy:health
 
@@ -203,94 +177,77 @@ tasks:
     cmds:
       - task: deploy:metrics
 
-  # Development
+  # === DEVELOPMENT TASKS ===
   dev:
     desc: Development cycle (build → deploy → quick-test)
     cmds:
       - task: build
       - task: deploy:dev
 
-  dev:watch:
-    desc: Development with file watching
-    cmds:
-      - task: common:test
-        vars:
-          TEST_ARGS: "-w"
-
-  # CI/CD Tasks
+  # === CI/CD TASKS ===
   ci:
     desc: Run CI pipeline
     cmds:
-      - task: common:ci
+      - task: build:ci
 
   release:
     desc: Create release artifacts
     cmds:
-      - task: common:release
+      - task: build:release
         vars:
           BINARY_NAME: semantic-cache
           MAIN: ./cmd/server
 
-  # Testing Suites
+  # === TESTING TASKS ===
   test:api:
-    desc: Test API endpoints only
+    desc: Test API endpoints
     cmds:
-      - task -d {{.DEPLOY_DIR}} test:api
+      - task: deploy:test:api
 
-  test:perf:
-    desc: Test performance and load handling
+  test:benchmark:
+    desc: Run API performance benchmark
     cmds:
-      - task -d {{.DEPLOY_DIR}} test:performance
+      - task: deploy:test:benchmark
 
-  test:infra:
-    desc: Test infrastructure components only
-    cmds:
-      - task -d {{.DEPLOY_DIR}} test:infrastructure
-
-  test:quick:
-    desc: Run essential tests only (faster)
-    cmds:
-      - task -d {{.DEPLOY_DIR}} test:quick
-
-  # Debugging
+  # === DEBUGGING TASKS ===
   debug:
     desc: Debug deployment issues
     cmds:
-      - task -d {{.DEPLOY_DIR}} debug
+      - task: deploy:debug
 
   debug:pods:
     desc: Debug pod issues
     cmds:
-      - task -d {{.DEPLOY_DIR}} debug:pods
+      - task: deploy:debug:pods
 
   debug:network:
     desc: Debug network connectivity
     cmds:
-      - task -d {{.DEPLOY_DIR}} debug:network
+      - task: deploy:debug:network
 
-  # Scaling
+  # === SCALING TASKS ===
   scale:up:
     desc: Scale application to 2 replicas
     cmds:
-      - task -d {{.DEPLOY_DIR}} scale:up
+      - task: deploy:scale:up
 
   scale:down:
     desc: Scale application to 1 replica
     cmds:
-      - task -d {{.DEPLOY_DIR}} scale:down
+      - task: deploy:scale:down
 
-  # Verification
+  # === VERIFICATION TASKS ===
   verify:
     desc: Verify deployment is working correctly
     cmds:
-      - task -d {{.DEPLOY_DIR}} verify
+      - task: deploy:verify
 
   validate:
     desc: Validate configuration files
     cmds:
-      - task -d {{.DEPLOY_DIR}} validate
+      - task: deploy:validate
 
-  # Cleanup
+  # === CLEANUP TASKS ===
   cleanup:
     desc: Destroy cluster and cleanup all resources
     cmds:
@@ -302,50 +259,38 @@ tasks:
       - task: cleanup
       - task: clean
 
-  # Advanced Workflows
-  production-ready:
-    desc: Full production readiness validation
-    cmds:
-      - task -d {{.DEPLOY_DIR}} production-ready
-
-  quick-start:
-    desc: Quick start for new deployments
-    cmds:
-      - task -d {{.DEPLOY_DIR}} quick-start
-
-  ci:test:
-    desc: Run CI-friendly tests (no interactive prompts)
-    cmds:
-      - task -d {{.DEPLOY_DIR}} ci:test
-
-  # Port Forwarding
+  # === PORT FORWARDING TASKS ===
   port-forward:api:
     desc: Port forward to API service (localhost:8080)
     cmds:
-      - task -d {{.DEPLOY_DIR}} port-forward:api
+      - task: deploy:port-forward:api
 
   port-forward:postgres:
     desc: Port forward to PostgreSQL (localhost:5432)
     cmds:
-      - task -d {{.DEPLOY_DIR}} port-forward:postgres
+      - task: deploy:port-forward:postgres
 
-  # Utility Tasks
+  port-forward:redis:
+    desc: Port forward to Redis (localhost:6379)
+    cmds:
+      - task: deploy:port-forward:redis
+
+  # === UTILITY TASKS ===
   deps:
     desc: Download and tidy dependencies
     cmds:
-      - task: common:deps
-      - task: common:deps:tidy
+      - task: build:deps
+      - task: build:deps:tidy
 
   info:
     desc: Show project and build information
     cmds:
-      - task: common:info
+      - task: build:info
       - |
         echo ""
-        echo "📦 Semantic Cache Specific:"
+        echo "📦 Semantic Cache Project Info:"
         echo "Deploy Directory: {{.DEPLOY_DIR}}"
-        echo "Build Directory: {{.BUILD_DIR}}"
-        echo "Test Runner: {{.TEST_RUNNER}}"
+        echo "DevOps Directory: {{.DEVOPS_DIR}}"
 
   docs:
     desc: Show project documentation
@@ -354,7 +299,7 @@ tasks:
         echo "📚 Semantic Cache Documentation:"
         echo "Main README: ./README.md"
         echo "Deploy README: ./deploy/README.md"
-        echo "Test README: ./deploy/tests/README.md"
+        echo "DevOps README: ./devops/README.md"
         echo ""
         echo "Quick links:"
         echo "  API: http://localhost:8080/semantic-cache/"
@@ -364,13 +309,3 @@ tasks:
         echo "  task full      # Complete workflow"
         echo "  task status    # Check status"
         echo "  task logs      # View logs"
-
-  # Install all tools
-  install:tools:
-    desc: Install all required tools
-    cmds:
-      - "{{.TEST_RUNNER}} --install-tools"
-      - |
-        echo "📦 Installing additional tools..."
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-        echo "✅ All tools installed"

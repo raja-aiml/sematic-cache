@@ -1,9 +1,9 @@
-# Common Task definitions that can be included in any Taskfile
+# Common Build Task definitions for Go projects
 # Usage: 
 #   includes:
-#     common: ./build/Taskfile.common.yaml
+#     build: ./devops/Taskfile.build.common.yaml
 #
-# Then use: task common:build, task common:test, etc.
+# Then use: task build:build, task build:test, etc.
 
 version: '3'
 
@@ -55,7 +55,7 @@ vars:
   LDFLAGS: ""  # Additional ldflags can be passed
 
 tasks:
-  # Build tasks
+  # === BUILD TASKS ===
   build:
     desc: Build binary for current platform
     vars:
@@ -104,7 +104,7 @@ tasks:
           echo "  ✓ Built: $output ($(du -h "$output" | cut -f1))"
         done
 
-  # Clean tasks
+  # === CLEAN TASKS ===
   clean:
     desc: Clean build artifacts
     cmds:
@@ -121,18 +121,11 @@ tasks:
       - '{{.GOCLEAN}} -modcache'
       - echo "🧹 Deep clean completed"
 
-  # Test tasks
+  # === TEST TASKS ===
   test:
     desc: Run tests
-    vars:
-      TEST_RUNNER: '{{.TEST_RUNNER | default (print .BUILD_DIR "/test.sh")}}'
     cmds:
-      - |
-        if [ -f "{{.TEST_RUNNER}}" ]; then
-          {{.TEST_RUNNER}} {{.CLI_ARGS}}
-        else
-          {{.GOTEST}} -race -v {{.TEST_ARGS}} {{.PACKAGES | default "./..."}}
-        fi
+      - '{{.GOTEST}} -race -v {{.TEST_ARGS}} {{.PACKAGES | default "./..."}}'
 
   test:short:
     desc: Run short tests
@@ -156,7 +149,7 @@ tasks:
     cmds:
       - '{{.GOTEST}} -bench=. -benchmem {{.BENCH_ARGS}} {{.PACKAGES | default "./..."}}'
 
-  # Code quality tasks
+  # === CODE QUALITY TASKS ===
   fmt:
     desc: Format code
     cmds:
@@ -191,7 +184,7 @@ tasks:
           echo "⚠️  golangci-lint not installed, skipping..."
         fi
 
-  # Dependency tasks
+  # === DEPENDENCY TASKS ===
   deps:
     desc: Download dependencies
     cmds:
@@ -211,7 +204,7 @@ tasks:
       - '{{.GOMOD}} tidy'
       - echo "📦 Dependencies tidied"
 
-  # Docker tasks
+  # === DOCKER TASKS ===
   docker:build:
     desc: Build Docker image
     vars:
@@ -234,7 +227,7 @@ tasks:
       - docker push {{.IMAGE_NAME}}:latest
       - 'echo "✅ Docker image pushed: {{.IMAGE_NAME}}:{{.IMAGE_TAG}}"'
 
-  # Utility tasks
+  # === UTILITY TASKS ===
   info:
     desc: Show build information
     cmds:
@@ -276,4 +269,3 @@ tasks:
         mkdir -p releases/{{.VERSION}}
         cp {{.BINARY_DIR}}/* releases/{{.VERSION}}/
         cd releases && tar -czf {{.BINARY_NAME}}-{{.VERSION}}.tar.gz {{.VERSION}}
-        echo "✅ Release created: releases/{{.BINARY_NAME}}-{{.VERSION}}.tar.gz"
