@@ -55,8 +55,17 @@ TEST_CMD="$TEST_CMD -race -coverprofile=coverage.out ./..."
 
 echo -e "${YELLOW}Running tests...${NC}"
 
+# Set environment to suppress k8s client warnings
+export KUBERNETES_SERVICE_HOST=""
+export KUBERNETES_SERVICE_PORT=""
+
 # Run tests and filter warnings
-if $TEST_CMD 2>&1 | grep -v "ld: warning: -bind_at_load is deprecated" | grep -v "ld: warning: .* has malformed LC_DYSYMTAB"; then
+if $TEST_CMD 2>&1 | \
+    grep -v "ld: warning: -bind_at_load is deprecated" | \
+    grep -v "ld: warning: .* has malformed LC_DYSYMTAB" | \
+    grep -v "Neither --kubeconfig nor --master was specified" | \
+    grep -v "error creating inClusterConfig" | \
+    grep -v "KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined"; then
     echo -e "${GREEN}✓ All tests passed!${NC}"
     
     if [ "$COVERAGE" = true ]; then

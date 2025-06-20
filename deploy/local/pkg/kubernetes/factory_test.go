@@ -37,6 +37,9 @@ func TestNewClientFactory(t *testing.T) {
 }
 
 func TestClientFactory_GetClient(t *testing.T) {
+	cleanup := SetupTestEnvironment(t)
+	defer cleanup()
+	
 	cf := NewClientFactory("/nonexistent/path")
 
 	// This will fail as kubeconfig doesn't exist
@@ -47,6 +50,9 @@ func TestClientFactory_GetClient(t *testing.T) {
 }
 
 func TestClientFactory_GetClientWithRetry(t *testing.T) {
+	cleanup := SetupTestEnvironment(t)
+	defer cleanup()
+
 	tests := []struct {
 		name       string
 		maxRetries int
@@ -95,6 +101,9 @@ func TestClientFactory_GetClientWithRetry(t *testing.T) {
 }
 
 func TestGetDefaultClient(t *testing.T) {
+	cleanup := SetupTestEnvironment(t)
+	defer cleanup()
+
 	// This will fail as default kubeconfig doesn't exist
 	_, err := GetDefaultClient()
 	if err == nil {
@@ -103,6 +112,9 @@ func TestGetDefaultClient(t *testing.T) {
 }
 
 func TestMustGetDefaultClient(t *testing.T) {
+	cleanup := SetupTestEnvironment(t)
+	defer cleanup()
+
 	// Test that it panics
 	defer func() {
 		if r := recover(); r == nil {
@@ -114,6 +126,9 @@ func TestMustGetDefaultClient(t *testing.T) {
 }
 
 func TestClientFactory_WithContext(t *testing.T) {
+	cleanup := SetupTestEnvironment(t)
+	defer cleanup()
+
 	cf := NewClientFactory("/nonexistent/path")
 
 	tests := []struct {

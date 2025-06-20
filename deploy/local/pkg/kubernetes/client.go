@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -24,7 +25,19 @@ func NewClient(kubeconfigPath string) (*Client, error) {
 		}
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	// Check if kubeconfig file exists before trying to load it
+	if kubeconfigPath != "" {
+		if _, err := os.Stat(kubeconfigPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("kubeconfig not found at %s", kubeconfigPath)
+		}
+	}
+
+	// Use NewNonInteractiveDeferredLoadingClientConfig to avoid auto-detection
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
+	configOverrides := &clientcmd.ConfigOverrides{}
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	
+	config, err := kubeConfig.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
