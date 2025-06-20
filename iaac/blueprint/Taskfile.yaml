@@ -1,0 +1,262 @@
+version: '3'
+
+# =====================================
+# 🚀 BLUEPRINT DEPLOYMENT TASKS
+# =====================================
+
+vars:
+  CLUSTER_NAME: blueprint
+  REGISTRY_NAME: blueprint-registry
+  REGISTRY_PORT: 5000
+  KUBECONFIG_FILE: ~/.kube/config-blueprint
+  BASE_DIR: "{{.USER_WORKING_DIR}}"
+  SCRIPTS_DIR: "{{.BASE_DIR}}/scripts"
+  VALIDATION_DIR: "{{.BASE_DIR}}/validation-kit"
+
+env:
+  FORCE_COLOR: true
+  KUBECONFIG: "{{.KUBECONFIG_FILE}}"
+
+tasks:
+  # === HELP & INFO ===
+  default:
+    desc: Show available tasks
+    cmds:
+      - |
+        echo "🚀 Blueprint Deployment Tasks"
+        echo "=================================="
+        echo ""
+        echo "Quick Start:"
+        echo "  task setup         # Create cluster and registry"
+        echo "  task deploy:minimal # Deploy minimal stack"
+        echo "  task deploy:full   # Deploy full stack"
+        echo "  task status        # Check deployment status"
+        echo "  task cleanup       # Destroy everything"
+        echo ""
+        echo "Scenarios:"
+        echo "  task scenarios:minimal     # Just postgres + redis"
+        echo "  task scenarios:development # Full dev stack"
+        echo "  task scenarios:service-mesh # Istio focused"
+        echo "  task scenarios:monitoring  # Observability only"
+        echo "  task scenarios:full-stack  # Everything enabled"
+        echo ""
+        echo "For detailed help: task --list"
+    silent: true
+
+  # === CLUSTER MANAGEMENT ===
+  setup:
+    desc: Create k3d cluster with registry
+    cmds:
+      - "{{.SCRIPTS_DIR}}/cluster/cluster.sh create {{.CLUSTER_NAME}} {{.REGISTRY_NAME}} {{.REGISTRY_PORT}}"
+      - echo "✅ Cluster {{.CLUSTER_NAME}} created successfully"
+      - task: cluster:info
+
+  cluster:info:
+    desc: Show cluster information
+    cmds:
+      - echo "📋 Cluster Information:"
+      - kubectl cluster-info
+      - echo ""
+      - echo "📋 Nodes:"
+      - kubectl get nodes -o wide
+      - echo ""
+      - echo "📋 Namespaces:"
+      - kubectl get namespaces
+
+  cluster:events:
+    desc: Show recent cluster events
+    cmds:
+      - echo "📋 Recent Events:"
+      - kubectl get events --sort-by=.metadata.creationTimestamp -A
+
+  # === SCENARIO DEPLOYMENTS ===
+  scenarios:minimal:
+    desc: Deploy minimal scenario (postgres + redis only)
+    cmds:
+      - echo "🚀 Deploying minimal scenario..."
+      - kubectl apply -k scenarios/minimal/
+      - echo "✅ Minimal scenario deployed"
+      - task: status
+
+  scenarios:development:
+    desc: Deploy development scenario (full dev experience)
+    cmds:
+      - echo "🚀 Deploying development scenario..."
+      - kubectl apply -k scenarios/development/
+      - echo "✅ Development scenario deployed"
+      - task: status
+
+  scenarios:service-mesh:
+    desc: Deploy service mesh scenario (Istio focused)
+    cmds:
+      - echo "🚀 Deploying service mesh scenario..."
+      - kubectl apply -k scenarios/service-mesh/
+      - echo "✅ Service mesh scenario deployed"
+      - task: status
+
+  scenarios:monitoring-only:
+    desc: Deploy monitoring scenario (observability only)
+    cmds:
+      - echo "🚀 Deploying monitoring scenario..."
+      - kubectl apply -k scenarios/monitoring-only/
+      - echo "✅ Monitoring scenario deployed"
+      - task: status
+
+  scenarios:full-stack:
+    desc: Deploy full stack scenario (everything enabled)
+    cmds:
+      - echo "🚀 Deploying full stack scenario..."
+      - kubectl apply -k scenarios/full-stack/
+      - echo "✅ Full stack scenario deployed"
+      - task: status
+
+  # === QUICK DEPLOYMENTS ===
+  deploy:base:
+    desc: Deploy base infrastructure only
+    cmds:
+      - echo "🚀 Deploying base infrastructure..."
+      - kubectl apply -k infra/base/
+      - echo "✅ Base infrastructure deployed"
+
+  deploy:minimal:
+    desc: Deploy minimal stack (alias for scenarios:minimal)
+    cmds:
+      - task: scenarios:minimal
+
+  deploy:full:
+    desc: Deploy full stack (alias for scenarios:full-stack)
+    cmds:
+      - task: scenarios:full-stack
+
+  # === STATUS & MONITORING ===
+  status:
+    desc: Show deployment status
+    cmds:
+      - echo "📋 Deployment Status:"
+      - kubectl get all -A
+      - echo ""
+      - echo "📋 Persistent Volumes:"
+      - kubectl get pv,pvc -A
+      - echo ""
+      - echo "📋 Ingress:"
+      - kubectl get ingress -A
+
+  health:
+    desc: Check health of all services
+    cmds:
+      - echo "🔍 Health Check:"
+      - kubectl get pods -A -o wide
+      - echo ""
+      - echo "🔍 Service Endpoints:"
+      - kubectl get svc -A
+      - echo ""
+      - echo "🔍 Recent Events:"
+      - kubectl get events --sort-by=.metadata.creationTimestamp -A | tail -10
+
+  logs:
+    desc: Show logs from all pods
+    cmds:
+      - echo "📜 Recent Logs:"
+      - kubectl logs -l app=postgres -n infra --tail=20 --since=1m || true
+      - kubectl logs -l app=redis -n infra --tail=20 --since=1m || true
+
+  # === TESTING & VALIDATION ===
+  test:
+    desc: Run comprehensive tests
+    cmds:
+      - echo "🧪 Running validation tests..."
+      - "{{.VALIDATION_DIR}}/scripts/run-tests.sh"
+
+  test:smoke:
+    desc: Run smoke tests
+    cmds:
+      - echo "🧪 Running smoke tests..."
+      - "{{.VALIDATION_DIR}}/scripts/smoke-test.sh"
+
+  test:integration:
+    desc: Run integration tests
+    cmds:
+      - echo "🧪 Running integration tests..."
+      - "{{.VALIDATION_DIR}}/scripts/integration-test.sh"
+
+  # === DEVELOPMENT HELPERS ===
+  dev:
+    desc: Development workflow
+    cmds:
+      - task: setup
+      - task: deploy:minimal
+      - task: test:smoke
+
+  port-forward:postgres:
+    desc: Port forward to PostgreSQL (localhost:5432)
+    cmds:
+      - echo "🔌 Port forwarding PostgreSQL..."
+      - kubectl port-forward svc/postgres 5432:5432 -n infra
+
+  port-forward:redis:
+    desc: Port forward to Redis (localhost:6379)
+    cmds:
+      - echo "🔌 Port forwarding Redis..."
+      - kubectl port-forward svc/redis 6379:6379 -n infra
+
+  # === CLEANUP ===
+  cleanup:
+    desc: Destroy cluster and cleanup all resources
+    cmds:
+      - echo "🧹 Cleaning up cluster..."
+      - "{{.SCRIPTS_DIR}}/cluster/cluster.sh delete {{.CLUSTER_NAME}}"
+      - echo "✅ Cleanup completed"
+
+  reset:
+    desc: Reset and redeploy everything
+    cmds:
+      - task: cleanup
+      - task: setup
+      - task: deploy:minimal
+
+  # === UTILITIES ===
+  validate:
+    desc: Validate all manifests
+    cmds:
+      - echo "✅ Validating manifests..."
+      - find . -name "*.yaml" -o -name "*.yml" | xargs -I {} kubectl apply --dry-run=client -f {}
+      - echo "✅ All manifests are valid"
+
+  lint:
+    desc: Lint all YAML files
+    cmds:
+      - echo "🔍 Linting YAML files..."
+      - find . -name "*.yaml" -o -name "*.yml" | xargs yamllint || echo "yamllint not found, skipping"
+
+  # === ADVANCED OPERATIONS ===
+  backup:
+    desc: Backup cluster state
+    cmds:
+      - echo "💾 Backing up cluster state..."
+      - mkdir -p backups/$(date +%Y%m%d-%H%M%S)
+      - kubectl get all -A -o yaml > backups/$(date +%Y%m%d-%H%M%S)/all-resources.yaml
+      - echo "✅ Backup completed"
+
+  restore:
+    desc: Restore cluster from backup (requires BACKUP_DIR)
+    preconditions:
+      - sh: test -n "{{.BACKUP_DIR}}"
+        msg: "Please set BACKUP_DIR variable"
+    cmds:
+      - echo "🔄 Restoring from {{.BACKUP_DIR}}..."
+      - kubectl apply -f "{{.BACKUP_DIR}}/all-resources.yaml"
+      - echo "✅ Restore completed"
+
+  # === DOCUMENTATION ===
+  docs:
+    desc: Show documentation
+    cmds:
+      - echo "📚 Blueprint Documentation:"
+      - echo "Main README: ./README.md"
+      - echo "Validation README: ./validation-kit/README.md"
+      - echo "Scripts README: ./scripts/README.md"
+      - echo ""
+      - echo "Quick reference:"
+      - echo "  Cluster: {{.CLUSTER_NAME}}"
+      - echo "  Registry: {{.REGISTRY_NAME}}:{{.REGISTRY_PORT}}"
+      - echo "  Kubeconfig: {{.KUBECONFIG_FILE}}"

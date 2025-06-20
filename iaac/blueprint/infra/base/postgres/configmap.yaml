@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+data:
+  postgresql.conf: |
+    # Connection settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 100
+    
+    # Memory settings
+    shared_buffers = 128MB
+    effective_cache_size = 256MB
+    
+    # Write ahead log
+    wal_level = replica
+    max_wal_size = 1GB
+    min_wal_size = 80MB
+    
+    # Query tuning
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_statement = 'all'
+    log_min_duration_statement = 1000
+    
+    # Vector extension settings
+    shared_preload_libraries = 'vector'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  01-init.sql: |
+    -- Create vector extension
+    CREATE EXTENSION IF NOT EXISTS vector;
+    
+    -- Create cache schema
+    CREATE SCHEMA IF NOT EXISTS cache;
+    
+    -- Create semantic cache table
+    CREATE TABLE IF NOT EXISTS cache.semantic_cache (
+        id SERIAL PRIMARY KEY,
+        query_hash VARCHAR(64) UNIQUE NOT NULL,
+        query_text TEXT NOT NULL,
+        response_data JSONB NOT NULL,
+        embedding vector(1536),
+        similarity_threshold FLOAT DEFAULT 0.85,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        access_count INTEGER DEFAULT 1,
+        last_accessed TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Create indexes for performance
+    CREATE INDEX IF NOT EXISTS idx_semantic_cache_embedding ON cache.semantic_cache USING ivfflat (embedding vector_cosine_ops);
+    CREATE INDEX IF NOT EXISTS idx_semantic_cache_query_hash ON cache.semantic_cache (query_hash);
+    CREATE INDEX IF NOT EXISTS idx_semantic_cache_created_at ON cache.semantic_cache (created_at);
+    CREATE INDEX IF NOT EXISTS idx_semantic_cache_last_accessed ON cache.semantic_cache (last_accessed);
+    
+    -- Grant permissions
+    GRANT USAGE ON SCHEMA cache TO cache;
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cache TO cache;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA cache TO cache;

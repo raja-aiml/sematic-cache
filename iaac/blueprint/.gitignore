@@ -1,0 +1,34 @@
+# Build artifacts
+bin/
+build/
+dist/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+.DS_Store
+.vscode/
+.idea/
+
+# Environment and secrets
+.env
+*.secret
+secrets/
+
+# Testing
+test-results/
+coverage/
+
+# Kubernetes
+kubeconfig*
+*.kubeconfig
+
+# Backup files
+backups/
+*.backup
+
+# Local development
+local-*
