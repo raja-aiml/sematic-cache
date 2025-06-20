@@ -36,7 +36,7 @@ func NewClient(kubeconfigPath string) (*Client, error) {
 	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
 	configOverrides := &clientcmd.ConfigOverrides{}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-	
+
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build config: %w", err)

@@ -17,6 +17,7 @@ import (
 func DevCmd() *cobra.Command {
 	var imageName string
 	var clusterName string
+	var kustomizePath string
 
 	cmd := &cobra.Command{
 		Use:   "dev",
@@ -26,18 +27,19 @@ func DevCmd() *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&imageName, "image", "i", constants.DefaultImageName, "Docker image name")
 	cmd.PersistentFlags().StringVarP(&clusterName, "cluster", "c", constants.DefaultClusterName, "k3d cluster name")
+	cmd.PersistentFlags().StringVarP(&kustomizePath, "kustomize-path", "k", "", "Path to kustomize overlay (optional)")
 
-	cmd.AddCommand(devBuildCmd(imageName, clusterName))
-	cmd.AddCommand(devDeployCmd())
+	cmd.AddCommand(devBuildCmd(&imageName, &clusterName))
+	cmd.AddCommand(devDeployCmd(&kustomizePath))
 	cmd.AddCommand(devTestCmd())
-	cmd.AddCommand(devRemoveCmd())
+	cmd.AddCommand(devRemoveCmd(&kustomizePath))
 	cmd.AddCommand(devLogsCmd())
 	cmd.AddCommand(devStatusCmd())
 
 	return cmd
 }
 
-func devBuildCmd(imageName, clusterName string) *cobra.Command {
+func devBuildCmd(imageName, clusterName *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "build",
 		Short: "Build Docker image and import to k3d",
@@ -55,19 +57,19 @@ func devBuildCmd(imageName, clusterName string) *cobra.Command {
 			builder := docker.NewBuilder()
 			dockerfilePath := filepath.Join(projectRoot, "Dockerfile")
 
-			if err := builder.Build(ctx, dockerfilePath, imageName, projectRoot); err != nil {
+			if err := builder.Build(ctx, dockerfilePath, *imageName, projectRoot); err != nil {
 				return fmt.Errorf("failed to build image: %w", err)
 			}
 
 			// Test image locally
 			logger.Info("Testing image locally...")
 			opts := &docker.RunOptions{Command: []string{"--help"}}
-			if _, err := builder.Run(ctx, imageName, opts); err != nil {
+			if _, err := builder.Run(ctx, *imageName, opts); err != nil {
 				logger.Warn("Local test failed: %v", err)
 			}
 
 			// Import to k3d
-			if err := builder.ImportToK3d(ctx, imageName, clusterName); err != nil {
+			if err := builder.ImportToK3d(ctx, *imageName, *clusterName); err != nil {
 				return fmt.Errorf("failed to import image to k3d: %w", err)
 			}
 
@@ -77,7 +79,7 @@ func devBuildCmd(imageName, clusterName string) *cobra.Command {
 	}
 }
 
-func devDeployCmd() *cobra.Command {
+func devDeployCmd(kustomizePath *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "deploy",
 		Short: "Create secrets and deploy application",
@@ -105,12 +107,18 @@ func devDeployCmd() *cobra.Command {
 
 			// Deploy application
 			logger.Info("Deploying application...")
-			kustomizePath, err := utils.GetKustomizePath("local/app")
-			if err != nil {
-				return fmt.Errorf("failed to get kustomize path: %w", err)
+			var deployPath string
+			if *kustomizePath != "" {
+				// Use the provided path directly
+				deployPath = *kustomizePath
+			} else {
+				deployPath, err = utils.GetKustomizePath("local/app")
+				if err != nil {
+					return fmt.Errorf("failed to get kustomize path: %w", err)
+				}
 			}
 
-			if err := kubernetes.ApplyKustomize(ctx, kustomizePath, constants.AppNamespace); err != nil {
+			if err := kubernetes.ApplyKustomize(ctx, deployPath, constants.AppNamespace); err != nil {
 				return fmt.Errorf("failed to deploy application: %w", err)
 			}
 
@@ -158,7 +166,7 @@ func devTestCmd() *cobra.Command {
 	}
 }
 
-func devRemoveCmd() *cobra.Command {
+func devRemoveCmd(kustomizePath *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove",
 		Short: "Remove application deployment",
@@ -166,13 +174,20 @@ func devRemoveCmd() *cobra.Command {
 			ctx := context.Background()
 			logger := utils.NewLogger("remove")
 
-			kustomizePath, err := utils.GetKustomizePath("local/app")
-			if err != nil {
-				return fmt.Errorf("failed to get kustomize path: %w", err)
+			var removePath string
+			var err error
+			if *kustomizePath != "" {
+				// Use the provided path directly
+				removePath = *kustomizePath
+			} else {
+				removePath, err = utils.GetKustomizePath("local/app")
+				if err != nil {
+					return fmt.Errorf("failed to get kustomize path: %w", err)
+				}
 			}
 
 			logger.Info("Removing application...")
-			if err := kubernetes.DeleteKustomize(ctx, kustomizePath, constants.AppNamespace); err != nil {
+			if err := kubernetes.DeleteKustomize(ctx, removePath, constants.AppNamespace); err != nil {
 				logger.Warn("Remove completed with warnings: %v", err)
 			}
 

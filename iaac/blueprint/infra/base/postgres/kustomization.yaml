@@ -15,12 +15,13 @@ resources:
   - pdb.yaml
   - hpa.yaml
   - network-policy.yaml
-  - service-monitor.yaml
+  # - service-monitor.yaml  # Requires Prometheus Operator
 
-commonLabels:
-  app: postgres
-  component: database
-  part-of: blueprint
+labels:
+  - pairs:
+      app: postgres
+      component: database
+      part-of: blueprint
 
 commonAnnotations:
   app.kubernetes.io/name: postgres

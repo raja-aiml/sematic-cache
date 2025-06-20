@@ -4,10 +4,11 @@ kind: Kustomization
 metadata:
   name: semantic-cache-app-local
 
-bases:
+resources:
   - ../../base
 
 namespace: app
 
-commonLabels:
-  environment: local
+labels:
+  - pairs:
+      environment: local

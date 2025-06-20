@@ -225,6 +225,7 @@ deploy:
 
 - [Development Guide](DEVELOPMENT_GUIDE.md) - Development workflow, testing, and debugging
 - [Production Guide](PRODUCTION_GUIDE.md) - Production deployment and best practices
+- [Environment Variables](ENV_VARS.md) - Complete list of configuration options
 
 ## Common Workflows
 

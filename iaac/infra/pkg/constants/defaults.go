@@ -4,11 +4,11 @@ import "time"
 
 const (
 	// Cluster defaults
-	DefaultClusterName = "semantic-cache"
+	DefaultClusterName = "local-k8s"
 	DefaultAPIPort     = "6550"
 
 	// Container defaults
-	DefaultImageName = "semantic-cache:local"
+	DefaultImageName = "app:local"
 
 	// Namespace defaults
 	AppNamespace   = "app"
@@ -25,8 +25,13 @@ const (
 	HTTPSPort = "8443:443"
 
 	// Secret names
-	AppSecretName = "semantic-cache-secrets"
+	AppSecretName = "app-secrets"
 
 	// Default database URL for local deployment
-	DefaultDatabaseURL = "postgres://postgres:postgres@postgres.infra.svc.cluster.local:5432/semantic_cache?sslmode=disable"
+	DefaultDatabaseURL = "postgres://postgres:postgres@postgres.infra.svc.cluster.local:5432/appdb?sslmode=disable"
+
+	// Blueprint path defaults
+	DefaultBlueprintPath = "iaac/blueprint"
+	DefaultInfraPath     = "infra"
+	DefaultAppPath       = "app"
 )

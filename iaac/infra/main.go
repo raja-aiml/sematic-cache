@@ -18,8 +18,8 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "iaac",
-	Short: "Infrastructure as Code tool for Semantic Cache deployment",
-	Long: `A comprehensive CLI tool for managing semantic cache deployments in local Kubernetes environments.
+	Short: "Infrastructure as Code tool for local Kubernetes deployments",
+	Long: `A comprehensive CLI tool for managing application deployments in local Kubernetes environments.
 This tool provides infrastructure-as-code capabilities using k3d, Docker SDK, and Kubernetes client-go.`,
 	Version: fmt.Sprintf("%s (built %s, commit %s)", version, buildTime, gitCommit),
 }

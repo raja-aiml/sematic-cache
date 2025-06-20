@@ -140,7 +140,8 @@ func workflowCleanupCmd(wm *WorkflowManager) *cobra.Command {
 			wm.logger.Info("Cleaning up application...")
 
 			// Remove application
-			devRemove := devRemoveCmd()
+			kustomizePath := ""
+			devRemove := devRemoveCmd(&kustomizePath)
 			if err := devRemove.RunE(devRemove, []string{}); err != nil {
 				wm.logger.Warn("Cleanup completed with warnings: %v", err)
 			}
@@ -159,7 +160,7 @@ func workflowStatusCmd(wm *WorkflowManager) *cobra.Command {
 			wm.logger.Info("Checking workflow status...")
 
 			// Check cluster
-			clusterStatus := clusterStatusCmd(wm.clusterName)
+			clusterStatus := clusterStatusCmd(&wm.clusterName)
 			if err := clusterStatus.RunE(clusterStatus, []string{}); err != nil {
 				wm.logger.Error("Cluster status check failed: %v", err)
 			}
@@ -195,7 +196,7 @@ func workflowResetCmd(wm *WorkflowManager) *cobra.Command {
 			wm.logger.Warn("Resetting environment...")
 
 			// Destroy cluster
-			clusterDown := clusterDownCmd(wm.clusterName)
+			clusterDown := clusterDownCmd(&wm.clusterName)
 			if err := clusterDown.RunE(clusterDown, []string{}); err != nil {
 				wm.logger.Error("Failed to destroy cluster: %v", err)
 			}
@@ -211,7 +212,9 @@ func runSetup(_ context.Context, wm *WorkflowManager) error {
 	wm.logger.Info("Setting up cluster and infrastructure...")
 
 	// Create cluster
-	clusterUp := clusterUpCmd(wm.clusterName)
+	clusterName := wm.clusterName
+	kustomizePath := ""
+	clusterUp := clusterUpCmd(&clusterName, &kustomizePath)
 	if err := clusterUp.RunE(clusterUp, []string{}); err != nil {
 		return fmt.Errorf("cluster setup failed: %w", err)
 	}
@@ -223,7 +226,7 @@ func runBuild(_ context.Context, wm *WorkflowManager) error {
 	wm.logger.Info("Building application...")
 
 	// Build and import image
-	devBuild := devBuildCmd(wm.imageName, wm.clusterName)
+	devBuild := devBuildCmd(&wm.imageName, &wm.clusterName)
 	if err := devBuild.RunE(devBuild, []string{}); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
@@ -235,7 +238,8 @@ func runDeploy(_ context.Context, wm *WorkflowManager) error {
 	wm.logger.Info("Deploying application...")
 
 	// Deploy application
-	devDeploy := devDeployCmd()
+	kPath := ""
+	devDeploy := devDeployCmd(&kPath)
 	if err := devDeploy.RunE(devDeploy, []string{}); err != nil {
 		return fmt.Errorf("deploy failed: %w", err)
 	}

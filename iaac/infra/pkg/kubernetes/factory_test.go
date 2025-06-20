@@ -39,7 +39,7 @@ func TestNewClientFactory(t *testing.T) {
 func TestClientFactory_GetClient(t *testing.T) {
 	cleanup := SetupTestEnvironment(t)
 	defer cleanup()
-	
+
 	cf := NewClientFactory("/nonexistent/path")
 
 	// This will fail as kubeconfig doesn't exist

@@ -45,10 +45,20 @@ func TestClusterCmd(t *testing.T) {
 	} else if flag.DefValue != constants.DefaultClusterName {
 		t.Errorf("ClusterCmd() name flag default = %v, want %v", flag.DefValue, constants.DefaultClusterName)
 	}
+
+	// Check kustomize-path flag
+	kustomizeFlag := cmd.PersistentFlags().Lookup("kustomize-path")
+	if kustomizeFlag == nil {
+		t.Error("ClusterCmd() missing 'kustomize-path' flag")
+	} else if kustomizeFlag.DefValue != "" {
+		t.Errorf("ClusterCmd() kustomize-path flag default = %v, want empty string", kustomizeFlag.DefValue)
+	}
 }
 
 func TestClusterUpCmd(t *testing.T) {
-	cmd := clusterUpCmd("test-cluster")
+	clusterName := "test-cluster"
+	kustomizePath := ""
+	cmd := clusterUpCmd(&clusterName, &kustomizePath)
 
 	if cmd == nil {
 		t.Fatal("clusterUpCmd() returned nil")
@@ -64,7 +74,8 @@ func TestClusterUpCmd(t *testing.T) {
 }
 
 func TestClusterDownCmd(t *testing.T) {
-	cmd := clusterDownCmd("test-cluster")
+	clusterName := "test-cluster"
+	cmd := clusterDownCmd(&clusterName)
 
 	if cmd == nil {
 		t.Fatal("clusterDownCmd() returned nil")
@@ -80,7 +91,8 @@ func TestClusterDownCmd(t *testing.T) {
 }
 
 func TestClusterStatusCmd(t *testing.T) {
-	cmd := clusterStatusCmd("test-cluster")
+	clusterName := "test-cluster"
+	cmd := clusterStatusCmd(&clusterName)
 
 	if cmd == nil {
 		t.Fatal("clusterStatusCmd() returned nil")
@@ -96,7 +108,8 @@ func TestClusterStatusCmd(t *testing.T) {
 }
 
 func TestClusterLogsCmd(t *testing.T) {
-	cmd := clusterLogsCmd("test-cluster")
+	clusterName := "test-cluster"
+	cmd := clusterLogsCmd(&clusterName)
 
 	if cmd == nil {
 		t.Fatal("clusterLogsCmd() returned nil")
@@ -131,7 +144,8 @@ func TestClusterLogsCmd(t *testing.T) {
 }
 
 func TestClusterTestCmd(t *testing.T) {
-	cmd := clusterTestCmd("test-cluster")
+	clusterName := "test-cluster"
+	cmd := clusterTestCmd(&clusterName)
 
 	if cmd == nil {
 		t.Fatal("clusterTestCmd() returned nil")
@@ -209,7 +223,9 @@ func BenchmarkClusterCmd(b *testing.B) {
 }
 
 func BenchmarkClusterUpCmd(b *testing.B) {
+	clusterName := "bench-cluster"
+	kustomizePath := ""
 	for i := 0; i < b.N; i++ {
-		_ = clusterUpCmd("bench-cluster")
+		_ = clusterUpCmd(&clusterName, &kustomizePath)
 	}
 }

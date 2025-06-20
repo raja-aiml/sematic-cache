@@ -1,6 +1,6 @@
-# Semantic Cache Infrastructure
+# IaaC - Infrastructure as Code Tool
 
-Production-ready infrastructure-as-code for deploying the Semantic Cache system to local Kubernetes environments.
+A generic, production-ready infrastructure-as-code tool for deploying applications to local Kubernetes environments.
 
 ## Quick Start
 
@@ -14,12 +14,13 @@ task build
 
 ## Overview
 
-This directory contains a Go-based CLI tool that manages the complete lifecycle of the Semantic Cache infrastructure:
+This directory contains a generic Go-based CLI tool that manages the complete lifecycle of application infrastructure:
 
 - **Local Kubernetes**: k3d cluster creation and management
-- **Infrastructure Components**: PostgreSQL with pgvector, Redis, and NGINX Ingress
+- **Infrastructure Components**: PostgreSQL, Redis, and NGINX Ingress
 - **Application Deployment**: Automated build, deploy, and configuration
-- **Testing**: Built-in endpoint testing and composite backend validation
+- **Testing**: Built-in endpoint testing and validation
+- **Fully Configurable**: Adaptable to any application via environment variables
 
 ## Prerequisites
 
@@ -28,6 +29,19 @@ This directory contains a Go-based CLI tool that manages the complete lifecycle 
 - k3d v5.x
 - kubectl
 
+## Configuration
+
+The tool is fully configurable via environment variables:
+
+```bash
+export IAAC_APP_NAME=myapp
+export IAAC_CLUSTER_NAME=myapp-dev
+export IAAC_IMAGE_NAME=myapp:latest
+export IAAC_BLUEPRINT_PATH=deploy/k8s
+```
+
+See [Environment Variables Guide](docs/guide/ENV_VARS.md) for complete configuration options.
+
 ## Documentation
 
 Comprehensive documentation is available in the `docs/guide` directory:
@@ -35,6 +49,7 @@ Comprehensive documentation is available in the `docs/guide` directory:
 - [**README.md**](docs/guide/README.md) - Complete command reference and usage guide
 - [**DEVELOPMENT_GUIDE.md**](docs/guide/DEVELOPMENT_GUIDE.md) - Development workflow and testing
 - [**PRODUCTION_GUIDE.md**](docs/guide/PRODUCTION_GUIDE.md) - Production deployment best practices
+- [**ENV_VARS.md**](docs/guide/ENV_VARS.md) - Environment variables configuration
 
 ## Key Features
 
@@ -76,6 +91,31 @@ iaac/infra/
 └── Taskfile.yaml     # Build automation
 ```
 
+## Adapting to Your Project
+
+1. Set environment variables for your application:
+   ```bash
+   export IAAC_APP_NAME=yourapp
+   export IAAC_IMAGE_NAME=yourapp:latest
+   export IAAC_BLUEPRINT_PATH=path/to/k8s/manifests
+   ```
+
+2. Create your Kubernetes manifests following the blueprint structure:
+   ```
+   your-blueprint-path/
+   ├── infra/
+   │   ├── base/
+   │   └── overlays/
+   └── app/
+       ├── base/
+       └── overlays/
+   ```
+
+3. Run the deployment:
+   ```bash
+   iaac workflow full
+   ```
+
 ## License
 
-Part of the Semantic Cache project. See the main repository for license information.
+This is an open-source infrastructure tool. See LICENSE for details.

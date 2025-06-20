@@ -11,11 +11,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// getEnvOrDefault returns environment variable value or default
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 // Config represents the application configuration
 type Config struct {
 	// General settings
 	Debug   bool   `yaml:"debug" validate:""`
 	LogFile string `yaml:"log_file" validate:"omitempty"`
+
+	// Application settings
+	App AppConfig `yaml:"app" validate:"required"`
 
 	// Cluster configuration
 	Cluster ClusterConfig `yaml:"cluster" validate:"required"`
@@ -31,6 +42,14 @@ type Config struct {
 
 	// Security configuration
 	Security SecurityConfig `yaml:"security" validate:"required"`
+}
+
+// AppConfig contains application-specific settings
+type AppConfig struct {
+	Name          string `yaml:"name" validate:"required,min=1,max=63"`
+	SecretName    string `yaml:"secret_name" validate:"required,min=1,max=63"`
+	BlueprintPath string `yaml:"blueprint_path" validate:"omitempty"`
+	DatabaseName  string `yaml:"database_name" validate:"omitempty"`
 }
 
 // ClusterConfig contains k3d cluster settings
@@ -109,11 +128,17 @@ func DefaultConfig() *Config {
 	return &Config{
 		Debug:   false,
 		LogFile: "",
+		App: AppConfig{
+			Name:          getEnvOrDefault("IAAC_APP_NAME", "myapp"),
+			SecretName:    getEnvOrDefault("IAAC_SECRET_NAME", "app-secrets"),
+			BlueprintPath: getEnvOrDefault("IAAC_BLUEPRINT_PATH", "iaac/blueprint"),
+			DatabaseName:  getEnvOrDefault("IAAC_DATABASE_NAME", "appdb"),
+		},
 		Cluster: ClusterConfig{
-			Name:        "semantic-cache",
-			APIPort:     "6550",
-			HTTPPort:    "8080:80",
-			HTTPSPort:   "8443:443",
+			Name:        getEnvOrDefault("IAAC_CLUSTER_NAME", "local-k8s"),
+			APIPort:     getEnvOrDefault("IAAC_API_PORT", "6550"),
+			HTTPPort:    getEnvOrDefault("IAAC_HTTP_PORT", "8080:80"),
+			HTTPSPort:   getEnvOrDefault("IAAC_HTTPS_PORT", "8443:443"),
 			Servers:     1,
 			Agents:      0,
 			Timeout:     5 * time.Minute,
@@ -125,9 +150,9 @@ func DefaultConfig() *Config {
 			},
 		},
 		Build: BuildConfig{
-			ImageName:  "semantic-cache:local",
-			Dockerfile: "Dockerfile",
-			Context:    ".",
+			ImageName:  getEnvOrDefault("IAAC_IMAGE_NAME", "app:local"),
+			Dockerfile: getEnvOrDefault("IAAC_DOCKERFILE", "Dockerfile"),
+			Context:    getEnvOrDefault("IAAC_BUILD_CONTEXT", "."),
 			Timeout:    10 * time.Minute,
 			NoCache:    false,
 			BuildArgs:  []string{},
@@ -187,7 +212,7 @@ func LoadConfig(configPath string) (*Config, error) {
 		configPaths := []string{
 			"deploy-config.yaml",
 			"./config/deploy-config.yaml",
-			filepath.Join(os.Getenv("HOME"), ".semantic-cache", "deploy-config.yaml"),
+			filepath.Join(os.Getenv("HOME"), ".iaac", "deploy-config.yaml"),
 		}
 
 		for _, path := range configPaths {
@@ -287,7 +312,7 @@ func GetConfigPaths() []string {
 	return []string{
 		"deploy-config.yaml",
 		"./config/deploy-config.yaml",
-		filepath.Join(os.Getenv("HOME"), ".semantic-cache", "deploy-config.yaml"),
+		filepath.Join(os.Getenv("HOME"), ".iaac", "deploy-config.yaml"),
 	}
 }
 

@@ -10,12 +10,12 @@ resources:
   - resource-quotas.yaml
   - postgres/
   - redis/
-  - ingress-nginx/
 
-commonLabels:
-  environment: base
-  blueprint: semantic-cache
-  version: v1.0.0
+labels:
+  - pairs:
+      environment: base
+      blueprint: semantic-cache
+      version: v1.0.0
 
 commonAnnotations:
   app.kubernetes.io/managed-by: kustomize

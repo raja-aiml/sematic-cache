@@ -9,8 +9,9 @@ resources:
   - service.yaml
   - ingress.yaml
 
-commonLabels:
-  app: semantic-cache
-  component: api
+labels:
+  - pairs:
+      app: semantic-cache
+      component: api
 
 namespace: app

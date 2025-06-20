@@ -4,14 +4,15 @@ kind: Kustomization
 metadata:
   name: blueprint-local
 
-bases:
+resources:
   - ../../base
 
-commonLabels:
-  environment: local
+labels:
+  - pairs:
+      environment: local
 
 # Local development specific configurations
-patchesStrategicMerge: []
+patches: []
 
 # No replicas scaling for local development
 replicas: []

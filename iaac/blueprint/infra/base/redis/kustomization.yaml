@@ -14,12 +14,13 @@ resources:
   - pdb.yaml
   - hpa.yaml
   - network-policy.yaml
-  - service-monitor.yaml
+  # - service-monitor.yaml  # Requires Prometheus Operator
 
-commonLabels:
-  app: redis
-  component: cache
-  part-of: blueprint
+labels:
+  - pairs:
+      app: redis
+      component: cache
+      part-of: blueprint
 
 commonAnnotations:
   app.kubernetes.io/name: redis

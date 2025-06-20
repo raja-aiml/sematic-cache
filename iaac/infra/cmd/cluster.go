@@ -14,6 +14,7 @@ import (
 
 func ClusterCmd() *cobra.Command {
 	var clusterName string
+	var kustomizePath string
 
 	cmd := &cobra.Command{
 		Use:   "cluster",
@@ -22,17 +23,18 @@ func ClusterCmd() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVarP(&clusterName, "name", "n", constants.DefaultClusterName, "Cluster name")
+	cmd.PersistentFlags().StringVarP(&kustomizePath, "kustomize-path", "k", "", "Path to kustomize overlay (optional)")
 
-	cmd.AddCommand(clusterUpCmd(clusterName))
-	cmd.AddCommand(clusterDownCmd(clusterName))
-	cmd.AddCommand(clusterStatusCmd(clusterName))
-	cmd.AddCommand(clusterLogsCmd(clusterName))
-	cmd.AddCommand(clusterTestCmd(clusterName))
+	cmd.AddCommand(clusterUpCmd(&clusterName, &kustomizePath))
+	cmd.AddCommand(clusterDownCmd(&clusterName))
+	cmd.AddCommand(clusterStatusCmd(&clusterName))
+	cmd.AddCommand(clusterLogsCmd(&clusterName))
+	cmd.AddCommand(clusterTestCmd(&clusterName))
 
 	return cmd
 }
 
-func clusterUpCmd(clusterName string) *cobra.Command {
+func clusterUpCmd(clusterName *string, kustomizePath *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "up",
 		Short: "Create k3d cluster and deploy infrastructure",
@@ -41,7 +43,7 @@ func clusterUpCmd(clusterName string) *cobra.Command {
 			logger := utils.NewLogger("cluster")
 
 			// Create cluster
-			cm := k3d.NewClusterManager(clusterName)
+			cm := k3d.NewClusterManager(*clusterName)
 			if err := cm.CreateCluster(ctx); err != nil {
 				return fmt.Errorf("failed to create cluster: %w", err)
 			}
@@ -68,12 +70,19 @@ func clusterUpCmd(clusterName string) *cobra.Command {
 			logger.Info("Deploying infrastructure components...")
 
 			// Find kustomize path
-			kustomizePath, err := utils.GetKustomizePath("local")
-			if err != nil {
-				return fmt.Errorf("failed to get kustomize path: %w", err)
+			var kustomizeDir string
+			if *kustomizePath != "" {
+				// Use the provided path directly
+				kustomizeDir = *kustomizePath
+			} else {
+				var kErr error
+				kustomizeDir, kErr = utils.GetKustomizePath("local")
+				if kErr != nil {
+					return fmt.Errorf("failed to get kustomize path: %w", kErr)
+				}
 			}
 
-			if err := kubernetes.ApplyKustomize(ctx, kustomizePath, ""); err != nil {
+			if err := kubernetes.ApplyKustomize(ctx, kustomizeDir, ""); err != nil {
 				return fmt.Errorf("failed to apply kustomize: %w", err)
 			}
 
@@ -91,7 +100,7 @@ func clusterUpCmd(clusterName string) *cobra.Command {
 	}
 }
 
-func clusterDownCmd(clusterName string) *cobra.Command {
+func clusterDownCmd(clusterName *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "down",
 		Short: "Destroy k3d cluster and clean up resources",
@@ -99,9 +108,9 @@ func clusterDownCmd(clusterName string) *cobra.Command {
 			ctx := context.Background()
 			logger := utils.NewLogger("cluster")
 
-			logger.Info("Destroying cluster %s...", clusterName)
+			logger.Info("Destroying cluster %s...", *clusterName)
 
-			cm := k3d.NewClusterManager(clusterName)
+			cm := k3d.NewClusterManager(*clusterName)
 			if err := cm.DeleteCluster(ctx); err != nil {
 				return fmt.Errorf("failed to delete cluster: %w", err)
 			}
@@ -112,7 +121,7 @@ func clusterDownCmd(clusterName string) *cobra.Command {
 	}
 }
 
-func clusterStatusCmd(clusterName string) *cobra.Command {
+func clusterStatusCmd(clusterName *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "ps",
 		Short: "Show cluster and resource status",
@@ -121,13 +130,13 @@ func clusterStatusCmd(clusterName string) *cobra.Command {
 			logger := utils.NewLogger("cluster")
 
 			// Check k3d cluster status
-			cm := k3d.NewClusterManager(clusterName)
+			cm := k3d.NewClusterManager(*clusterName)
 			if !cm.IsRunning(ctx) {
-				logger.Error("Cluster %s is not running", clusterName)
+				logger.Error("Cluster %s is not running", *clusterName)
 				return nil
 			}
 
-			logger.Info("Cluster %s is running", clusterName)
+			logger.Info("Cluster %s is running", *clusterName)
 
 			// Show Kubernetes resources
 			output, err := utils.RunCommand(ctx, "kubectl", []string{"get", "all", "--all-namespaces"}, nil)
@@ -141,7 +150,7 @@ func clusterStatusCmd(clusterName string) *cobra.Command {
 	}
 }
 
-func clusterLogsCmd(_ string) *cobra.Command {
+func clusterLogsCmd(_ *string) *cobra.Command {
 	var namespace string
 	var labelSelector string
 	var tail int64
@@ -183,7 +192,7 @@ func clusterLogsCmd(_ string) *cobra.Command {
 	return cmd
 }
 
-func clusterTestCmd(clusterName string) *cobra.Command {
+func clusterTestCmd(clusterName *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "test",
 		Short: "Verify deployment health",
@@ -192,9 +201,9 @@ func clusterTestCmd(clusterName string) *cobra.Command {
 			logger := utils.NewLogger("test")
 
 			// Check cluster
-			cm := k3d.NewClusterManager(clusterName)
+			cm := k3d.NewClusterManager(*clusterName)
 			if !cm.IsRunning(ctx) {
-				return fmt.Errorf("cluster %s is not running", clusterName)
+				return fmt.Errorf("cluster %s is not running", *clusterName)
 			}
 			logger.Info("✓ Cluster is running")
 
