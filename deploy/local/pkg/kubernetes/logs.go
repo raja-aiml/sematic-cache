@@ -35,6 +35,10 @@ type LogOptions struct {
 
 // GetLogs retrieves logs based on the provided options
 func (lr *LogRetriever) GetLogs(ctx context.Context, opts LogOptions) (string, error) {
+	if lr.client == nil {
+		return "", fmt.Errorf("kubernetes client is nil")
+	}
+
 	if opts.PodName != "" {
 		// Get logs for specific pod
 		return lr.getPodLogs(ctx, opts.Namespace, opts.PodName, opts.TailLines)
@@ -104,6 +108,10 @@ func (lr *LogRetriever) StreamLogs(ctx context.Context, opts LogOptions) error {
 
 // GetPodStatus returns a summary of pod statuses
 func (lr *LogRetriever) GetPodStatus(ctx context.Context, namespace, labelSelector string) ([]PodStatus, error) {
+	if lr.client == nil {
+		return nil, fmt.Errorf("kubernetes client is nil")
+	}
+
 	pods, err := lr.client.GetPods(ctx, namespace, labelSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pods: %w", err)

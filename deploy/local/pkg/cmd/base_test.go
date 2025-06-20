@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -47,6 +48,17 @@ func TestNewBaseCommand(t *testing.T) {
 }
 
 func TestBaseCommand_Initialize(t *testing.T) {
+	// Save and restore HOME env var
+	origHome := os.Getenv("HOME")
+	if err := os.Setenv("HOME", "/nonexistent"); err != nil {
+		t.Fatalf("Failed to set HOME: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("HOME", origHome); err != nil {
+			t.Logf("Failed to restore HOME: %v", err)
+		}
+	}()
+
 	bc := NewBaseCommand("test")
 	ctx := context.Background()
 
@@ -145,6 +157,17 @@ func TestBaseCommand_Execute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Save and restore HOME env var
+			origHome := os.Getenv("HOME")
+			if err := os.Setenv("HOME", "/nonexistent"); err != nil {
+				t.Fatalf("Failed to set HOME: %v", err)
+			}
+			defer func() {
+				if err := os.Setenv("HOME", origHome); err != nil {
+					t.Logf("Failed to restore HOME: %v", err)
+				}
+			}()
+
 			bc := NewBaseCommand("test")
 
 			err := bc.Execute(tt.fn)

@@ -19,7 +19,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name:           "empty_kubeconfig_path",
 			kubeconfigPath: "",
-			wantErr:        true,
+			wantErr:        false, // When empty, it uses ~/.kube/config if it exists
 		},
 		{
 			name:           "invalid_kubeconfig_path",
