@@ -1,0 +1,169 @@
+version: '3'
+
+vars:
+  BINARY_NAME: semantic-cache-deploy
+  BINARY_DIR: bin
+  VERSION:
+    sh: git describe --tags --always --dirty
+  BUILD_TIME:
+    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+  LDFLAGS: -ldflags "-X main.version={{.VERSION}} -X main.buildTime={{.BUILD_TIME}}"
+  GOCMD: go
+  GOBUILD: "{{.GOCMD}} build"
+  GOCLEAN: "{{.GOCMD}} clean"
+  GOTEST: "{{.GOCMD}} test"
+  GOGET: "{{.GOCMD}} get"
+  GOMOD: "{{.GOCMD}} mod"
+  GOFMT: gofmt
+  GOVET: "{{.GOCMD}} vet"
+  GOLINT: golangci-lint
+
+tasks:
+  default:
+    desc: Display help message
+    cmds:
+      - task --list-all
+
+  build:
+    desc: Build the binary
+    cmds:
+      - mkdir -p {{.BINARY_DIR}}
+      - "{{.GOBUILD}} {{.LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}} ."
+      - echo "Binary built{{":"}} {{.BINARY_DIR}}/{{.BINARY_NAME}}"
+
+  build-all:
+    desc: Build for all platforms
+    cmds:
+      - echo "Building for multiple platforms..."
+      - mkdir -p {{.BINARY_DIR}}
+      - GOOS=darwin GOARCH=amd64 {{.GOBUILD}} {{.LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}}-darwin-amd64 .
+      - GOOS=darwin GOARCH=arm64 {{.GOBUILD}} {{.LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}}-darwin-arm64 .
+      - GOOS=linux GOARCH=amd64 {{.GOBUILD}} {{.LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}}-linux-amd64 .
+      - GOOS=linux GOARCH=arm64 {{.GOBUILD}} {{.LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}}-linux-arm64 .
+      - GOOS=windows GOARCH=amd64 {{.GOBUILD}} {{.LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}}-windows-amd64.exe .
+
+  install:
+    desc: Install the binary to GOPATH/bin
+    deps: [build]
+    cmds:
+      - cp {{.BINARY_DIR}}/{{.BINARY_NAME}} $GOPATH/bin/
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - "{{.GOCLEAN}}"
+      - rm -rf {{.BINARY_DIR}}
+      - rm -f coverage.out coverage.html
+
+  test:
+    desc: Run tests
+    cmds:
+      - "{{.GOTEST}} -v -race -coverprofile=coverage.out ./..."
+
+  test-coverage:
+    desc: Run tests with coverage report
+    deps: [test]
+    cmds:
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report{{":"}} coverage.html"
+
+  benchmark:
+    desc: Run benchmarks
+    cmds:
+      - "{{.GOTEST}} -bench=. -benchmem ./..."
+
+  lint:
+    desc: Run linter
+    cmds:
+      - "{{.GOLINT}} run ./..."
+
+  fmt:
+    desc: Format code
+    cmds:
+      - "{{.GOFMT}} -w ."
+
+  fmt-check:
+    desc: Check if code is formatted
+    cmds:
+      - |
+        if [ -n "$({{.GOFMT}} -l .)" ]; then
+          echo "Go code is not formatted. Run 'task fmt'"
+          {{.GOFMT}} -d .
+          exit 1
+        fi
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - "{{.GOVET}} ./..."
+
+  mod-tidy:
+    desc: Tidy go modules
+    cmds:
+      - "{{.GOMOD}} tidy"
+
+  mod-download:
+    desc: Download go modules
+    cmds:
+      - "{{.GOMOD}} download"
+
+  deps:
+    desc: Install dependencies
+    deps: [mod-download]
+
+  check:
+    desc: Run all checks
+    deps: [fmt-check, vet, lint, test]
+
+  ci:
+    desc: Run CI pipeline
+    deps: [deps, check, build]
+
+  run:
+    desc: Build and run
+    deps: [build]
+    cmds:
+      - ./{{.BINARY_DIR}}/{{.BINARY_NAME}}
+
+  docker-build:
+    desc: Build Docker image
+    cmds:
+      - docker build -t {{.BINARY_NAME}}:{{.VERSION}} .
+
+  release:
+    desc: Create release artifacts
+    deps: [clean, test, build-all]
+    cmds:
+      - echo "Creating release {{.VERSION}}..."
+      - mkdir -p releases/{{.VERSION}}
+      - cp {{.BINARY_DIR}}/* releases/{{.VERSION}}/
+      - tar -czf releases/{{.BINARY_NAME}}-{{.VERSION}}.tar.gz -C releases/{{.VERSION}} .
+      - echo "Release created{{":"}} releases/{{.BINARY_NAME}}-{{.VERSION}}.tar.gz"
+
+  # Development shortcuts
+  dev:
+    desc: Run development workflow
+    deps: [build]
+    cmds:
+      - ./{{.BINARY_DIR}}/{{.BINARY_NAME}} workflow full
+
+  dev-up:
+    desc: Start development cluster
+    deps: [build]
+    cmds:
+      - ./{{.BINARY_DIR}}/{{.BINARY_NAME}} cluster up
+
+  dev-down:
+    desc: Stop development cluster
+    cmds:
+      - ./{{.BINARY_DIR}}/{{.BINARY_NAME}} cluster down
+
+  dev-logs:
+    desc: Show application logs
+    cmds:
+      - ./{{.BINARY_DIR}}/{{.BINARY_NAME}} dev logs -f
+
+  dev-test:
+    desc: Run application tests
+    cmds:
+      - ./{{.BINARY_DIR}}/{{.BINARY_NAME}} dev test

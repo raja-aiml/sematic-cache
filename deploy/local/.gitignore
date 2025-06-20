@@ -3,3 +3,13 @@
 *.out
 coverage.out
 *_coverage.out
+coverage.html
+
+# Task runner
+.task/
+
+# Build output
+bin/
+
+# Release artifacts
+releases/
