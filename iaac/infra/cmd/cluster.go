@@ -221,7 +221,6 @@ func clusterTestCmd(clusterName *string) *cobra.Command {
 			}{
 				{"PostgreSQL", constants.InfraNamespace, "app=postgres"},
 				{"Redis", constants.InfraNamespace, "app=redis"},
-				{"Ingress Controller", "ingress-nginx", "app.kubernetes.io/name=ingress-nginx"},
 			}
 
 			for _, check := range checks {
@@ -259,7 +258,6 @@ func waitForInfrastructure(ctx context.Context, k8sClient *kubernetes.Client) er
 	}{
 		{constants.InfraNamespace, "postgres"},
 		{constants.InfraNamespace, "redis"},
-		{"ingress-nginx", "ingress-nginx-controller"},
 	}
 
 	for _, dep := range deployments {

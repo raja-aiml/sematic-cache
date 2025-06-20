@@ -8,6 +8,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -59,6 +60,10 @@ func (c *Client) CreateNamespace(ctx context.Context, name string) error {
 
 	_, err := c.clientset.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if err != nil {
+		// Check if namespace already exists
+		if k8serrors.IsAlreadyExists(err) {
+			return nil // Already exists, not an error
+		}
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 

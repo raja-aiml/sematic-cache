@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -174,13 +175,35 @@ func (ac *ApplyConfig) applyResource(ctx context.Context, obj *unstructured.Unst
 		dr = ac.Dynamic.Resource(mapping.Resource)
 	}
 
-	// Try to create, if already exists then update
+	// Try to create first
 	_, err = dr.Create(ctx, obj, metav1.CreateOptions{})
 	if err != nil {
-		// Try update if create failed
+		if !k8serrors.IsAlreadyExists(err) {
+			return fmt.Errorf("failed to create resource: %w", err)
+		}
+
+		// Resource exists, decide if we should update based on resource type
+		kind := obj.GetKind()
+
+		// Skip update for immutable resources
+		if kind == "PersistentVolumeClaim" {
+			// PVCs have immutable spec except for size
+			return nil
+		}
+
+		// For PodDisruptionBudget, we need to get the current resourceVersion
+		if kind == "PodDisruptionBudget" {
+			current, err := dr.Get(ctx, obj.GetName(), metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to get current PDB: %w", err)
+			}
+			obj.SetResourceVersion(current.GetResourceVersion())
+		}
+
+		// Try to update
 		_, err = dr.Update(ctx, obj, metav1.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to create/update resource: %w", err)
+			return fmt.Errorf("failed to update resource: %w", err)
 		}
 	}
 
