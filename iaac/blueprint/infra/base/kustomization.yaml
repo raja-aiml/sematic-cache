@@ -10,6 +10,7 @@ resources:
   - resource-quotas.yaml
   - postgres/
   - redis/
+  - ingress-nginx/
 
 commonLabels:
   environment: base

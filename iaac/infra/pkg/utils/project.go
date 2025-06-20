@@ -53,5 +53,29 @@ func GetKustomizePath(overlay string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, "deploy", "k8s", "overlays", overlay), nil
+	
+	// Determine if this is for app or infra based on the overlay path
+	var basePath string
+	if filepath.Base(overlay) == "app" || filepath.Dir(overlay) == "local" && filepath.Base(overlay) == "app" {
+		// This is for app deployment (e.g., "local/app")
+		overlayDir := filepath.Dir(overlay) // Get "local" from "local/app"
+		if overlayDir == "." {
+			overlayDir = "local"
+		}
+		basePath = filepath.Join(root, "iaac", "blueprint", "app", "overlays", overlayDir)
+	} else {
+		// This is for infra deployment
+		basePath = filepath.Join(root, "iaac", "blueprint", "infra", "overlays", overlay)
+	}
+	
+	// Check if overlay exists
+	if _, err := os.Stat(basePath); os.IsNotExist(err) {
+		// For app, use app base; for infra, use infra base
+		if filepath.Base(overlay) == "app" || filepath.Dir(overlay) == "local" && filepath.Base(overlay) == "app" {
+			return filepath.Join(root, "iaac", "blueprint", "app", "base"), nil
+		}
+		return filepath.Join(root, "iaac", "blueprint", "infra", "base"), nil
+	}
+	
+	return basePath, nil
 }
