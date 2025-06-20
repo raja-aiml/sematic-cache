@@ -1,0 +1,5 @@
+
+# Test coverage files
+*.out
+coverage.out
+*_coverage.out
