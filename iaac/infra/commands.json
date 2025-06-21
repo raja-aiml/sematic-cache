@@ -1,0 +1,698 @@
+{
+  "commands": [
+    {
+      "name": "iaac",
+      "description": "Infrastructure as Code tool for local Kubernetes deployments",
+      "category": "",
+      "subcommands": [
+        {
+          "name": "agent",
+          "description": "Natural language interface for infrastructure management",
+          "category": "iaac",
+          "options": [
+            {
+              "name": "audit-log",
+              "type": "string",
+              "description": "Audit log file path",
+              "required": false,
+              "default": "audit.log"
+            },
+            {
+              "name": "command-timeout",
+              "type": "duration",
+              "description": "Command execution timeout",
+              "required": false,
+              "default": "2m0s"
+            },
+            {
+              "name": "config",
+              "shorthand": "c",
+              "type": "string",
+              "description": "Agent configuration file",
+              "required": false
+            },
+            {
+              "name": "enable-dangerous",
+              "type": "bool",
+              "description": "Enable execution of dangerous commands",
+              "required": false,
+              "default": "false"
+            },
+            {
+              "name": "interactive",
+              "shorthand": "i",
+              "type": "bool",
+              "description": "Start interactive mode",
+              "required": false,
+              "default": "false"
+            },
+            {
+              "name": "openai-max-tokens",
+              "type": "int",
+              "description": "Maximum tokens for OpenAI responses",
+              "required": false,
+              "default": "1000"
+            },
+            {
+              "name": "openai-model",
+              "type": "string",
+              "description": "OpenAI model to use",
+              "required": false,
+              "default": "gpt-4-turbo-preview"
+            },
+            {
+              "name": "require-confirmation",
+              "type": "bool",
+              "description": "Require confirmation before execution",
+              "required": false,
+              "default": "true"
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "cluster",
+          "description": "Manage k3d cluster with blueprint scenarios",
+          "category": "iaac",
+          "subcommands": [
+            {
+              "name": "down",
+              "description": "Destroy k3d cluster and clean up resources",
+              "category": "iaac/cluster",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "logs",
+              "description": "Display pod logs",
+              "category": "iaac/cluster",
+              "options": [
+                {
+                  "name": "namespace",
+                  "shorthand": "n",
+                  "type": "string",
+                  "description": "Namespace",
+                  "required": false,
+                  "default": "app"
+                },
+                {
+                  "name": "selector",
+                  "shorthand": "l",
+                  "type": "string",
+                  "description": "Label selector",
+                  "required": false
+                },
+                {
+                  "name": "tail",
+                  "type": "int64",
+                  "description": "Number of lines to show",
+                  "required": false,
+                  "default": "50"
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "ps",
+              "description": "Show cluster and blueprint component status",
+              "category": "iaac/cluster",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "test",
+              "description": "Run tests for the deployed blueprint scenario",
+              "category": "iaac/cluster",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "up",
+              "description": "Create k3d cluster and deploy blueprint scenario",
+              "category": "iaac/cluster",
+              "dangerous": false,
+              "requires_confirmation": false
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "composite-test",
+          "description": "Test composite backend with k3d cluster services",
+          "category": "iaac",
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "config",
+          "description": "Configuration management commands",
+          "category": "iaac",
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "debug",
+          "description": "Comprehensive debugging and management tool",
+          "category": "iaac",
+          "subcommands": [
+            {
+              "name": "analyze",
+              "description": "Analyze deployment issues",
+              "category": "iaac/debug",
+              "subcommands": [
+                {
+                  "name": "full",
+                  "description": "Full diagnostic analysis",
+                  "category": "iaac/debug/analyze",
+                  "dangerous": false,
+                  "requires_confirmation": false
+                },
+                {
+                  "name": "quick",
+                  "description": "Quick summary with recommendations",
+                  "category": "iaac/debug/analyze",
+                  "dangerous": false,
+                  "requires_confirmation": false
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "secrets",
+              "description": "Manage Kubernetes secrets",
+              "category": "iaac/debug",
+              "subcommands": [
+                {
+                  "name": "create",
+                  "description": "Create secrets from environment or .env file",
+                  "category": "iaac/debug/secrets",
+                  "dangerous": false,
+                  "requires_confirmation": true
+                },
+                {
+                  "name": "update",
+                  "description": "Update secrets from environment",
+                  "category": "iaac/debug/secrets",
+                  "dangerous": false,
+                  "requires_confirmation": true
+                },
+                {
+                  "name": "view",
+                  "description": "View current secrets",
+                  "category": "iaac/debug/secrets",
+                  "dangerous": false,
+                  "requires_confirmation": false
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "test",
+              "description": "Test API endpoints",
+              "category": "iaac/debug",
+              "subcommands": [
+                {
+                  "name": "detailed",
+                  "description": "Detailed endpoint analysis",
+                  "category": "iaac/debug/test",
+                  "dangerous": false,
+                  "requires_confirmation": false
+                },
+                {
+                  "name": "quick",
+                  "description": "Quick API tests",
+                  "category": "iaac/debug/test",
+                  "dangerous": false,
+                  "requires_confirmation": false
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "dev",
+          "description": "Manage application build and deployment",
+          "category": "iaac",
+          "subcommands": [
+            {
+              "name": "build",
+              "description": "Build Docker image and import to k3d",
+              "category": "iaac/dev",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "deploy",
+              "description": "Create secrets and deploy application",
+              "category": "iaac/dev",
+              "dangerous": false,
+              "requires_confirmation": true
+            },
+            {
+              "name": "logs",
+              "description": "Show application logs",
+              "category": "iaac/dev",
+              "options": [
+                {
+                  "name": "follow",
+                  "shorthand": "f",
+                  "type": "bool",
+                  "description": "Follow log output",
+                  "required": false,
+                  "default": "false"
+                },
+                {
+                  "name": "tail",
+                  "type": "int64",
+                  "description": "Number of lines to show",
+                  "required": false,
+                  "default": "100"
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "remove",
+              "description": "Remove application deployment",
+              "category": "iaac/dev",
+              "dangerous": true,
+              "requires_confirmation": true
+            },
+            {
+              "name": "status",
+              "description": "Display deployment status",
+              "category": "iaac/dev",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "test",
+              "description": "Test application endpoints",
+              "category": "iaac/dev",
+              "dangerous": false,
+              "requires_confirmation": false
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "docs",
+          "description": "Generate command documentation",
+          "category": "iaac",
+          "options": [
+            {
+              "name": "format",
+              "shorthand": "f",
+              "type": "string",
+              "description": "Output format (json, markdown)",
+              "required": false,
+              "default": "json"
+            },
+            {
+              "name": "help",
+              "shorthand": "h",
+              "type": "bool",
+              "description": "help for docs",
+              "required": false,
+              "default": "false"
+            },
+            {
+              "name": "output",
+              "shorthand": "o",
+              "type": "string",
+              "description": "Output file path",
+              "required": false,
+              "default": "commands.json"
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "help",
+          "description": "Help about any command",
+          "category": "iaac",
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "manifest",
+          "description": "Manage and generate Kubernetes manifests",
+          "category": "iaac",
+          "subcommands": [
+            {
+              "name": "diff",
+              "description": "Show differences between manifests",
+              "category": "iaac/manifest",
+              "options": [
+                {
+                  "name": "namespace",
+                  "type": "string",
+                  "description": "Namespace to compare (empty for all)",
+                  "required": false
+                },
+                {
+                  "name": "overlay",
+                  "type": "string",
+                  "description": "Overlay to apply",
+                  "required": false
+                },
+                {
+                  "name": "scenario",
+                  "type": "string",
+                  "description": "Blueprint scenario to compare",
+                  "required": false,
+                  "default": "minimal"
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "generate",
+              "description": "Generate Kubernetes manifests from blueprint",
+              "category": "iaac/manifest",
+              "options": [
+                {
+                  "name": "output",
+                  "shorthand": "o",
+                  "type": "string",
+                  "description": "Output file (default: stdout)",
+                  "required": false
+                },
+                {
+                  "name": "overlay",
+                  "type": "string",
+                  "description": "Overlay to apply (local, dev)",
+                  "required": false
+                },
+                {
+                  "name": "path",
+                  "type": "string",
+                  "description": "Custom kustomization path",
+                  "required": false
+                },
+                {
+                  "name": "scenario",
+                  "type": "string",
+                  "description": "Blueprint scenario to generate",
+                  "required": false,
+                  "default": "minimal"
+                },
+                {
+                  "name": "validate",
+                  "type": "bool",
+                  "description": "Validate generated manifests",
+                  "required": false,
+                  "default": "true"
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "render",
+              "description": "Render manifests with environment substitution",
+              "category": "iaac/manifest",
+              "options": [
+                {
+                  "name": "dry-run",
+                  "type": "bool",
+                  "description": "Show what would be rendered",
+                  "required": false,
+                  "default": "false"
+                },
+                {
+                  "name": "output",
+                  "shorthand": "o",
+                  "type": "string",
+                  "description": "Output file (default: stdout)",
+                  "required": false
+                },
+                {
+                  "name": "path",
+                  "type": "string",
+                  "description": "Path to manifests or kustomization",
+                  "required": false
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "test",
+          "description": "Run validation tests",
+          "category": "iaac",
+          "options": [
+            {
+              "name": "fail-fast",
+              "type": "bool",
+              "description": "Stop on first failure",
+              "required": false,
+              "default": "false"
+            },
+            {
+              "name": "namespace",
+              "type": "string",
+              "description": "Namespace to test (default: based on scenario)",
+              "required": false
+            },
+            {
+              "name": "output",
+              "shorthand": "o",
+              "type": "string",
+              "description": "Output file for test report",
+              "required": false
+            },
+            {
+              "name": "parallel",
+              "type": "bool",
+              "description": "Run tests in parallel",
+              "required": false,
+              "default": "false"
+            },
+            {
+              "name": "report",
+              "type": "string",
+              "description": "Report type (console, json)",
+              "required": false,
+              "default": "console"
+            },
+            {
+              "name": "scenario",
+              "type": "string",
+              "description": "Blueprint scenario to test",
+              "required": false,
+              "default": "minimal"
+            },
+            {
+              "name": "timeout",
+              "type": "int",
+              "description": "Test timeout in seconds",
+              "required": false,
+              "default": "300"
+            },
+            {
+              "name": "verbose",
+              "shorthand": "v",
+              "type": "bool",
+              "description": "Verbose output",
+              "required": false,
+              "default": "false"
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "validate",
+          "description": "Validate configurations and deployments",
+          "category": "iaac",
+          "subcommands": [
+            {
+              "name": "blueprint",
+              "description": "Validate blueprint directory structure",
+              "category": "iaac/validate",
+              "options": [
+                {
+                  "name": "path",
+                  "type": "string",
+                  "description": "Path to blueprint directory",
+                  "required": false,
+                  "default": "./iaac/blueprint"
+                },
+                {
+                  "name": "strict",
+                  "type": "bool",
+                  "description": "Enable strict validation",
+                  "required": false,
+                  "default": "false"
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "deployment",
+              "description": "Validate deployed resources in cluster",
+              "category": "iaac/validate",
+              "options": [
+                {
+                  "name": "namespace",
+                  "type": "string",
+                  "description": "Namespace to validate (empty for all)",
+                  "required": false
+                },
+                {
+                  "name": "scenario",
+                  "type": "string",
+                  "description": "Expected scenario deployment",
+                  "required": false,
+                  "default": "minimal"
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": true
+            },
+            {
+              "name": "manifests",
+              "description": "Validate Kubernetes manifest files",
+              "category": "iaac/validate",
+              "options": [
+                {
+                  "name": "format",
+                  "type": "string",
+                  "description": "Output format (text, json)",
+                  "required": false,
+                  "default": "text"
+                },
+                {
+                  "name": "path",
+                  "type": "string",
+                  "description": "Path to manifest files or directory",
+                  "required": false,
+                  "default": "."
+                },
+                {
+                  "name": "recursive",
+                  "type": "bool",
+                  "description": "Validate files recursively",
+                  "required": false,
+                  "default": "false"
+                }
+              ],
+              "dangerous": false,
+              "requires_confirmation": false
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": true
+        },
+        {
+          "name": "version",
+          "description": "Print version information",
+          "category": "iaac",
+          "dangerous": false,
+          "requires_confirmation": false
+        },
+        {
+          "name": "workflow",
+          "description": "Production-ready end-to-end workflow orchestrator",
+          "category": "iaac",
+          "subcommands": [
+            {
+              "name": "build",
+              "description": "Build and import Docker image",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "cleanup",
+              "description": "Remove application deployment",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "deploy",
+              "description": "Deploy application with secrets",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": true
+            },
+            {
+              "name": "full",
+              "description": "Run complete workflow (setup, build, deploy, test)",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "logs",
+              "description": "Show application and infrastructure logs",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "reset",
+              "description": "Reset everything (destroy cluster and clean up)",
+              "category": "iaac/workflow",
+              "dangerous": true,
+              "requires_confirmation": false
+            },
+            {
+              "name": "setup",
+              "description": "Create cluster and deploy infrastructure",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "status",
+              "description": "Show workflow status",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": false
+            },
+            {
+              "name": "test",
+              "description": "Run comprehensive e2e tests",
+              "category": "iaac/workflow",
+              "dangerous": false,
+              "requires_confirmation": false
+            }
+          ],
+          "dangerous": false,
+          "requires_confirmation": false
+        }
+      ],
+      "dangerous": false,
+      "requires_confirmation": false
+    }
+  ],
+  "version": "1.0.0",
+  "generated_at": "2025-06-21T09:12:09.924077-04:00",
+  "metadata": {
+    "binary": "iaac",
+    "description": "Infrastructure as Code tool for local Kubernetes deployments",
+    "root_command": "iaac",
+    "version": "dev"
+  }
+}

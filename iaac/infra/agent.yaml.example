@@ -1,0 +1,32 @@
+# Agent Configuration Example
+# Copy this file to agent.yaml and customize as needed
+
+# OpenAI Configuration
+openai_key: ${OPENAI_API_KEY}  # Can use environment variable
+openai_model: gpt-4-turbo-preview
+openai_max_tokens: 1000
+
+# Safety Configuration
+enable_dangerous_commands: false
+require_confirmation: true
+
+# Command Whitelist - Only these commands will be allowed (if specified)
+command_whitelist:
+  - cluster
+  - blueprint
+  - deploy
+
+# Command Blacklist - These commands will be blocked
+command_blacklist:
+  - "cluster delete"
+  - "cluster reset"
+
+# Execution Configuration
+command_timeout: 30s
+max_retries: 3
+audit_log_path: ./logs/audit.log
+
+# Interactive Mode Configuration
+interactive_prompt: "iaac> "
+history_file: ~/.iaac_history
+enable_auto_complete: true
