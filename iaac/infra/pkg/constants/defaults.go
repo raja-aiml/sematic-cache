@@ -29,5 +29,4 @@ const (
 
 	// Default database URL for local deployment
 	DefaultDatabaseURL = "postgres://postgres:postgres@postgres.infra.svc.cluster.local:5432/semantic_cache?sslmode=disable"
-
 )

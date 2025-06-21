@@ -70,8 +70,6 @@ func TestClusterUpCmd(t *testing.T) {
 	})
 }
 
-
-
 func TestFindIaacPath(t *testing.T) {
 	// Test with various starting paths
 	testCases := []struct {

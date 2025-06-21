@@ -1,7 +1,6 @@
 // Package constants provides constants for the iaac infrastructure deployment.
 package constants
 
-
 const (
 	// K3d specific defaults
 	DefaultK3dRegistry = "k3d-local-registry:5000"
@@ -12,7 +11,6 @@ const (
 	IstioNamespace      = "istio-system"
 	LoggingNamespace    = "logging"
 	TracingNamespace    = "tracing"
-
 
 	// Component labels
 	LabelApp       = "app"
@@ -26,4 +24,3 @@ const (
 	ClusterCreationTimeout = 300 // seconds
 	DeploymentReadyTimeout = 600 // seconds
 )
-
