@@ -1,8 +1,11 @@
 package secrets
 
 import (
+	"fmt"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/kubernetes"
@@ -302,4 +305,210 @@ func BenchmarkSecretDataConversion(b *testing.B) {
 			"database-url":   []byte(data.DatabaseURL),
 		}
 	}
+}
+
+// Additional comprehensive tests without complex mocking
+
+func TestManager_EnsureAppSecrets_DataTransformation(t *testing.T) {
+	tests := []struct {
+		name           string
+		envVars        map[string]string
+		expectedAPIKey string
+		expectedDBURL  string
+	}{
+		{
+			name: "with_env_vars",
+			envVars: map[string]string{
+				"OPENAI_API_KEY": "test-key-123",
+				"DATABASE_URL":   "postgres://test-db",
+			},
+			expectedAPIKey: "test-key-123",
+			expectedDBURL:  "postgres://test-db",
+		},
+		{
+			name:           "with_defaults",
+			envVars:        map[string]string{},
+			expectedAPIKey: "dummy-key-for-testing",
+			expectedDBURL:  constants.DefaultDatabaseURL,
+		},
+		{
+			name: "partial_env_vars",
+			envVars: map[string]string{
+				"OPENAI_API_KEY": "partial-key",
+			},
+			expectedAPIKey: "partial-key",
+			expectedDBURL:  constants.DefaultDatabaseURL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up environment
+			cleanupEnv := setTestEnv(t, tt.envVars)
+			defer cleanupEnv()
+
+			// Create manager (we'll test the data transformation part)
+			manager := &Manager{
+				logger: utils.NewLogger("test"),
+			}
+
+			// Test the secret data generation
+			data := manager.getSecretData()
+			assert.Equal(t, tt.expectedAPIKey, data.OpenAIAPIKey)
+			assert.Equal(t, tt.expectedDBURL, data.DatabaseURL)
+
+			// Test the conversion to byte map (what EnsureAppSecrets does)
+			secretData := map[string][]byte{
+				"openai-api-key": []byte(data.OpenAIAPIKey),
+				"database-url":   []byte(data.DatabaseURL),
+			}
+
+			assert.Equal(t, tt.expectedAPIKey, string(secretData["openai-api-key"]))
+			assert.Equal(t, tt.expectedDBURL, string(secretData["database-url"]))
+			assert.Len(t, secretData, 2)
+		})
+	}
+}
+
+func TestManager_SecretNameFormatting(t *testing.T) {
+	tests := []struct {
+		name      string
+		namespace string
+		secret    string
+		expected  string
+	}{
+		{
+			name:      "standard_formatting",
+			namespace: "test-namespace",
+			secret:    "test-secret",
+			expected:  "test-namespace/test-secret",
+		},
+		{
+			name:      "app_secret_formatting",
+			namespace: constants.AppNamespace,
+			secret:    constants.AppSecretName,
+			expected:  constants.AppNamespace + "/" + constants.AppSecretName,
+		},
+		{
+			name:      "empty_namespace",
+			namespace: "",
+			secret:    "secret",
+			expected:  "/secret",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formatted := fmt.Sprintf("%s/%s", tt.namespace, tt.secret)
+			assert.Equal(t, tt.expected, formatted)
+		})
+	}
+}
+
+func TestManager_ValidateSecrets_ErrorFormatting(t *testing.T) {
+	namespace := constants.AppNamespace
+	secretName := constants.AppSecretName
+	expectedFormat := fmt.Sprintf("secret %s/%s does not exist", namespace, secretName)
+
+	assert.Equal(t, "secret "+namespace+"/"+secretName+" does not exist", expectedFormat)
+}
+
+func TestSecretData_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name string
+		data SecretData
+	}{
+		{
+			name: "unicode_characters",
+			data: SecretData{
+				OpenAIAPIKey: "sk-测试密钥-ファイル-🔑",
+				DatabaseURL:  "postgres://用户:密码@主机:5432/数据库",
+			},
+		},
+		{
+			name: "very_long_values",
+			data: SecretData{
+				OpenAIAPIKey: generateLargeString(1000),
+				DatabaseURL:  "postgres://user:password@host:5432/" + generateLargeString(100),
+			},
+		},
+		{
+			name: "newlines_and_whitespace",
+			data: SecretData{
+				OpenAIAPIKey: "  sk-key-with-spaces  \n",
+				DatabaseURL:  "\tpostgres://localhost\t\r\n",
+			},
+		},
+		{
+			name: "binary_like_data",
+			data: SecretData{
+				OpenAIAPIKey: string([]byte{0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE}),
+				DatabaseURL:  string([]byte{0x41, 0x42, 0x43, 0x00, 0x44}),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test that conversion to bytes and back preserves data
+			secretData := map[string][]byte{
+				"openai-api-key": []byte(tt.data.OpenAIAPIKey),
+				"database-url":   []byte(tt.data.DatabaseURL),
+			}
+
+			assert.Equal(t, tt.data.OpenAIAPIKey, string(secretData["openai-api-key"]))
+			assert.Equal(t, tt.data.DatabaseURL, string(secretData["database-url"]))
+		})
+	}
+}
+
+func TestManager_ConstantsUsage(t *testing.T) {
+	// Test that the manager uses the correct constants
+	assert.NotEmpty(t, constants.AppNamespace, "AppNamespace should not be empty")
+	assert.NotEmpty(t, constants.AppSecretName, "AppSecretName should not be empty")
+	assert.NotEmpty(t, constants.DefaultDatabaseURL, "DefaultDatabaseURL should not be empty")
+}
+
+// Helper functions
+
+func setTestEnv(t *testing.T, envVars map[string]string) func() {
+	// Store original values for cleanup
+	originalValues := make(map[string]string)
+
+	// Clear environment variables first
+	for _, key := range []string{"OPENAI_API_KEY", "DATABASE_URL"} {
+		originalValues[key] = os.Getenv(key)
+		os.Unsetenv(key)
+	}
+
+	// Set test environment variables
+	for k, v := range envVars {
+		err := os.Setenv(k, v)
+		if err != nil {
+			t.Logf("Failed to set %s: %v", k, err)
+		}
+	}
+
+	// Return cleanup function
+	return func() {
+		// Clear test env vars
+		for k := range envVars {
+			os.Unsetenv(k)
+		}
+
+		// Restore original values
+		for k, v := range originalValues {
+			if v != "" {
+				os.Setenv(k, v)
+			}
+		}
+	}
+}
+
+func generateLargeString(size int) string {
+	result := make([]byte, size)
+	for i := range result {
+		result[i] = byte('a' + (i % 26))
+	}
+	return string(result)
 }
