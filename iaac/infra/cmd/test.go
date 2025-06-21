@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/kubernetes"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/testing/framework"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/testing/reporters"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/testing/suites/integration"
@@ -100,8 +101,12 @@ func runTest(cmd *cobra.Command, args []string) error {
 
 	// Create test environment
 	logger := framework.NewSimpleLogger("test", testVerbose)
+	k8sClient, err := kubernetes.GetDefaultClient()
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
 	env := &framework.TestEnvironment{
-		KubeClient: nil, // TODO: Initialize kubernetes client
+		KubeClient: k8sClient,
 		Config:     config,
 		Logger:     logger,
 		Context:    make(map[string]interface{}),
