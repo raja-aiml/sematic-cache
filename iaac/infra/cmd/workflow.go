@@ -84,7 +84,7 @@ func workflowFullCmd(wm *WorkflowManager) *cobra.Command {
 
 			// Test
 			wm.logger.Step("Phase 4/4: Test")
-			if err := runTest(ctx, wm); err != nil {
+			if err := runWorkflowTest(ctx, wm); err != nil {
 				return fmt.Errorf("test failed: %w", err)
 			}
 
@@ -139,7 +139,7 @@ func workflowTestCmd(wm *WorkflowManager) *cobra.Command {
 		Short: "Run comprehensive e2e tests",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			return runTest(ctx, wm)
+			return runWorkflowTest(ctx, wm)
 		},
 	}
 }
@@ -261,7 +261,7 @@ func runDeploy(_ context.Context, wm *WorkflowManager) error {
 	return nil
 }
 
-func runTest(ctx context.Context, wm *WorkflowManager) error {
+func runWorkflowTest(ctx context.Context, wm *WorkflowManager) error {
 	wm.logger.Info("Running tests...")
 
 	// Run basic endpoint tests

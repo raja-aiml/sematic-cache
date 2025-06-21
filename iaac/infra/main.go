@@ -34,6 +34,9 @@ func init() {
 	rootCmd.AddCommand(cmd.WorkflowCmd())
 	rootCmd.AddCommand(cmd.CompositeTestCmd())
 	rootCmd.AddCommand(cmd.DebugCmd())
+	rootCmd.AddCommand(cmd.TestCmd())
+	rootCmd.AddCommand(cmd.ValidateCmd())
+	rootCmd.AddCommand(cmd.ManifestCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(configCmd())
 }

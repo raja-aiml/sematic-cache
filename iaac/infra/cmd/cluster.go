@@ -354,23 +354,14 @@ func clusterTestCmd(clusterName *string, scenario *string) *cobra.Command {
 			}
 
 			// Get iaac path for validation scripts
-			workDir, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get working directory: %w", err)
-			}
-
-			iaacPath := findIaacPath(workDir)
-			if iaacPath != "" {
-				// Run validation kit tests if available
-				testScript := filepath.Join(iaacPath, "blueprint/validation-kit/scripts/smoke-test.sh")
-				if _, err := os.Stat(testScript); err == nil {
-					logger.Info("Running blueprint validation tests...")
-					if _, err := utils.RunCommand(ctx, "bash", []string{testScript}, nil); err != nil {
-						logger.Error("Validation tests failed: %v", err)
-					} else {
-						logger.Info("✓ Validation tests passed")
-					}
-				}
+			// Run smoke tests using Go implementation
+			logger.Info("Running blueprint validation tests...")
+			testCmd := TestCmd()
+			testCmd.SetArgs([]string{"smoke", "--scenario", *scenario})
+			if err := testCmd.Execute(); err != nil {
+				logger.Error("Validation tests failed: %v", err)
+			} else {
+				logger.Info("✓ Validation tests passed")
 			}
 
 			return nil
