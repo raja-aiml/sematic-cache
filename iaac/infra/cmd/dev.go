@@ -60,17 +60,25 @@ func devBuildCmd(imageName, clusterName *string) *cobra.Command {
 			}
 
 			// Build image
-			builder := docker.NewBuilder()
+			builder, err := docker.NewBuilder()
+			if err != nil {
+				return fmt.Errorf("failed to create Docker builder: %w", err)
+			}
+			defer builder.Close()
+			
 			dockerfilePath := filepath.Join(projectRoot, "Dockerfile")
 
-			if err := builder.Build(ctx, dockerfilePath, *imageName, projectRoot); err != nil {
+			if err := builder.BuildSimple(ctx, dockerfilePath, *imageName, projectRoot); err != nil {
 				return fmt.Errorf("failed to build image: %w", err)
 			}
 
 			// Test image locally
 			logger.Info("Testing image locally...")
-			opts := &docker.RunOptions{Command: []string{"--help"}}
-			if _, err := builder.Run(ctx, *imageName, opts); err != nil {
+			config := &docker.ContainerConfig{
+				Cmd:        []string{"--help"},
+				AutoRemove: true,
+			}
+			if _, err := builder.RunContainer(ctx, *imageName, config); err != nil {
 				logger.Warn("Local test failed: %v", err)
 			}
 

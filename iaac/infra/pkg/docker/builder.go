@@ -1,235 +1,459 @@
 package docker
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 )
 
+// Builder implements all Docker operations using only the Docker SDK
 type Builder struct {
-	logger     *utils.Logger
-	sdkBuilder *SDKBuilder
-	useSDK     bool
+	client *client.Client
+	logger *utils.Logger
 }
 
-func NewBuilder() *Builder {
-	builder := &Builder{
+// NewBuilder creates a new Docker builder using only SDK
+func NewBuilder() (*Builder, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Docker client: %w", err)
+	}
+
+	// Test connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := cli.Ping(ctx); err != nil {
+		cli.Close()
+		return nil, fmt.Errorf("failed to connect to Docker daemon: %w", err)
+	}
+
+	return &Builder{
+		client: cli,
 		logger: utils.NewLogger("docker"),
-		useSDK: true,
-	}
-
-	// Try to create SDK builder
-	if sdkBuilder, err := NewSDKBuilder(); err == nil {
-		builder.sdkBuilder = sdkBuilder
-		builder.logger.Info("Using Docker SDK")
-	} else {
-		builder.useSDK = false
-		builder.logger.Info("Falling back to Docker CLI: %v", err)
-	}
-
-	return builder
+	}, nil
 }
 
-func (b *Builder) Build(ctx context.Context, dockerfilePath, imageName, buildContext string) error {
-	// Use SDK if available
-	if b.useSDK && b.sdkBuilder != nil {
-		return b.sdkBuilder.Build(ctx, dockerfilePath, imageName, buildContext)
-	}
+// Build implements BuildProvider interface using SDK
+func (b *Builder) Build(ctx context.Context, options ProviderBuildOptions) error {
+	b.logger.Info("Building image with Docker SDK, tags: %v", options.Tags)
 
-	// Fallback to CLI
-	b.logger.Info("Building image: %s", imageName)
-
-	args := []string{
-		"build",
-		"-f", dockerfilePath,
-		"-t", imageName,
-		buildContext,
-	}
-
-	output, err := utils.RunCommand(ctx, "docker", args, nil)
+	// Create build context
+	buildCtx, err := b.createBuildContext(options.Context, options.Dockerfile)
 	if err != nil {
-		return fmt.Errorf("docker build failed: %w", err)
+		return fmt.Errorf("failed to create build context: %w", err)
 	}
 
-	b.logger.Debug("Build output: %s", output)
-	b.logger.Info("Image built successfully: %s", imageName)
-	return nil
-}
-
-func (b *Builder) Tag(ctx context.Context, sourceImage, targetImage string) error {
-	// Use SDK if available
-	if b.useSDK && b.sdkBuilder != nil {
-		return b.sdkBuilder.Tag(ctx, sourceImage, targetImage)
+	// Prepare build options
+	// Convert BuildArgs from map[string]string to map[string]*string
+	buildArgs := make(map[string]*string)
+	for k, v := range options.BuildArgs {
+		val := v
+		buildArgs[k] = &val
 	}
 
-	// Fallback to CLI
-	b.logger.Info("Tagging %s as %s", sourceImage, targetImage)
+	buildOpts := types.ImageBuildOptions{
+		Tags:        options.Tags,
+		Dockerfile:  filepath.Base(options.Dockerfile),
+		BuildArgs:   buildArgs,
+		NoCache:     options.NoCache,
+		Target:      options.Target,
+		Platform:    options.Platform,
+		Remove:      true,
+		ForceRemove: true,
+	}
 
-	args := []string{"tag", sourceImage, targetImage}
-
-	_, err := utils.RunCommand(ctx, "docker", args, nil)
+	// Build the image
+	resp, err := b.client.ImageBuild(ctx, buildCtx, buildOpts)
 	if err != nil {
-		return fmt.Errorf("docker tag failed: %w", err)
+		return fmt.Errorf("failed to build image: %w", err)
 	}
+	defer resp.Body.Close()
 
-	return nil
+	// Stream build output
+	return b.streamBuildOutput(resp.Body, options.OutputStream)
 }
 
-func (b *Builder) Push(ctx context.Context, imageName string) error {
-	// Use SDK if available
-	if b.useSDK && b.sdkBuilder != nil {
-		return b.sdkBuilder.Push(ctx, imageName)
-	}
+// BuildSimple provides a simple build interface for backward compatibility
+func (b *Builder) BuildSimple(ctx context.Context, dockerfilePath, imageName, buildContext string) error {
+	return b.Build(ctx, ProviderBuildOptions{
+		Dockerfile:   dockerfilePath,
+		Context:      buildContext,
+		Tags:         []string{imageName},
+		OutputStream: os.Stdout,
+	})
+}
 
-	// Fallback to CLI
+// Push pushes an image to a registry using SDK
+func (b *Builder) Push(ctx context.Context, imageName string, auth *AuthConfig) error {
 	b.logger.Info("Pushing image: %s", imageName)
 
-	args := []string{"push", imageName}
+	var pushOpts image.PushOptions
 
-	output, err := utils.RunCommand(ctx, "docker", args, nil)
-	if err != nil {
-		return fmt.Errorf("docker push failed: %w", err)
+	if auth != nil {
+		authBytes, _ := json.Marshal(registry.AuthConfig{
+			Username:      auth.Username,
+			Password:      auth.Password,
+			ServerAddress: auth.Server,
+		})
+		pushOpts.RegistryAuth = base64.URLEncoding.EncodeToString(authBytes)
 	}
 
-	b.logger.Debug("Push output: %s", output)
+	resp, err := b.client.ImagePush(ctx, imageName, pushOpts)
+	if err != nil {
+		return fmt.Errorf("failed to push image: %w", err)
+	}
+	defer resp.Close()
+
+	return b.streamOutput(resp, os.Stdout)
+}
+
+// Tag tags an image using SDK
+func (b *Builder) Tag(ctx context.Context, source, target string) error {
+	b.logger.Info("Tagging image %s as %s", source, target)
+
+	if err := b.client.ImageTag(ctx, source, target); err != nil {
+		return fmt.Errorf("failed to tag image: %w", err)
+	}
+
 	return nil
 }
 
+// Pull pulls an image using SDK
+func (b *Builder) Pull(ctx context.Context, imageName string, auth *AuthConfig) error {
+	b.logger.Info("Pulling image: %s", imageName)
+
+	var pullOpts image.PullOptions
+
+	if auth != nil {
+		authBytes, _ := json.Marshal(registry.AuthConfig{
+			Username:      auth.Username,
+			Password:      auth.Password,
+			ServerAddress: auth.Server,
+		})
+		pullOpts.RegistryAuth = base64.URLEncoding.EncodeToString(authBytes)
+	}
+
+	resp, err := b.client.ImagePull(ctx, imageName, pullOpts)
+	if err != nil {
+		return fmt.Errorf("failed to pull image: %w", err)
+	}
+	defer resp.Close()
+
+	return b.streamOutput(resp, os.Stdout)
+}
+
+// ImageExists checks if an image exists using SDK
+func (b *Builder) ImageExists(ctx context.Context, imageName string) (bool, error) {
+	images, err := b.client.ImageList(ctx, image.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to list images: %w", err)
+	}
+
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if tag == imageName {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// RemoveImage removes an image using SDK
+func (b *Builder) RemoveImage(ctx context.Context, imageName string) error {
+	b.logger.Info("Removing image: %s", imageName)
+
+	_, err := b.client.ImageRemove(ctx, imageName, image.RemoveOptions{
+		Force:         true,
+		PruneChildren: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to remove image: %w", err)
+	}
+
+	return nil
+}
+
+// ListImages lists all images using SDK
+func (b *Builder) ListImages(ctx context.Context) ([]ImageInfo, error) {
+	images, err := b.client.ImageList(ctx, image.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list images: %w", err)
+	}
+
+	var result []ImageInfo
+	for _, img := range images {
+		result = append(result, ImageInfo{
+			ID:      img.ID,
+			Tags:    img.RepoTags,
+			Size:    img.Size,
+			Created: img.Created,
+		})
+	}
+
+	return result, nil
+}
+
+// ImportToK3d imports an image to K3d cluster using k3d CLI
+// Note: This is the only operation that requires CLI as k3d doesn't have an SDK
 func (b *Builder) ImportToK3d(ctx context.Context, imageName, clusterName string) error {
 	b.logger.Info("Importing image %s to k3d cluster %s", imageName, clusterName)
 
-	args := []string{"image", "import", imageName, "-c", clusterName}
-
-	output, err := utils.RunCommand(ctx, "k3d", args, nil)
+	// Check if image exists first
+	exists, err := b.ImageExists(ctx, imageName)
 	if err != nil {
-		return fmt.Errorf("k3d image import failed: %w", err)
+		return fmt.Errorf("failed to check image existence: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("image %s does not exist", imageName)
 	}
 
-	b.logger.Debug("Import output: %s", output)
-	b.logger.Info("Image imported successfully")
-	return nil
+	// k3d requires CLI - no SDK available
+	cmd := []string{"k3d", "image", "import", imageName, "--cluster", clusterName}
+	_, err = utils.RunCommand(ctx, cmd[0], cmd[1:], nil)
+	return err
 }
 
-func (b *Builder) Run(ctx context.Context, imageName string, opts *RunOptions) (string, error) {
-	// Use SDK if available
-	if b.useSDK && b.sdkBuilder != nil {
-		return b.sdkBuilder.Run(ctx, imageName, opts)
+// RunContainer runs a container using SDK
+func (b *Builder) RunContainer(ctx context.Context, imageName string, config *ContainerConfig) (string, error) {
+	b.logger.Info("Running container from image: %s", imageName)
+
+	// Container configuration
+	containerConfig := &container.Config{
+		Image:        imageName,
+		Cmd:          config.Cmd,
+		Env:          config.Env,
+		WorkingDir:   config.WorkingDir,
+		AttachStdout: true,
+		AttachStderr: true,
 	}
 
-	// Fallback to CLI
-	args := []string{"run", "--rm"}
+	// Host configuration
+	hostConfig := &container.HostConfig{
+		AutoRemove: config.AutoRemove,
+	}
 
-	if opts != nil {
-		if opts.Name != "" {
-			args = append(args, "--name", opts.Name)
-		}
-		for k, v := range opts.Env {
-			args = append(args, "-e", fmt.Sprintf("%s=%s", k, v))
-		}
-		for _, v := range opts.Volumes {
-			args = append(args, "-v", v)
-		}
-		for k, v := range opts.Ports {
-			args = append(args, "-p", fmt.Sprintf("%s:%s", k, v))
-		}
-		if opts.Network != "" {
-			args = append(args, "--network", opts.Network)
-		}
-		if opts.Detach {
-			args = append(args, "-d")
+	// Port bindings
+	if len(config.Ports) > 0 {
+		containerConfig.ExposedPorts = nat.PortSet{}
+		hostConfig.PortBindings = nat.PortMap{}
+
+		for hostPort, containerPort := range config.Ports {
+			port := nat.Port(fmt.Sprintf("%s/tcp", containerPort))
+			containerConfig.ExposedPorts[port] = struct{}{}
+			hostConfig.PortBindings[port] = []nat.PortBinding{
+				{HostPort: hostPort},
+			}
 		}
 	}
 
-	args = append(args, imageName)
-	if opts != nil && len(opts.Command) > 0 {
-		args = append(args, opts.Command...)
-	}
+	// Volume mounts
+	hostConfig.Binds = config.Volumes
 
-	output, err := utils.RunCommand(ctx, "docker", args, nil)
+	// Create container
+	resp, err := b.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, config.Name)
 	if err != nil {
-		return "", fmt.Errorf("docker run failed: %w", err)
+		return "", fmt.Errorf("failed to create container: %w", err)
 	}
 
-	return strings.TrimSpace(output), nil
+	// Start container
+	if err := b.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return "", fmt.Errorf("failed to start container: %w", err)
+	}
+
+	return resp.ID, nil
 }
 
-func (b *Builder) Stop(ctx context.Context, containerID string) error {
-	// Use SDK if available
-	if b.useSDK && b.sdkBuilder != nil {
-		return b.sdkBuilder.Stop(ctx, containerID)
+// StopContainer stops a container using SDK
+func (b *Builder) StopContainer(ctx context.Context, containerID string) error {
+	timeout := 10
+	stopOptions := container.StopOptions{
+		Timeout: &timeout,
 	}
 
-	// Fallback to CLI
-	args := []string{"stop", containerID}
-
-	_, err := utils.RunCommand(ctx, "docker", args, nil)
-	if err != nil {
-		return fmt.Errorf("docker stop failed: %w", err)
-	}
-
-	return nil
-}
-
-func (b *Builder) Remove(ctx context.Context, containerID string) error {
-	// Use SDK if available
-	if b.useSDK && b.sdkBuilder != nil {
-		return b.sdkBuilder.Remove(ctx, containerID)
-	}
-
-	// Fallback to CLI
-	args := []string{"rm", "-f", containerID}
-
-	_, err := utils.RunCommand(ctx, "docker", args, nil)
-	if err != nil {
-		return fmt.Errorf("docker rm failed: %w", err)
+	if err := b.client.ContainerStop(ctx, containerID, stopOptions); err != nil {
+		return fmt.Errorf("failed to stop container: %w", err)
 	}
 
 	return nil
 }
 
-type RunOptions struct {
-	Name    string
-	Env     map[string]string
-	Volumes []string
-	Ports   map[string]string
-	Network string
-	Command []string
-	Detach  bool
-}
-
-// IsDockerRunning checks if Docker daemon is running
-func (b *Builder) IsDockerRunning(ctx context.Context) bool {
-	// Use SDK if available
-	if b.useSDK && b.sdkBuilder != nil {
-		return b.sdkBuilder.IsDockerRunning(ctx)
+// RemoveContainer removes a container using SDK
+func (b *Builder) RemoveContainer(ctx context.Context, containerID string) error {
+	removeOptions := container.RemoveOptions{
+		Force:         true,
+		RemoveVolumes: true,
 	}
 
-	// Fallback to CLI
-	_, err := utils.RunCommand(ctx, "docker", []string{"info"}, &utils.ExecOptions{Silent: true})
-	return err == nil
+	if err := b.client.ContainerRemove(ctx, containerID, removeOptions); err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+
+	return nil
 }
 
-// Close closes the Docker client connection if using SDK
+// GetContainerLogs gets container logs using SDK
+func (b *Builder) GetContainerLogs(ctx context.Context, containerID string, follow bool) (io.ReadCloser, error) {
+	options := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     follow,
+		Timestamps: true,
+	}
+
+	logs, err := b.client.ContainerLogs(ctx, containerID, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container logs: %w", err)
+	}
+
+	return logs, nil
+}
+
+// Close closes the Docker client connection
 func (b *Builder) Close() error {
-	if b.sdkBuilder != nil {
-		return b.sdkBuilder.Close()
+	if b.client != nil {
+		return b.client.Close()
 	}
 	return nil
 }
 
-func GetProjectRoot() (string, error) {
-	// Try to find project root by looking for go.mod
-	currentDir := "."
-	for i := 0; i < 5; i++ {
-		modPath := filepath.Join(currentDir, "go.mod")
-		if _, err := os.Stat(modPath); err == nil {
-			return filepath.Abs(currentDir)
-		}
-		currentDir = filepath.Join(currentDir, "..")
+// Helper methods
+
+func (b *Builder) createBuildContext(contextPath, dockerfilePath string) (io.Reader, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	defer tw.Close()
+
+	// Add Dockerfile
+	dockerfileContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Dockerfile: %w", err)
 	}
-	return "", fmt.Errorf("could not find project root")
+
+	dockerfileHeader := &tar.Header{
+		Name: "Dockerfile",
+		Mode: 0644,
+		Size: int64(len(dockerfileContent)),
+	}
+
+	if err := tw.WriteHeader(dockerfileHeader); err != nil {
+		return nil, err
+	}
+
+	if _, err := tw.Write(dockerfileContent); err != nil {
+		return nil, err
+	}
+
+	// Add context files
+	err = filepath.Walk(contextPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories and the Dockerfile
+		if info.IsDir() || path == dockerfilePath {
+			return nil
+		}
+
+		// Create relative path
+		relPath, err := filepath.Rel(contextPath, path)
+		if err != nil {
+			return err
+		}
+
+		// Read file
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		// Create tar header
+		header := &tar.Header{
+			Name: relPath,
+			Mode: 0644,
+			Size: int64(len(data)),
+		}
+
+		// Write header and data
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		if _, err := tw.Write(data); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create build context: %w", err)
+	}
+
+	return &buf, nil
+}
+
+func (b *Builder) streamBuildOutput(reader io.Reader, output io.Writer) error {
+	decoder := json.NewDecoder(reader)
+
+	for {
+		var message struct {
+			Stream string `json:"stream"`
+			Error  string `json:"error"`
+		}
+
+		if err := decoder.Decode(&message); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+
+		if message.Error != "" {
+			return fmt.Errorf("build error: %s", message.Error)
+		}
+
+		if message.Stream != "" && output != nil {
+			fmt.Fprint(output, message.Stream)
+		}
+	}
+
+	return nil
+}
+
+func (b *Builder) streamOutput(reader io.Reader, output io.Writer) error {
+	if output == nil {
+		output = io.Discard
+	}
+
+	_, err := io.Copy(output, reader)
+	return err
+}
+
+// ContainerConfig holds container runtime configuration
+type ContainerConfig struct {
+	Name       string
+	Cmd        []string
+	Env        []string
+	WorkingDir string
+	Volumes    []string          // host:container format
+	Ports      map[string]string // host:container format
+	AutoRemove bool
 }

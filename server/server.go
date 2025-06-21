@@ -1,157 +1,132 @@
-// Package server exposes HTTP handlers for cache operations using Gin.
-
 package server
 
 import (
-	"log"
+	"encoding/json"
+	"fmt"
 	"net/http"
-	"os"
-	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/raja-aiml/sematic-cache/core"
+	"github.com/raja-aiml/sematic-cache/storage"
 )
 
-// setRequest represents the JSON payload for /set.
-type setRequest struct {
-	Prompt    string    `json:"prompt"`
-	Answer    string    `json:"answer"`
-	Embedding []float32 `json:"embedding,omitempty"`
-	ModelName string    `json:"modelName,omitempty"`
-	ModelID   string    `json:"modelID,omitempty"`
+// Server handles HTTP requests for the cache
+type Server struct {
+	cache storage.Backend
+	mux   *http.ServeMux
 }
 
-// getRequest represents the JSON payload for /get.
-type getRequest struct {
-	Prompt string `json:"prompt"`
-}
-
-// getResponse is the JSON response for /get.
-type getResponse struct {
-	Answer    string `json:"answer"`
-	ModelName string `json:"modelName,omitempty"`
-	ModelID   string `json:"modelID,omitempty"`
-}
-
-// queryRequest represents the JSON payload for /query.
-type queryRequest struct {
-	Embedding []float32 `json:"embedding"`
-}
-
-// queryResponse is the JSON response for /query.
-type queryResponse struct {
-	Answer     string  `json:"answer"`
-	ModelName  string  `json:"modelName,omitempty"`
-	ModelID    string  `json:"modelID,omitempty"`
-	Similarity float64 `json:"similarity,omitempty"`
-}
-
-// topKRequest represents the JSON payload for /topk.
-type topKRequest struct {
-	Embedding []float32 `json:"embedding"`
-	K         int       `json:"k"`
-}
-
-// topKResponseItem is a single result in /topk.
-type topKResponseItem struct {
-	Prompt     string  `json:"prompt"`
-	Answer     string  `json:"answer"`
-	Similarity float64 `json:"similarity"`
-	ModelName  string  `json:"modelName,omitempty"`
-	ModelID    string  `json:"modelID,omitempty"`
-}
-
-// New creates a Gin engine with all cache routes configured.
-func New(cache core.CacheBackend) *gin.Engine {
-	r := gin.Default()
-	// Load admin token for protecting sensitive endpoints
-	adminToken := os.Getenv("ADMIN_TOKEN")
-
-	r.POST("/get", func(c *gin.Context) {
-		var req getRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		ans, ok := cache.Get(req.Prompt)
-		if !ok {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		modelName, modelID, _ := cache.GetModelInfo(req.Prompt)
-		resp := getResponse{Answer: ans, ModelName: modelName, ModelID: modelID}
-		c.JSON(http.StatusOK, resp)
-	})
-
-	r.POST("/set", func(c *gin.Context) {
-		var req setRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if len(req.Embedding) > 0 {
-			cache.SetWithModel(req.Prompt, req.Embedding, req.Answer, req.ModelName, req.ModelID)
-		} else {
-			if err := cache.SetPromptWithModel(req.Prompt, req.Answer, req.ModelName, req.ModelID); err != nil {
-				log.Printf("embedding failed or disabled: %v, storing without embedding", err)
-				cache.SetWithModel(req.Prompt, nil, req.Answer, req.ModelName, req.ModelID)
-			}
-		}
-		c.Status(http.StatusCreated)
-	})
-
-	// Admin endpoints: group under /admin and protect with AdminAuth
-	admin := r.Group("/admin")
-	if adminToken != "" {
-		admin.Use(AdminAuth(adminToken))
+// New creates a new server instance
+func New(cache storage.Backend) *Server {
+	s := &Server{
+		cache: cache,
+		mux:   http.NewServeMux(),
 	}
-	admin.POST("/flush", func(c *gin.Context) {
-		cache.Flush()
-		c.Status(http.StatusOK)
-	})
+	s.setupRoutes()
+	return s
+}
 
-	r.POST("/query", func(c *gin.Context) {
-		var req queryRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		results := cache.GetTopKByEmbedding(req.Embedding, 1)
-		if len(results) == 0 {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		r0 := results[0]
-		resp := queryResponse{Answer: r0.Answer, ModelName: r0.ModelName, ModelID: r0.ModelID, Similarity: r0.Similarity}
-		c.JSON(http.StatusOK, resp)
-	})
+// ServeHTTP implements http.Handler
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mux.ServeHTTP(w, r)
+}
 
-	r.POST("/topk", func(c *gin.Context) {
-		var req topKRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		results := cache.GetTopKByEmbedding(req.Embedding, req.K)
-		resp := make([]topKResponseItem, len(results))
-		for i, r0 := range results {
-			resp[i] = topKResponseItem{Prompt: r0.Prompt, Answer: r0.Answer, Similarity: r0.Similarity, ModelName: r0.ModelName, ModelID: r0.ModelID}
-		}
-		c.JSON(http.StatusOK, resp)
-	})
+func (s *Server) setupRoutes() {
+	s.mux.HandleFunc("/health", s.handleHealth)
+	s.mux.HandleFunc("/cache/get", s.handleCacheGet)
+	s.mux.HandleFunc("/cache/set", s.handleCacheSet)
+	s.mux.HandleFunc("/cache/similar", s.handleCacheSimilar)
+}
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":    "OK",
-			"service":   "semantic-cache",
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-		})
-	})
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+}
 
-	r.GET("/metrics", func(c *gin.Context) {
-		hits, misses, hitRate := cache.Stats()
-		c.JSON(http.StatusOK, gin.H{"hits": hits, "misses": misses, "hitRate": hitRate})
-	})
+func (s *Server) handleCacheGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-	return r
+	var req struct {
+		Key string `json:"key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	result, err := s.cache.Get(r.Context(), req.Key)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if result == nil {
+		http.Error(w, "Key not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"key":   req.Key,
+		"value": result,
+	})
+}
+
+func (s *Server) handleCacheSet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Key   string      `json:"key"`
+		Value interface{} `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Convert value to string for storage
+	valueStr := fmt.Sprintf("%v", req.Value)
+	if err := s.cache.Set(r.Context(), req.Key, valueStr); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+func (s *Server) handleCacheSimilar(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Query string `json:"query"`
+		TopK  int    `json:"top_k"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.TopK <= 0 {
+		req.TopK = 5 // default
+	}
+
+	results, err := s.cache.GetSimilar(r.Context(), req.Query, req.TopK)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"query":   req.Query,
+		"results": results,
+	})
 }
