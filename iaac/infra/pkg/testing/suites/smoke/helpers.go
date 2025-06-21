@@ -17,7 +17,7 @@ func checkDeploymentExists(ctx context.Context, env *framework.TestEnvironment, 
 	// client := env.KubeClient.(*kubernetes.Client)
 	// deployment, err := client.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	// return err == nil && deployment != nil
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking deployment existence", "namespace", namespace, "name", name)
 	return true // Simulated success
@@ -32,7 +32,7 @@ func checkPodRunning(ctx context.Context, env *framework.TestEnvironment, namesp
 	//     FieldSelector: "status.phase=Running",
 	// })
 	// return err == nil && len(pods.Items) > 0
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking pod status", "namespace", namespace, "selector", labelSelector)
 	return true // Simulated success
@@ -44,7 +44,7 @@ func checkServiceExists(ctx context.Context, env *framework.TestEnvironment, nam
 	// client := env.KubeClient.(*kubernetes.Client)
 	// service, err := client.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 	// return err == nil && service != nil
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking service existence", "namespace", namespace, "name", name)
 	return true // Simulated success
@@ -55,7 +55,7 @@ func checkPostgresReady(ctx context.Context, env *framework.TestEnvironment) boo
 	// TODO: Replace with actual exec command
 	// This would execute: pg_isready -U cache -d cache
 	// inside the postgres pod
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking PostgreSQL readiness")
 	return true // Simulated success
@@ -66,7 +66,7 @@ func checkRedisPing(ctx context.Context, env *framework.TestEnvironment) bool {
 	// TODO: Replace with actual exec command
 	// This would execute: redis-cli ping
 	// inside the redis pod
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking Redis ping response")
 	return true // Simulated success
@@ -81,7 +81,7 @@ func checkPVCStatus(ctx context.Context, env *framework.TestEnvironment, namespa
 	//     return "NotFound"
 	// }
 	// return string(pvc.Status.Phase)
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking PVC status", "namespace", namespace, "name", name)
 	return "Bound" // Simulated bound status
@@ -93,7 +93,7 @@ func checkNetworkPolicyExists(ctx context.Context, env *framework.TestEnvironmen
 	// client := env.KubeClient.(*kubernetes.Client)
 	// policy, err := client.NetworkingV1().NetworkPolicies(namespace).Get(ctx, name, metav1.GetOptions{})
 	// return err == nil && policy != nil
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking network policy existence", "namespace", namespace, "name", name)
 	return true // Simulated success
@@ -105,7 +105,7 @@ func checkResourceQuotaExists(ctx context.Context, env *framework.TestEnvironmen
 	// client := env.KubeClient.(*kubernetes.Client)
 	// quota, err := client.CoreV1().ResourceQuotas(namespace).Get(ctx, name, metav1.GetOptions{})
 	// return err == nil && quota != nil
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Checking resource quota existence", "namespace", namespace, "name", name)
 	return true // Simulated success
@@ -116,7 +116,7 @@ func testPostgresQuery(ctx context.Context, env *framework.TestEnvironment) bool
 	// TODO: Replace with actual exec command
 	// This would execute: psql -U cache -d cache -c "SELECT 1"
 	// inside the postgres pod
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Testing PostgreSQL query execution")
 	return true // Simulated success
@@ -127,7 +127,7 @@ func testPostgresVector(ctx context.Context, env *framework.TestEnvironment) boo
 	// TODO: Replace with actual exec command
 	// This would execute: psql -U cache -d cache -c "SELECT extname FROM pg_extension WHERE extname='vector'"
 	// inside the postgres pod
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Testing PostgreSQL vector extension")
 	return true // Simulated success
@@ -141,7 +141,7 @@ func testRedisSetGet(ctx context.Context, env *framework.TestEnvironment) bool {
 	// 2. redis-cli get test-key
 	// 3. redis-cli del test-key
 	// inside the redis pod
-	
+
 	// Placeholder implementation
 	env.Logger.Debug("Testing Redis SET/GET operations")
 	return true // Simulated success
@@ -152,7 +152,7 @@ func testRedisSetGet(ctx context.Context, env *framework.TestEnvironment) bool {
 func ExecInPod(ctx context.Context, namespace, podName, containerName string, command []string) (string, error) {
 	// TODO: Implement actual pod exec using Kubernetes client
 	// This would use the kubernetes client-go exec functionality
-	
+
 	// Placeholder implementation
 	return fmt.Sprintf("Command executed: %v", command), nil
 }
@@ -162,7 +162,7 @@ func WaitForCondition(ctx context.Context, timeout time.Duration, checkFn func()
 	deadline := time.Now().Add(timeout)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -171,7 +171,7 @@ func WaitForCondition(ctx context.Context, timeout time.Duration, checkFn func()
 			if time.Now().After(deadline) {
 				return fmt.Errorf("timeout waiting for condition")
 			}
-			
+
 			ready, err := checkFn()
 			if err != nil {
 				return err

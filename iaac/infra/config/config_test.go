@@ -611,6 +611,87 @@ func TestPrintConfig(t *testing.T) {
 	}
 }
 
+func TestBlueprintIntegration(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Test that blueprint methods work without error
+	t.Run("GetScenarioPath", func(t *testing.T) {
+		path, err := cfg.GetScenarioPath("minimal")
+		if err != nil {
+			t.Errorf("GetScenarioPath() error = %v", err)
+		}
+		if path == "" {
+			t.Error("GetScenarioPath() returned empty path")
+		}
+	})
+
+	t.Run("GetModulePath", func(t *testing.T) {
+		path, err := cfg.GetModulePath("observability")
+		if err != nil {
+			t.Errorf("GetModulePath() error = %v", err)
+		}
+		if path == "" {
+			t.Error("GetModulePath() returned empty path")
+		}
+	})
+
+	t.Run("ValidateScenario", func(t *testing.T) {
+		err := cfg.ValidateScenario("minimal")
+		if err != nil {
+			t.Errorf("ValidateScenario() error = %v", err)
+		}
+
+		// Test invalid scenario
+		err = cfg.ValidateScenario("invalid-scenario")
+		if err == nil {
+			t.Error("ValidateScenario() should error for invalid scenario")
+		}
+	})
+
+	t.Run("GetScenarioNamespaces", func(t *testing.T) {
+		namespaces, err := cfg.GetScenarioNamespaces("minimal")
+		if err != nil {
+			t.Errorf("GetScenarioNamespaces() error = %v", err)
+		}
+		if len(namespaces) == 0 {
+			t.Error("GetScenarioNamespaces() returned empty list")
+		}
+	})
+
+	t.Run("ListAvailableScenarios", func(t *testing.T) {
+		scenarios, err := cfg.ListAvailableScenarios()
+		if err != nil {
+			t.Errorf("ListAvailableScenarios() error = %v", err)
+		}
+		if len(scenarios) == 0 {
+			t.Error("ListAvailableScenarios() returned empty list")
+		}
+	})
+}
+
+func TestAppConfigBlueprintFields(t *testing.T) {
+	// Test that blueprint config fields are set correctly
+	t.Run("BlueprintConfig", func(t *testing.T) {
+		os.Setenv("IAAC_BLUEPRINT_CONFIG", "/path/to/blueprint.yaml")
+		defer os.Unsetenv("IAAC_BLUEPRINT_CONFIG")
+
+		cfg := DefaultConfig()
+		if cfg.App.BlueprintConfig != "/path/to/blueprint.yaml" {
+			t.Errorf("BlueprintConfig = %v, want %v", cfg.App.BlueprintConfig, "/path/to/blueprint.yaml")
+		}
+	})
+
+	t.Run("PreferredScenario", func(t *testing.T) {
+		os.Setenv("IAAC_PREFERRED_SCENARIO", "full-stack")
+		defer os.Unsetenv("IAAC_PREFERRED_SCENARIO")
+
+		cfg := DefaultConfig()
+		if cfg.App.PreferredScenario != "full-stack" {
+			t.Errorf("PreferredScenario = %v, want %v", cfg.App.PreferredScenario, "full-stack")
+		}
+	})
+}
+
 // Benchmark tests
 func BenchmarkDefaultConfig(b *testing.B) {
 	for i := 0; i < b.N; i++ {

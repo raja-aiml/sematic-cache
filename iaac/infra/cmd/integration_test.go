@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,11 +36,11 @@ func TestBlueprintIntegration(t *testing.T) {
 
 		// Check scenarios exist
 		scenarios := []string{
-			constants.ScenarioMinimal,
-			constants.ScenarioDevelopment,
-			constants.ScenarioServiceMesh,
-			constants.ScenarioMonitoring,
-			constants.ScenarioFullStack,
+			"minimal",
+			"development",
+			"service-mesh",
+			"monitoring-only",
+			"full-stack",
 		}
 
 		for _, scenario := range scenarios {
@@ -78,15 +78,15 @@ func TestBlueprintIntegration(t *testing.T) {
 
 	t.Run("path helper functions work correctly", func(t *testing.T) {
 		// Test scenario paths
-		minimalPath := constants.GetScenarioPath(constants.ScenarioMinimal)
+		minimalPath := blueprint.GetScenarioPath("minimal")
 		assert.Contains(t, minimalPath, "blueprint/scenarios/minimal")
 
 		// Test module paths
-		observabilityPath := constants.GetModulePath("observability")
+		observabilityPath := blueprint.GetModulePath("observability")
 		assert.Contains(t, observabilityPath, "blueprint/infra/modules/observability")
 
 		// Test overlay paths
-		localOverlayPath := constants.GetOverlayPath("local")
+		localOverlayPath := blueprint.GetOverlayPath("local")
 		assert.Contains(t, localOverlayPath, "blueprint/infra/overlays/local")
 	})
 }

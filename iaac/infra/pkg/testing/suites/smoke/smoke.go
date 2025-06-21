@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/testing/framework"
 )
 
@@ -75,8 +76,18 @@ func NewSmokeTestSuite() *framework.TestSuite {
 
 // GetScenarioNamespaces returns expected namespaces based on scenario
 func GetScenarioNamespaces(scenario string) []string {
+	// Try to get from blueprint configuration first
+	manager, err := blueprint.GetGlobalManager()
+	if err == nil {
+		namespaces, err := manager.GetScenarioNamespaces(scenario)
+		if err == nil && len(namespaces) > 0 {
+			return namespaces
+		}
+	}
+
+	// Fallback to hardcoded values
 	baseNamespaces := []string{"infra", "app"}
-	
+
 	switch scenario {
 	case "minimal":
 		return baseNamespaces
@@ -106,7 +117,7 @@ func testClusterConnectivity(ctx context.Context, env *framework.TestEnvironment
 			Error:   fmt.Errorf("kubernetes client is nil"),
 		}
 	}
-	
+
 	// In real implementation, this would check cluster-info
 	// For now, we'll assume it passes if client exists
 	return framework.TestResult{
@@ -123,10 +134,10 @@ func testClusterConnectivity(ctx context.Context, env *framework.TestEnvironment
 func testNamespaces(ctx context.Context, env *framework.TestEnvironment) framework.TestResult {
 	scenario := env.Config.Scenario
 	expectedNamespaces := GetScenarioNamespaces(scenario)
-	
+
 	missingNamespaces := []string{}
 	foundNamespaces := []string{}
-	
+
 	// In real implementation, this would check actual namespaces
 	// For now, we'll simulate the check
 	for _, ns := range expectedNamespaces {
@@ -138,23 +149,23 @@ func testNamespaces(ctx context.Context, env *framework.TestEnvironment) framewo
 			missingNamespaces = append(missingNamespaces, ns)
 		}
 	}
-	
+
 	passed := len(missingNamespaces) == 0
 	message := fmt.Sprintf("Found %d/%d expected namespaces", len(foundNamespaces), len(expectedNamespaces))
-	
+
 	if !passed {
 		message = fmt.Sprintf("Missing namespaces: %s", strings.Join(missingNamespaces, ", "))
 	}
-	
+
 	return framework.TestResult{
 		Name:    "namespaces",
 		Passed:  passed,
 		Message: message,
 		Details: map[string]interface{}{
-			"expected":   expectedNamespaces,
-			"found":      foundNamespaces,
-			"missing":    missingNamespaces,
-			"scenario":   scenario,
+			"expected": expectedNamespaces,
+			"found":    foundNamespaces,
+			"missing":  missingNamespaces,
+			"scenario": scenario,
 		},
 	}
 }
@@ -162,19 +173,19 @@ func testNamespaces(ctx context.Context, env *framework.TestEnvironment) framewo
 // testPostgres tests PostgreSQL deployment
 func testPostgres(ctx context.Context, env *framework.TestEnvironment) framework.TestResult {
 	results := make(map[string]bool)
-	
+
 	// Check deployment exists
 	results["deployment_exists"] = checkDeploymentExists(ctx, env, "infra", "postgres")
-	
+
 	// Check pod is running
 	results["pod_running"] = checkPodRunning(ctx, env, "infra", "app=postgres")
-	
+
 	// Check service exists
 	results["service_exists"] = checkServiceExists(ctx, env, "infra", "postgres")
-	
+
 	// Check database connectivity
 	results["db_ready"] = checkPostgresReady(ctx, env)
-	
+
 	// Calculate overall result
 	passed := true
 	for _, v := range results {
@@ -183,12 +194,12 @@ func testPostgres(ctx context.Context, env *framework.TestEnvironment) framework
 			break
 		}
 	}
-	
+
 	message := "PostgreSQL is fully operational"
 	if !passed {
 		message = "PostgreSQL has issues"
 	}
-	
+
 	return framework.TestResult{
 		Name:    "postgres-deployment",
 		Passed:  passed,
@@ -205,19 +216,19 @@ func testPostgres(ctx context.Context, env *framework.TestEnvironment) framework
 // testRedis tests Redis deployment
 func testRedis(ctx context.Context, env *framework.TestEnvironment) framework.TestResult {
 	results := make(map[string]bool)
-	
+
 	// Check deployment exists
 	results["deployment_exists"] = checkDeploymentExists(ctx, env, "infra", "redis")
-	
+
 	// Check pod is running
 	results["pod_running"] = checkPodRunning(ctx, env, "infra", "app=redis")
-	
+
 	// Check service exists
 	results["service_exists"] = checkServiceExists(ctx, env, "infra", "redis")
-	
+
 	// Check Redis connectivity
 	results["redis_ping"] = checkRedisPing(ctx, env)
-	
+
 	// Calculate overall result
 	passed := true
 	for _, v := range results {
@@ -226,12 +237,12 @@ func testRedis(ctx context.Context, env *framework.TestEnvironment) framework.Te
 			break
 		}
 	}
-	
+
 	message := "Redis is fully operational"
 	if !passed {
 		message = "Redis has issues"
 	}
-	
+
 	return framework.TestResult{
 		Name:    "redis-deployment",
 		Passed:  passed,
@@ -254,10 +265,10 @@ func testPersistentVolumes(ctx context.Context, env *framework.TestEnvironment) 
 		{"postgres-pvc", "infra"},
 		{"redis-pvc", "infra"},
 	}
-	
+
 	results := make(map[string]string)
 	allBound := true
-	
+
 	for _, pvc := range pvcs {
 		status := checkPVCStatus(ctx, env, pvc.namespace, pvc.name)
 		results[pvc.name] = status
@@ -265,12 +276,12 @@ func testPersistentVolumes(ctx context.Context, env *framework.TestEnvironment) 
 			allBound = false
 		}
 	}
-	
+
 	message := "All PVCs are bound"
 	if !allBound {
 		message = "Some PVCs are not bound"
 	}
-	
+
 	return framework.TestResult{
 		Name:    "persistent-volumes",
 		Passed:  allBound,
@@ -285,10 +296,10 @@ func testPersistentVolumes(ctx context.Context, env *framework.TestEnvironment) 
 func testNetworkPolicies(ctx context.Context, env *framework.TestEnvironment) framework.TestResult {
 	policies := []string{"default-deny-all", "allow-dns"}
 	namespaces := []string{"infra", "app"}
-	
+
 	missing := []string{}
 	found := []string{}
-	
+
 	for _, ns := range namespaces {
 		for _, policy := range policies {
 			exists := checkNetworkPolicyExists(ctx, env, ns, policy)
@@ -300,14 +311,14 @@ func testNetworkPolicies(ctx context.Context, env *framework.TestEnvironment) fr
 			}
 		}
 	}
-	
+
 	passed := len(missing) == 0
 	message := fmt.Sprintf("Found %d/%d network policies", len(found), len(found)+len(missing))
-	
+
 	if !passed {
 		message = fmt.Sprintf("Missing network policies: %s", strings.Join(missing, ", "))
 	}
-	
+
 	return framework.TestResult{
 		Name:    "network-policies",
 		Passed:  passed,
@@ -328,10 +339,10 @@ func testResourceQuotas(ctx context.Context, env *framework.TestEnvironment) fra
 		{"infra-quota", "infra"},
 		{"app-quota", "app"},
 	}
-	
+
 	missing := []string{}
 	found := []string{}
-	
+
 	for _, quota := range quotas {
 		exists := checkResourceQuotaExists(ctx, env, quota.namespace, quota.name)
 		key := fmt.Sprintf("%s/%s", quota.namespace, quota.name)
@@ -341,14 +352,14 @@ func testResourceQuotas(ctx context.Context, env *framework.TestEnvironment) fra
 			missing = append(missing, key)
 		}
 	}
-	
+
 	passed := len(missing) == 0
 	message := fmt.Sprintf("Found %d/%d resource quotas", len(found), len(found)+len(missing))
-	
+
 	if !passed {
 		message = fmt.Sprintf("Missing resource quotas: %s", strings.Join(missing, ", "))
 	}
-	
+
 	return framework.TestResult{
 		Name:    "resource-quotas",
 		Passed:  passed,
@@ -369,10 +380,10 @@ func testMetrics(ctx context.Context, env *framework.TestEnvironment) framework.
 		{"postgres-metrics", "infra"},
 		{"redis-metrics", "infra"},
 	}
-	
+
 	results := make(map[string]bool)
 	allExist := true
-	
+
 	for _, svc := range services {
 		exists := checkServiceExists(ctx, env, svc.namespace, svc.name)
 		results[svc.name] = exists
@@ -380,12 +391,12 @@ func testMetrics(ctx context.Context, env *framework.TestEnvironment) framework.
 			allExist = false
 		}
 	}
-	
+
 	message := "All metrics services exist"
 	if !allExist {
 		message = "Some metrics services are missing"
 	}
-	
+
 	return framework.TestResult{
 		Name:    "metrics-endpoints",
 		Passed:  allExist,
@@ -399,14 +410,14 @@ func testMetrics(ctx context.Context, env *framework.TestEnvironment) framework.
 // testDatabaseFunctionality tests database operations
 func testDatabaseFunctionality(ctx context.Context, env *framework.TestEnvironment) framework.TestResult {
 	results := make(map[string]bool)
-	
+
 	// Test PostgreSQL
 	results["postgres_query"] = testPostgresQuery(ctx, env)
 	results["postgres_vector"] = testPostgresVector(ctx, env)
-	
+
 	// Test Redis
 	results["redis_set_get"] = testRedisSetGet(ctx, env)
-	
+
 	// Calculate overall result
 	passed := true
 	for _, v := range results {
@@ -415,12 +426,12 @@ func testDatabaseFunctionality(ctx context.Context, env *framework.TestEnvironme
 			break
 		}
 	}
-	
+
 	message := "Database functionality tests passed"
 	if !passed {
 		message = "Some database functionality tests failed"
 	}
-	
+
 	return framework.TestResult{
 		Name:    "database-functionality",
 		Passed:  passed,

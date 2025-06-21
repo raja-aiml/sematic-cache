@@ -18,12 +18,12 @@ type TestFunc func(ctx context.Context, env *TestEnvironment) TestResult
 
 // TestResult represents the result of a test
 type TestResult struct {
-	Name      string
-	Passed    bool
-	Duration  time.Duration
-	Message   string
-	Error     error
-	Details   map[string]interface{}
+	Name     string
+	Passed   bool
+	Duration time.Duration
+	Message  string
+	Error    error
+	Details  map[string]interface{}
 }
 
 // TestSuite represents a collection of related tests
@@ -45,12 +45,12 @@ type TestEnvironment struct {
 
 // TestConfig holds test configuration
 type TestConfig struct {
-	Namespace       string
-	Scenario        string
-	Timeout         time.Duration
-	Parallel        bool
-	FailFast        bool
-	VerboseLogging  bool
+	Namespace      string
+	Scenario       string
+	Timeout        time.Duration
+	Parallel       bool
+	FailFast       bool
+	VerboseLogging bool
 }
 
 // Logger interface for test logging

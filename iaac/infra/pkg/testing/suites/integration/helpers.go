@@ -137,20 +137,20 @@ func cleanupTestApp(ctx context.Context, env *framework.TestEnvironment, appName
 func testNamespaceConnectivity(ctx context.Context, env *framework.TestEnvironment, fromNS, toNS string) bool {
 	// TODO: Test if pods in fromNS can connect to services in toNS
 	env.Logger.Debug("Testing namespace connectivity", "from", fromNS, "to", toNS)
-	
+
 	// This would:
 	// 1. Deploy a test pod in fromNS
 	// 2. Try to connect to a service in toNS
 	// 3. Return true if connection succeeds, false otherwise
-	
+
 	// For now, simulate based on expected network policies
 	allowed := map[string]bool{
-		"app->infra":       true,
-		"app->monitoring":  true,
-		"infra->app":       false,
-		"default->infra":   false,
+		"app->infra":      true,
+		"app->monitoring": true,
+		"infra->app":      false,
+		"default->infra":  false,
 	}
-	
+
 	key := fmt.Sprintf("%s->%s", fromNS, toNS)
 	return allowed[key]
 }
@@ -159,7 +159,7 @@ func testNamespaceConnectivity(ctx context.Context, env *framework.TestEnvironme
 func writeTestData(ctx context.Context, env *framework.TestEnvironment, database, value string) error {
 	// TODO: Write test data to database
 	env.Logger.Info("Writing test data", "database", database, "value", value)
-	
+
 	switch database {
 	case "postgres":
 		// Execute: INSERT INTO test_table (data) VALUES (value)
@@ -175,7 +175,7 @@ func writeTestData(ctx context.Context, env *framework.TestEnvironment, database
 func readTestData(ctx context.Context, env *framework.TestEnvironment, database string) (string, error) {
 	// TODO: Read test data from database
 	env.Logger.Info("Reading test data", "database", database)
-	
+
 	switch database {
 	case "postgres":
 		// Execute: SELECT data FROM test_table WHERE id = 1
@@ -191,35 +191,35 @@ func readTestData(ctx context.Context, env *framework.TestEnvironment, database 
 func restartDatabasePods(ctx context.Context, env *framework.TestEnvironment) error {
 	// TODO: Restart database pods
 	env.Logger.Info("Restarting database pods")
-	
+
 	// This would:
 	// 1. Delete postgres pod (deployment will recreate it)
 	// 2. Delete redis pod (deployment will recreate it)
 	// 3. Return any errors
-	
+
 	return nil
 }
 
 func waitForDatabasesReady(ctx context.Context, env *framework.TestEnvironment) error {
 	// TODO: Wait for databases to be ready after restart
 	env.Logger.Info("Waiting for databases to be ready")
-	
+
 	timeout := 2 * time.Minute
 	checkInterval := 5 * time.Second
 	deadline := time.Now().Add(timeout)
-	
+
 	for time.Now().Before(deadline) {
 		// Check if both postgres and redis are ready
 		postgresReady := checkPostgresReady(ctx, env)
 		redisReady := checkRedisReady(ctx, env)
-		
+
 		if postgresReady && redisReady {
 			return nil
 		}
-		
+
 		time.Sleep(checkInterval)
 	}
-	
+
 	return fmt.Errorf("databases not ready after %v", timeout)
 }
 

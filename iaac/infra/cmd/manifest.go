@@ -7,16 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
 	"github.com/spf13/cobra"
 )
 
 var (
-	manifestScenario  string
-	manifestOverlay   string
-	manifestPath      string
-	manifestOutput    string
-	manifestDryRun    bool
-	manifestValidate  bool
+	manifestScenario string
+	manifestOverlay  string
+	manifestPath     string
+	manifestOutput   string
+	manifestDryRun   bool
+	manifestValidate bool
 )
 
 // ManifestCmd returns the manifest command
@@ -230,23 +231,33 @@ func checkKustomize() error {
 }
 
 func buildKustomizationPath(scenario, overlay string) string {
-	// Find iaac path
-	iaacPath := findIaacPathForManifest(".")
-	if iaacPath == "" {
-		// Use relative path as fallback
-		iaacPath = "."
-	}
+	// Try to use blueprint configuration first
+	manager, err := blueprint.GetGlobalManager()
+	if err == nil {
+		// Validate scenario
+		if err := manager.GetConfig().ValidateScenario(scenario); err != nil {
+			// Invalid scenario, return empty
+			return ""
+		}
 
-	// Build scenario path
-	scenarioPath := filepath.Join(iaacPath, "blueprint", "scenarios", scenario)
+		scenarioPath, _ := manager.GetScenarioPath(scenario)
 
-	// If overlay is specified, create a temporary kustomization that combines both
-	if overlay != "" {
+		// If overlay is specified, we could merge them
 		// For now, just return the scenario path
-		// TODO: Implement overlay merging
+		if overlay != "" {
+			// TODO: Implement overlay merging
+		}
+
 		return scenarioPath
 	}
 
+	// Fallback to old method
+	iaacPath := findIaacPathForManifest(".")
+	if iaacPath == "" {
+		iaacPath = "."
+	}
+
+	scenarioPath := filepath.Join(iaacPath, "blueprint", "scenarios", scenario)
 	return scenarioPath
 }
 
@@ -341,36 +352,36 @@ func readManifestFiles(path string) (string, error) {
 func performEnvSubstitution(manifests string) string {
 	// Simple environment variable substitution
 	// Replace ${VAR_NAME} with environment variable values
-	
+
 	result := manifests
-	
+
 	// Find all ${...} patterns
 	for {
 		start := strings.Index(result, "${")
 		if start == -1 {
 			break
 		}
-		
+
 		end := strings.Index(result[start:], "}")
 		if end == -1 {
 			break
 		}
 		end += start
-		
+
 		// Extract variable name
 		varName := result[start+2 : end]
-		
+
 		// Get value from environment
 		value := os.Getenv(varName)
 		if value == "" {
 			// Optionally, you could leave it unchanged or use a default
 			value = fmt.Sprintf("${%s}", varName)
 		}
-		
+
 		// Replace
 		result = result[:start] + value + result[end+1:]
 	}
-	
+
 	return result
 }
 

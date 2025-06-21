@@ -32,7 +32,7 @@ func WorkflowCmd() *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&clusterName, "cluster", "c", constants.DefaultClusterName, "k3d cluster name")
 	cmd.PersistentFlags().StringVarP(&imageName, "image", "i", constants.DefaultImageName, "Docker image name")
-	cmd.PersistentFlags().StringVarP(&scenario, "scenario", "s", constants.ScenarioDevelopment, "Blueprint scenario to deploy")
+	cmd.PersistentFlags().StringVarP(&scenario, "scenario", "s", "development", "Blueprint scenario to deploy")
 	cmd.PersistentFlags().StringVarP(&overlay, "overlay", "o", "local", "Overlay to use (local, dev)")
 
 	wm := &WorkflowManager{
@@ -89,7 +89,7 @@ func workflowFullCmd(wm *WorkflowManager) *cobra.Command {
 			}
 
 			wm.logger.Info("Workflow completed successfully!")
-			if wm.scenario == constants.ScenarioMinimal {
+			if wm.scenario == "minimal" {
 				wm.logger.Info("Infrastructure components are ready!")
 			} else {
 				wm.logger.Info("Access the application at: http://localhost:8080")

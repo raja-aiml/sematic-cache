@@ -59,13 +59,13 @@ func NewIntegrationTestSuite() *framework.TestSuite {
 // setupIntegrationTests prepares the environment for integration tests
 func setupIntegrationTests(ctx context.Context, env *framework.TestEnvironment) error {
 	env.Logger.Info("Setting up integration test environment")
-	
+
 	// Create test namespace
 	testNamespace := "integration-test"
 	env.Context["test_namespace"] = testNamespace
-	
+
 	env.Logger.Info("Creating test namespace", "namespace", testNamespace)
-	
+
 	// TODO: Actually create namespace using kubernetes client
 	// client := env.KubeClient
 	// namespace := &v1.Namespace{
@@ -74,25 +74,25 @@ func setupIntegrationTests(ctx context.Context, env *framework.TestEnvironment) 
 	//     },
 	// }
 	// _, err := client.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{})
-	
+
 	return nil
 }
 
 // teardownIntegrationTests cleans up after integration tests
 func teardownIntegrationTests(ctx context.Context, env *framework.TestEnvironment) error {
 	env.Logger.Info("Cleaning up integration test environment")
-	
+
 	testNamespace, ok := env.Context["test_namespace"].(string)
 	if !ok {
 		return fmt.Errorf("test namespace not found in context")
 	}
-	
+
 	env.Logger.Info("Deleting test namespace", "namespace", testNamespace)
-	
+
 	// TODO: Delete test namespace
 	// client := env.KubeClient
 	// return client.CoreV1().Namespaces().Delete(ctx, testNamespace, metav1.DeleteOptions{})
-	
+
 	return nil
 }
 
@@ -110,10 +110,10 @@ func testPostgresIntegration(ctx context.Context, env *framework.TestEnvironment
 		{"vector-extension", testPostgresVectorExtension},
 		{"concurrent-connections", testPostgresConcurrentConnections},
 	}
-	
+
 	results := make(map[string]bool)
 	var failedTests []string
-	
+
 	for _, test := range tests {
 		err := test.fn()
 		results[test.name] = err == nil
@@ -122,13 +122,13 @@ func testPostgresIntegration(ctx context.Context, env *framework.TestEnvironment
 			env.Logger.Error("PostgreSQL test failed", "test", test.name, "error", err)
 		}
 	}
-	
+
 	passed := len(failedTests) == 0
 	message := "All PostgreSQL integration tests passed"
 	if !passed {
 		message = fmt.Sprintf("Failed tests: %v", failedTests)
 	}
-	
+
 	return framework.TestResult{
 		Name:    "postgres-integration",
 		Passed:  passed,
@@ -153,10 +153,10 @@ func testRedisIntegration(ctx context.Context, env *framework.TestEnvironment) f
 		{"expire-operations", testRedisExpire},
 		{"concurrent-operations", testRedisConcurrent},
 	}
-	
+
 	results := make(map[string]bool)
 	var failedTests []string
-	
+
 	for _, test := range tests {
 		err := test.fn()
 		results[test.name] = err == nil
@@ -165,13 +165,13 @@ func testRedisIntegration(ctx context.Context, env *framework.TestEnvironment) f
 			env.Logger.Error("Redis test failed", "test", test.name, "error", err)
 		}
 	}
-	
+
 	passed := len(failedTests) == 0
 	message := "All Redis integration tests passed"
 	if !passed {
 		message = fmt.Sprintf("Failed tests: %v", failedTests)
 	}
-	
+
 	return framework.TestResult{
 		Name:    "redis-integration",
 		Passed:  passed,
@@ -195,10 +195,10 @@ func testIngressIntegration(ctx context.Context, env *framework.TestEnvironment)
 		{"path-based-routing", testPathBasedRouting},
 		{"host-based-routing", testHostBasedRouting},
 	}
-	
+
 	results := make(map[string]bool)
 	var failedTests []string
-	
+
 	for _, test := range tests {
 		err := test.fn()
 		results[test.name] = err == nil
@@ -206,13 +206,13 @@ func testIngressIntegration(ctx context.Context, env *framework.TestEnvironment)
 			failedTests = append(failedTests, fmt.Sprintf("%s: %v", test.name, err))
 		}
 	}
-	
+
 	passed := len(failedTests) == 0
 	message := "All ingress integration tests passed"
 	if !passed {
 		message = fmt.Sprintf("Failed tests: %v", failedTests)
 	}
-	
+
 	return framework.TestResult{
 		Name:    "ingress-integration",
 		Passed:  passed,
@@ -228,7 +228,7 @@ func testIngressIntegration(ctx context.Context, env *framework.TestEnvironment)
 func testAppDatabaseConnectivity(ctx context.Context, env *framework.TestEnvironment) framework.TestResult {
 	// Deploy a test application that connects to databases
 	testApp := "connectivity-test-app"
-	
+
 	steps := []struct {
 		name string
 		fn   func() error
@@ -239,7 +239,7 @@ func testAppDatabaseConnectivity(ctx context.Context, env *framework.TestEnviron
 		{"test-redis-connection", func() error { return testAppRedisConnection(ctx, env, testApp) }},
 		{"cleanup-test-app", func() error { return cleanupTestApp(ctx, env, testApp) }},
 	}
-	
+
 	for _, step := range steps {
 		if err := step.fn(); err != nil {
 			return framework.TestResult{
@@ -250,7 +250,7 @@ func testAppDatabaseConnectivity(ctx context.Context, env *framework.TestEnviron
 			}
 		}
 	}
-	
+
 	return framework.TestResult{
 		Name:    "app-database-connectivity",
 		Passed:  true,
@@ -274,28 +274,28 @@ func testCrossNamespaceCommunication(ctx context.Context, env *framework.TestEnv
 		{"app-to-monitoring-allowed", "app", "monitoring", true},
 		{"default-to-infra-denied", "default", "infra", false},
 	}
-	
+
 	results := make(map[string]bool)
 	allPassed := true
-	
+
 	for _, test := range tests {
 		canConnect := testNamespaceConnectivity(ctx, env, test.from, test.to)
 		results[test.name] = canConnect == test.expected
-		
+
 		if canConnect != test.expected {
 			allPassed = false
-			env.Logger.Error("Network policy test failed", 
-				"test", test.name, 
-				"expected", test.expected, 
+			env.Logger.Error("Network policy test failed",
+				"test", test.name,
+				"expected", test.expected,
 				"actual", canConnect)
 		}
 	}
-	
+
 	message := "All network policy tests passed"
 	if !allPassed {
 		message = "Some network policy tests failed"
 	}
-	
+
 	return framework.TestResult{
 		Name:    "cross-namespace-communication",
 		Passed:  allPassed,
@@ -312,7 +312,7 @@ func testPersistentData(ctx context.Context, env *framework.TestEnvironment) fra
 		"postgres": "test-value-postgres",
 		"redis":    "test-value-redis",
 	}
-	
+
 	// Step 1: Write test data
 	for db, value := range testData {
 		if err := writeTestData(ctx, env, db, value); err != nil {
@@ -324,7 +324,7 @@ func testPersistentData(ctx context.Context, env *framework.TestEnvironment) fra
 			}
 		}
 	}
-	
+
 	// Step 2: Restart pods
 	if err := restartDatabasePods(ctx, env); err != nil {
 		return framework.TestResult{
@@ -334,7 +334,7 @@ func testPersistentData(ctx context.Context, env *framework.TestEnvironment) fra
 			Error:   err,
 		}
 	}
-	
+
 	// Step 3: Wait for pods to be ready
 	if err := waitForDatabasesReady(ctx, env); err != nil {
 		return framework.TestResult{
@@ -344,7 +344,7 @@ func testPersistentData(ctx context.Context, env *framework.TestEnvironment) fra
 			Error:   err,
 		}
 	}
-	
+
 	// Step 4: Verify data exists
 	for db, expectedValue := range testData {
 		actualValue, err := readTestData(ctx, env, db)
@@ -356,7 +356,7 @@ func testPersistentData(ctx context.Context, env *framework.TestEnvironment) fra
 				Error:   err,
 			}
 		}
-		
+
 		if actualValue != expectedValue {
 			return framework.TestResult{
 				Name:    "persistent-data",
@@ -365,7 +365,7 @@ func testPersistentData(ctx context.Context, env *framework.TestEnvironment) fra
 			}
 		}
 	}
-	
+
 	return framework.TestResult{
 		Name:    "persistent-data",
 		Passed:  true,

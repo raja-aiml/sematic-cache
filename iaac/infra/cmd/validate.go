@@ -99,7 +99,7 @@ health checks, resource quotas, and configuration.`,
 
 func runValidateBlueprint(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Validating blueprint at: %s\n", validatePath)
-	
+
 	// Check if path exists
 	if _, err := os.Stat(validatePath); os.IsNotExist(err) {
 		return fmt.Errorf("blueprint path does not exist: %s", validatePath)
@@ -146,7 +146,7 @@ func runValidateManifests(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to validate %s: %w", file, err)
 		}
-		
+
 		allResults[file] = result
 		if !result.IsValid() {
 			hasErrors = true
@@ -171,28 +171,28 @@ func runValidateManifests(cmd *cobra.Command, args []string) error {
 
 func runValidateDeployment(cmd *cobra.Command, args []string) error {
 	fmt.Println("Validating deployment...")
-	
+
 	// TODO: Initialize kubernetes client
 	// client := kubernetes.NewClient()
-	
+
 	validator := validation.NewDeploymentValidator(nil) // Pass actual client
-	
+
 	opts := validation.DeploymentValidationOptions{
 		Namespace: testNamespace,
 		Scenario:  testScenario,
 	}
-	
+
 	results, err := validator.Validate(opts)
 	if err != nil {
 		return fmt.Errorf("deployment validation failed: %w", err)
 	}
-	
+
 	printDeploymentValidationResults(results)
-	
+
 	if !results.IsValid() {
 		return fmt.Errorf("deployment validation failed with %d errors", len(results.Errors))
 	}
-	
+
 	fmt.Println("\n✅ Deployment validation passed!")
 	return nil
 }
@@ -201,12 +201,12 @@ func runValidateDeployment(cmd *cobra.Command, args []string) error {
 
 func getManifestFiles(path string, recursive bool) ([]string, error) {
 	var files []string
-	
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if info.IsDir() {
 		if recursive {
 			err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
@@ -235,7 +235,7 @@ func getManifestFiles(path string, recursive bool) ([]string, error) {
 			files = append(files, path)
 		}
 	}
-	
+
 	return files, err
 }
 
@@ -247,7 +247,7 @@ func printBlueprintValidationResults(results *validation.ValidationResult) {
 		}
 		fmt.Println()
 	}
-	
+
 	if len(results.Warnings) > 0 {
 		fmt.Println("⚠️  Warnings:")
 		for _, warn := range results.Warnings {
@@ -255,7 +255,7 @@ func printBlueprintValidationResults(results *validation.ValidationResult) {
 		}
 		fmt.Println()
 	}
-	
+
 	if len(results.Info) > 0 {
 		fmt.Println("ℹ️  Info:")
 		for _, info := range results.Info {
@@ -267,7 +267,7 @@ func printBlueprintValidationResults(results *validation.ValidationResult) {
 func printManifestResultsText(results map[string]*validation.ValidationResult) {
 	for file, result := range results {
 		relPath, _ := filepath.Rel(".", file)
-		
+
 		if result.IsValid() {
 			fmt.Printf("✅ %s\n", relPath)
 		} else {
@@ -276,7 +276,7 @@ func printManifestResultsText(results map[string]*validation.ValidationResult) {
 				fmt.Printf("   - %s\n", err)
 			}
 		}
-		
+
 		if len(result.Warnings) > 0 {
 			for _, warn := range result.Warnings {
 				fmt.Printf("   ⚠️  %s\n", warn)
@@ -293,7 +293,7 @@ func printManifestResultsJSON(results map[string]*validation.ValidationResult) {
 func printDeploymentValidationResults(results *validation.ValidationResult) {
 	fmt.Println("\nDeployment Validation Results:")
 	fmt.Println("=============================")
-	
+
 	// Print checks performed
 	if details, ok := results.Details["checks"].([]string); ok {
 		fmt.Println("\nChecks performed:")
@@ -301,6 +301,6 @@ func printDeploymentValidationResults(results *validation.ValidationResult) {
 			fmt.Printf("  ✓ %s\n", check)
 		}
 	}
-	
+
 	printBlueprintValidationResults(results)
 }

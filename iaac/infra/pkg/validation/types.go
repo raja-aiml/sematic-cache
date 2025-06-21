@@ -45,7 +45,7 @@ func (v *ValidationResult) Merge(other *ValidationResult) {
 	v.Errors = append(v.Errors, other.Errors...)
 	v.Warnings = append(v.Warnings, other.Warnings...)
 	v.Info = append(v.Info, other.Info...)
-	
+
 	for k, val := range other.Details {
 		v.Details[k] = val
 	}
@@ -57,4 +57,3 @@ type DeploymentValidationOptions struct {
 	Scenario  string
 	Timeout   int
 }
-

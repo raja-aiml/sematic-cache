@@ -4,44 +4,43 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestClusterCmd(t *testing.T) {
 	cmd := ClusterCmd()
-	
+
 	t.Run("command basic properties", func(t *testing.T) {
 		assert.Equal(t, "cluster", cmd.Use)
 		assert.Contains(t, cmd.Short, "blueprint scenarios")
 		// ClusterCmd returns a command with subcommands, not a RunE
 	})
-	
+
 	t.Run("has required subcommands", func(t *testing.T) {
 		subcommands := make(map[string]bool)
 		for _, subcmd := range cmd.Commands() {
 			subcommands[subcmd.Use] = true
 		}
-		
+
 		assert.True(t, subcommands["up"], "should have 'up' subcommand")
 		assert.True(t, subcommands["down"], "should have 'down' subcommand")
 		assert.True(t, subcommands["ps"], "should have 'ps' subcommand")
 		assert.True(t, subcommands["test"], "should have 'test' subcommand")
 		assert.True(t, subcommands["logs"], "should have 'logs' subcommand")
 	})
-	
+
 	t.Run("has blueprint flags", func(t *testing.T) {
 		// Check for scenario flag
 		scenarioFlag := cmd.PersistentFlags().Lookup("scenario")
 		require.NotNil(t, scenarioFlag, "should have --scenario flag")
-		assert.Equal(t, constants.ScenarioMinimal, scenarioFlag.DefValue)
-		
+		assert.Equal(t, "minimal", scenarioFlag.DefValue)
+
 		// Check for overlay flag
 		overlayFlag := cmd.PersistentFlags().Lookup("overlay")
 		require.NotNil(t, overlayFlag, "should have --overlay flag")
 		assert.Equal(t, "local", overlayFlag.DefValue)
-		
+
 		// Check for backward compatibility kustomize-path flag
 		kustomizeFlag := cmd.PersistentFlags().Lookup("kustomize-path")
 		require.NotNil(t, kustomizeFlag, "should have --kustomize-path flag")
@@ -50,18 +49,18 @@ func TestClusterCmd(t *testing.T) {
 
 func TestClusterUpCmd(t *testing.T) {
 	clusterName := "test-cluster"
-	scenario := constants.ScenarioMinimal
+	scenario := "minimal"
 	overlay := "local"
 	kustomizePath := ""
-	
+
 	cmd := clusterUpCmd(&clusterName, &scenario, &overlay, &kustomizePath)
-	
+
 	t.Run("command properties", func(t *testing.T) {
 		assert.Equal(t, "up", cmd.Use)
 		assert.Contains(t, cmd.Short, "deploy blueprint scenario")
 		assert.NotNil(t, cmd.RunE)
 	})
-	
+
 	t.Run("help text includes scenarios", func(t *testing.T) {
 		assert.Contains(t, cmd.Long, "minimal:")
 		assert.Contains(t, cmd.Long, "development:")
@@ -71,47 +70,7 @@ func TestClusterUpCmd(t *testing.T) {
 	})
 }
 
-func TestScenarioConstants(t *testing.T) {
-	// Verify all scenario constants are defined
-	scenarios := []string{
-		constants.ScenarioMinimal,
-		constants.ScenarioDevelopment,
-		constants.ScenarioServiceMesh,
-		constants.ScenarioMonitoring,
-		constants.ScenarioFullStack,
-	}
-	
-	for _, scenario := range scenarios {
-		assert.NotEmpty(t, scenario, "scenario constant should not be empty")
-	}
-	
-	// Verify scenario paths
-	for _, scenario := range scenarios {
-		path := constants.GetScenarioPath(scenario)
-		assert.Contains(t, path, "blueprint/scenarios/")
-		assert.Contains(t, path, scenario)
-	}
-}
 
-func TestBlueprintPaths(t *testing.T) {
-	t.Run("GetBlueprintPath", func(t *testing.T) {
-		path := constants.GetBlueprintPath("test-component")
-		assert.Contains(t, path, "blueprint")
-		assert.Contains(t, path, "test-component")
-	})
-	
-	t.Run("GetModulePath", func(t *testing.T) {
-		path := constants.GetModulePath("observability")
-		assert.Contains(t, path, "blueprint/infra/modules")
-		assert.Contains(t, path, "observability")
-	})
-	
-	t.Run("GetOverlayPath", func(t *testing.T) {
-		path := constants.GetOverlayPath("local")
-		assert.Contains(t, path, "blueprint/infra/overlays")
-		assert.Contains(t, path, "local")
-	})
-}
 
 func TestFindIaacPath(t *testing.T) {
 	// Test with various starting paths
@@ -131,7 +90,7 @@ func TestFindIaacPath(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := findIaacPath(tc.start)
@@ -145,16 +104,16 @@ func TestFindIaacPath(t *testing.T) {
 func TestWaitForScenarioComponents(t *testing.T) {
 	// This would require mocking the kubernetes client
 	// For now, just verify the function exists and handles scenarios
-	
+
 	scenarios := []string{
-		constants.ScenarioMinimal,
-		constants.ScenarioDevelopment,
-		constants.ScenarioServiceMesh,
-		constants.ScenarioMonitoring,
-		constants.ScenarioFullStack,
+		"minimal",
+		"development",
+		"service-mesh",
+		"monitoring-only",
+		"full-stack",
 		"unknown-scenario", // Should fall back to default
 	}
-	
+
 	for _, scenario := range scenarios {
 		t.Run("scenario_"+scenario, func(t *testing.T) {
 			// Just verify we can call the function without panic
@@ -170,13 +129,13 @@ func TestWaitForScenarioComponents(t *testing.T) {
 func TestPrintScenarioAccess(t *testing.T) {
 	// Test that printScenarioAccess doesn't panic for any scenario
 	scenarios := []string{
-		constants.ScenarioMinimal,
-		constants.ScenarioDevelopment,
-		constants.ScenarioServiceMesh,
-		constants.ScenarioMonitoring,
-		constants.ScenarioFullStack,
+		"minimal",
+		"development",
+		"service-mesh",
+		"monitoring-only",
+		"full-stack",
 	}
-	
+
 	for _, scenario := range scenarios {
 		t.Run("print_access_"+scenario, func(t *testing.T) {
 			assert.NotPanics(t, func() {
@@ -190,7 +149,7 @@ func TestPrintScenarioAccess(t *testing.T) {
 func TestClusterStatusCmd(t *testing.T) {
 	clusterName := "test-cluster"
 	cmd := clusterStatusCmd(&clusterName)
-	
+
 	t.Run("command properties", func(t *testing.T) {
 		assert.Equal(t, "ps", cmd.Use)
 		assert.Contains(t, cmd.Short, "blueprint component")
@@ -200,9 +159,9 @@ func TestClusterStatusCmd(t *testing.T) {
 
 func TestClusterTestCmd(t *testing.T) {
 	clusterName := "test-cluster"
-	scenario := constants.ScenarioMinimal
+	scenario := "minimal"
 	cmd := clusterTestCmd(&clusterName, &scenario)
-	
+
 	t.Run("command properties", func(t *testing.T) {
 		assert.Equal(t, "test", cmd.Use)
 		assert.Contains(t, cmd.Short, "blueprint scenario")
@@ -213,17 +172,17 @@ func TestClusterTestCmd(t *testing.T) {
 // Integration test for command help output
 func TestCommandHelpOutput(t *testing.T) {
 	cmd := ClusterCmd()
-	
+
 	// Capture help output
 	var helpOutput strings.Builder
 	cmd.SetOut(&helpOutput)
 	cmd.SetArgs([]string{"--help"})
-	
+
 	err := cmd.Execute()
 	require.NoError(t, err)
-	
+
 	help := helpOutput.String()
-	
+
 	// Verify help contains expected content
 	assert.Contains(t, help, "blueprint scenarios")
 	assert.Contains(t, help, "--scenario")

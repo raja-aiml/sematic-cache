@@ -30,7 +30,7 @@ func NewConsoleReporter(verbose, showDetails bool) *ConsoleReporter {
 func (r *ConsoleReporter) StartSuite(suite *framework.TestSuite) {
 	r.currentSuite = suite
 	r.suiteStart = time.Now()
-	
+
 	header := fmt.Sprintf("\n=== Test Suite: %s ===", suite.Name)
 	fmt.Println(header)
 	if suite.Description != "" {
@@ -42,7 +42,7 @@ func (r *ConsoleReporter) StartSuite(suite *framework.TestSuite) {
 // EndSuite marks the end of a test suite
 func (r *ConsoleReporter) EndSuite(suite *framework.TestSuite, results []framework.TestResult) {
 	duration := time.Since(r.suiteStart)
-	
+
 	var passed, failed int
 	for _, result := range results {
 		if result.Passed {
@@ -51,13 +51,13 @@ func (r *ConsoleReporter) EndSuite(suite *framework.TestSuite, results []framewo
 			failed++
 		}
 	}
-	
+
 	fmt.Printf("\n=== Suite Summary: %s ===\n", suite.Name)
 	fmt.Printf("Total tests: %d\n", len(results))
 	fmt.Printf("Passed: %d\n", passed)
 	fmt.Printf("Failed: %d\n", failed)
 	fmt.Printf("Duration: %s\n", duration.Round(time.Millisecond))
-	
+
 	if failed > 0 {
 		fmt.Println("\nFailed tests:")
 		for _, result := range results {
@@ -94,7 +94,7 @@ func (r *ConsoleReporter) EndTest(result framework.TestResult) {
 				fmt.Printf("    Error: %v\n", result.Error)
 			}
 		}
-		
+
 		if r.showDetails && len(result.Details) > 0 {
 			fmt.Println("    Details:")
 			for k, v := range result.Details {

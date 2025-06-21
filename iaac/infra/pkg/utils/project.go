@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
 )
 
 const maxDepth = 10 // Maximum depth to search for go.mod
@@ -60,7 +62,32 @@ func GetKustomizePath(overlay string, overridePath ...string) (string, error) {
 		return "", fmt.Errorf("kustomize path %s does not exist", overridePath[0])
 	}
 
-	// Get blueprint path from environment or use default
+	// Try to use blueprint adapter first
+	adapter := blueprint.GetAdapter()
+	if adapter != nil {
+		// Check if this is an app overlay
+		if filepath.Base(overlay) == "app" || (filepath.Dir(overlay) == "local" && filepath.Base(overlay) == "app") {
+			appPath := adapter.GetAppPath()
+			overlayDir := filepath.Dir(overlay)
+			if overlayDir == "." {
+				overlayDir = "local"
+			}
+			kustomizePath := filepath.Join(appPath, "overlays", overlayDir)
+			if _, err := os.Stat(kustomizePath); err == nil {
+				return kustomizePath, nil
+			}
+			// Fall back to app base
+			return filepath.Join(appPath, "base"), nil
+		}
+
+		// For infra overlays, use the overlay path directly
+		overlayPath := adapter.GetOverlayPath(overlay)
+		if _, err := os.Stat(overlayPath); err == nil {
+			return overlayPath, nil
+		}
+	}
+
+	// Fall back to legacy path resolution for backward compatibility
 	blueprintPath := os.Getenv("IAAC_BLUEPRINT_PATH")
 	if blueprintPath == "" {
 		blueprintPath = "iaac/blueprint"
@@ -82,6 +109,30 @@ func GetKustomizePath(overlay string, overridePath ...string) (string, error) {
 
 // findMainProjectRoot finds the main project root by looking for the blueprint directory
 func findMainProjectRoot() (string, error) {
+	// Try to find blueprint config using the manager's method
+	configPath, err := blueprint.FindBlueprintConfig(".")
+	if err == nil {
+		// Extract the project root from the config path
+		// The config is typically at iaac/blueprint/.blueprint.yaml
+		dir := filepath.Dir(configPath)
+		for i := 0; i < maxDepth; i++ {
+			// Check if we've found the project root (contains iaac directory)
+			if filepath.Base(dir) == "blueprint" && filepath.Base(filepath.Dir(dir)) == "iaac" {
+				return filepath.Dir(filepath.Dir(dir)), nil
+			}
+			// Check if config is at project root
+			if _, err := os.Stat(filepath.Join(dir, "iaac", "blueprint")); err == nil {
+				return dir, nil
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+
+	// Fall back to legacy directory search
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get working directory: %w", err)
@@ -125,6 +176,7 @@ func findMainProjectRoot() (string, error) {
 }
 
 // getKustomizePathFromBase constructs the kustomize path from a base blueprint path
+// This is kept for backward compatibility when blueprint configuration is not available
 func getKustomizePathFromBase(blueprintBase string, overlay string) (string, error) {
 	// Determine if this is for app or infra based on the overlay path
 	var basePath string
@@ -150,4 +202,96 @@ func getKustomizePathFromBase(blueprintBase string, overlay string) (string, err
 	}
 
 	return basePath, nil
+}
+
+// GetScenarioPath returns the path to a scenario using the blueprint configuration
+func GetScenarioPath(scenario string) (string, error) {
+	adapter := blueprint.GetAdapter()
+	if adapter != nil {
+		path := adapter.GetScenarioPath(scenario)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+		return "", fmt.Errorf("scenario path %s does not exist", path)
+	}
+
+	// Fall back to legacy path
+	root, err := findMainProjectRoot()
+	if err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(root, "iaac", "blueprint", "scenarios", scenario)
+	if _, err := os.Stat(path); err != nil {
+		return "", fmt.Errorf("scenario %s not found at %s", scenario, path)
+	}
+
+	return path, nil
+}
+
+// GetModulePath returns the path to a module using the blueprint configuration
+func GetModulePath(module string) (string, error) {
+	adapter := blueprint.GetAdapter()
+	if adapter != nil {
+		path := adapter.GetModulePath(module)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+		return "", fmt.Errorf("module path %s does not exist", path)
+	}
+
+	// Fall back to legacy path
+	root, err := findMainProjectRoot()
+	if err != nil {
+		return "", err
+	}
+
+	path := filepath.Join(root, "iaac", "blueprint", "infra", "modules", module)
+	if _, err := os.Stat(path); err != nil {
+		return "", fmt.Errorf("module %s not found at %s", module, path)
+	}
+
+	return path, nil
+}
+
+// GetBlueprintPath returns the path to a blueprint component
+func GetBlueprintPath(component string) (string, error) {
+	adapter := blueprint.GetAdapter()
+	if adapter != nil {
+		path := adapter.GetBlueprintPath(component)
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	// Fall back to legacy path resolution
+	root, err := findMainProjectRoot()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(root, "iaac", "blueprint", component), nil
+}
+
+// ListAvailableScenarios returns a list of available scenarios
+func ListAvailableScenarios() []string {
+	adapter := blueprint.GetAdapter()
+	if adapter != nil {
+		return adapter.ListScenarios()
+	}
+
+	// Fall back to empty list
+	return []string{}
+}
+
+// ValidateScenario checks if a scenario is valid
+func ValidateScenario(scenario string) error {
+	adapter := blueprint.GetAdapter()
+	if adapter != nil {
+		return adapter.ValidateScenario(scenario)
+	}
+
+	// Fall back to checking if the scenario directory exists
+	_, err := GetScenarioPath(scenario)
+	return err
 }

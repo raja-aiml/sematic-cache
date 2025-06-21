@@ -50,15 +50,15 @@ func (l *SimpleLogger) log(level, msg string, fields ...interface{}) {
 			fieldStrs = append(fieldStrs, fmt.Sprintf("%v=%v", fields[i], fields[i+1]))
 		}
 	}
-	
+
 	logMsg := fmt.Sprintf("[%s] %s", level, msg)
 	if l.prefix != "" {
 		logMsg = fmt.Sprintf("[%s] %s", l.prefix, logMsg)
 	}
-	
+
 	if len(fieldStrs) > 0 {
 		logMsg = fmt.Sprintf("%s %s", logMsg, strings.Join(fieldStrs, " "))
 	}
-	
+
 	log.Println(logMsg)
 }

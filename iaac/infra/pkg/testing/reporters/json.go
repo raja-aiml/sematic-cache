@@ -14,23 +14,23 @@ type JSONReporter struct {
 
 // SuiteReport represents a test suite report
 type SuiteReport struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	StartTime   time.Time      `json:"start_time"`
-	EndTime     time.Time      `json:"end_time"`
-	Duration    time.Duration  `json:"duration"`
-	Tests       []TestReport   `json:"tests"`
-	Summary     SuiteSummary   `json:"summary"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	StartTime   time.Time     `json:"start_time"`
+	EndTime     time.Time     `json:"end_time"`
+	Duration    time.Duration `json:"duration"`
+	Tests       []TestReport  `json:"tests"`
+	Summary     SuiteSummary  `json:"summary"`
 }
 
 // TestReport represents a single test report
 type TestReport struct {
-	Name        string                 `json:"name"`
-	Passed      bool                   `json:"passed"`
-	Duration    time.Duration          `json:"duration"`
-	Message     string                 `json:"message,omitempty"`
-	Error       string                 `json:"error,omitempty"`
-	Details     map[string]interface{} `json:"details,omitempty"`
+	Name     string                 `json:"name"`
+	Passed   bool                   `json:"passed"`
+	Duration time.Duration          `json:"duration"`
+	Message  string                 `json:"message,omitempty"`
+	Error    string                 `json:"error,omitempty"`
+	Details  map[string]interface{} `json:"details,omitempty"`
 }
 
 // SuiteSummary provides test statistics
@@ -63,14 +63,14 @@ func (r *JSONReporter) EndSuite(suite *framework.TestSuite, results []framework.
 	if len(r.suites) == 0 {
 		return
 	}
-	
+
 	// Get the last suite (current one)
 	currentIdx := len(r.suites) - 1
 	currentSuite := &r.suites[currentIdx]
-	
+
 	currentSuite.EndTime = time.Now()
 	currentSuite.Duration = currentSuite.EndTime.Sub(currentSuite.StartTime)
-	
+
 	// Process results
 	var passed, failed int
 	for _, result := range results {
@@ -81,20 +81,20 @@ func (r *JSONReporter) EndSuite(suite *framework.TestSuite, results []framework.
 			Message:  result.Message,
 			Details:  result.Details,
 		}
-		
+
 		if result.Error != nil {
 			testReport.Error = result.Error.Error()
 		}
-		
+
 		currentSuite.Tests = append(currentSuite.Tests, testReport)
-		
+
 		if result.Passed {
 			passed++
 		} else {
 			failed++
 		}
 	}
-	
+
 	currentSuite.Summary = SuiteSummary{
 		Total:  len(results),
 		Passed: passed,
@@ -123,7 +123,7 @@ func (r *JSONReporter) GenerateReport() ([]byte, error) {
 		Suites:    r.suites,
 		Summary:   r.calculateOverallSummary(),
 	}
-	
+
 	return json.MarshalIndent(report, "", "  ")
 }
 
@@ -140,13 +140,13 @@ func (r *JSONReporter) calculateOverallSummary() OverallSummary {
 	summary := OverallSummary{
 		TotalSuites: len(r.suites),
 	}
-	
+
 	var minStart, maxEnd time.Time
 	for i, suite := range r.suites {
 		summary.TotalTests += suite.Summary.Total
 		summary.Passed += suite.Summary.Passed
 		summary.Failed += suite.Summary.Failed
-		
+
 		if i == 0 || suite.StartTime.Before(minStart) {
 			minStart = suite.StartTime
 		}
@@ -154,10 +154,10 @@ func (r *JSONReporter) calculateOverallSummary() OverallSummary {
 			maxEnd = suite.EndTime
 		}
 	}
-	
+
 	if !minStart.IsZero() && !maxEnd.IsZero() {
 		summary.Duration = maxEnd.Sub(minStart)
 	}
-	
+
 	return summary
 }

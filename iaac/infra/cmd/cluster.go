@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/k3d"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/kubernetes"
@@ -28,7 +29,7 @@ func ClusterCmd() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVarP(&clusterName, "name", "n", constants.DefaultClusterName, "Cluster name")
-	cmd.PersistentFlags().StringVarP(&scenario, "scenario", "s", constants.ScenarioMinimal, "Blueprint scenario to deploy")
+	cmd.PersistentFlags().StringVarP(&scenario, "scenario", "s", "minimal", "Blueprint scenario to deploy")
 	cmd.PersistentFlags().StringVarP(&overlay, "overlay", "o", "local", "Overlay to use (local, dev)")
 	cmd.PersistentFlags().StringVarP(&kustomizePath, "kustomize-path", "k", "", "Path to kustomize overlay (overrides scenario)")
 
@@ -94,18 +95,18 @@ Available scenarios:
 				// Build path based on scenario and overlay
 				if *overlay != "" && *overlay != "base" {
 					// Use overlay-specific path if provided
-					overlayPath := filepath.Join(iaacPath, constants.GetOverlayPath(*overlay))
+					overlayPath := filepath.Join(iaacPath, blueprint.GetOverlayPath(*overlay))
 					if _, err := os.Stat(overlayPath); err == nil {
 						deployPath = overlayPath
 						logger.Info("Deploying with overlay: %s", *overlay)
 					} else {
 						// Fall back to scenario if overlay doesn't exist
 						logger.Warn("Overlay '%s' not found, using scenario '%s' instead", *overlay, *scenario)
-						deployPath = filepath.Join(iaacPath, constants.GetScenarioPath(*scenario))
+						deployPath = filepath.Join(iaacPath, blueprint.GetScenarioPath(*scenario))
 					}
 				} else {
 					// Use scenario path
-					deployPath = filepath.Join(iaacPath, constants.GetScenarioPath(*scenario))
+					deployPath = filepath.Join(iaacPath, blueprint.GetScenarioPath(*scenario))
 					logger.Info("Deploying blueprint scenario: %s", *scenario)
 				}
 			}
@@ -192,30 +193,30 @@ func clusterStatusCmd(clusterName *string) *cobra.Command {
 				exists, _ := k8sClient.NamespaceExists(ctx, ns)
 				if exists {
 					logger.Info("✓ %s", ns)
-					
+
 					// Check deployments in namespace
 					deployments, err := k8sClient.GetDeployments(ctx, ns)
 					if err == nil && len(deployments) > 0 {
 						for _, dep := range deployments {
 							if dep.Status.ReadyReplicas > 0 {
-								logger.Info("  ✓ %s (%d/%d replicas ready)", 
+								logger.Info("  ✓ %s (%d/%d replicas ready)",
 									dep.Name, dep.Status.ReadyReplicas, dep.Status.Replicas)
 							} else {
-								logger.Warn("  ✗ %s (0/%d replicas ready)", 
+								logger.Warn("  ✗ %s (0/%d replicas ready)",
 									dep.Name, dep.Status.Replicas)
 							}
 						}
 					}
-					
+
 					// Check statefulsets
 					statefulsets, err := k8sClient.GetStatefulSets(ctx, ns)
 					if err == nil && len(statefulsets) > 0 {
 						for _, sts := range statefulsets {
 							if sts.Status.ReadyReplicas > 0 {
-								logger.Info("  ✓ %s (%d/%d replicas ready) [StatefulSet]", 
+								logger.Info("  ✓ %s (%d/%d replicas ready) [StatefulSet]",
 									sts.Name, sts.Status.ReadyReplicas, sts.Status.Replicas)
 							} else {
-								logger.Warn("  ✗ %s (0/%d replicas ready) [StatefulSet]", 
+								logger.Warn("  ✗ %s (0/%d replicas ready) [StatefulSet]",
 									sts.Name, sts.Status.Replicas)
 							}
 						}
@@ -299,16 +300,16 @@ func clusterTestCmd(clusterName *string, scenario *string) *cobra.Command {
 
 			// Run scenario-specific tests
 			logger.Info("Running tests for scenario: %s", *scenario)
-			
+
 			switch *scenario {
-			case constants.ScenarioMinimal:
+			case "minimal":
 				// Test basic infrastructure
 				logger.Info("Testing minimal infrastructure components...")
 				if err := runConnectivityTests(ctx, k8sClient); err != nil {
 					logger.Error("Basic connectivity tests failed: %v", err)
 				}
-				
-			case constants.ScenarioDevelopment:
+
+			case "development":
 				// Test development stack
 				logger.Info("Testing development stack...")
 				if err := runConnectivityTests(ctx, k8sClient); err != nil {
@@ -317,22 +318,22 @@ func clusterTestCmd(clusterName *string, scenario *string) *cobra.Command {
 				if err := runMonitoringTests(ctx, k8sClient); err != nil {
 					logger.Error("Monitoring tests failed: %v", err)
 				}
-				
-			case constants.ScenarioServiceMesh:
+
+			case "service-mesh":
 				// Test service mesh
 				logger.Info("Testing service mesh components...")
 				if err := runServiceMeshTests(ctx, k8sClient); err != nil {
 					logger.Error("Service mesh tests failed: %v", err)
 				}
-				
-			case constants.ScenarioMonitoring:
+
+			case "monitoring-only":
 				// Test monitoring stack
 				logger.Info("Testing monitoring stack...")
 				if err := runMonitoringTests(ctx, k8sClient); err != nil {
 					logger.Error("Monitoring tests failed: %v", err)
 				}
-				
-			case constants.ScenarioFullStack:
+
+			case "full-stack":
 				// Test everything
 				logger.Info("Testing full stack...")
 				if err := runConnectivityTests(ctx, k8sClient); err != nil {
@@ -344,7 +345,7 @@ func clusterTestCmd(clusterName *string, scenario *string) *cobra.Command {
 				if err := runMonitoringTests(ctx, k8sClient); err != nil {
 					logger.Error("Monitoring tests failed: %v", err)
 				}
-				
+
 			default:
 				// Run basic tests for unknown scenarios
 				logger.Info("Running basic tests...")
@@ -401,7 +402,7 @@ func findIaacPath(startPath string) string {
 		if _, err := os.Stat(iaacPath); err == nil {
 			return iaacPath
 		}
-		
+
 		parent := filepath.Dir(current)
 		if parent == current {
 			break
@@ -415,19 +416,19 @@ func waitForScenarioComponents(ctx context.Context, client *kubernetes.Client, s
 	if ctx == nil || client == nil {
 		return fmt.Errorf("invalid parameters: context and client must not be nil")
 	}
-	
+
 	timeout := time.Duration(constants.DeploymentReadyTimeout) * time.Second
-	
+
 	switch scenario {
-	case constants.ScenarioMinimal:
+	case "minimal":
 		return waitForMinimalComponents(ctx, client, timeout)
-	case constants.ScenarioDevelopment:
+	case "development":
 		return waitForDevelopmentComponents(ctx, client, timeout)
-	case constants.ScenarioServiceMesh:
+	case "service-mesh":
 		return waitForServiceMeshComponents(ctx, client, timeout)
-	case constants.ScenarioMonitoring:
+	case "monitoring-only":
 		return waitForMonitoringComponents(ctx, client, timeout)
-	case constants.ScenarioFullStack:
+	case "full-stack":
 		return waitForFullStackComponents(ctx, client, timeout)
 	default:
 		// For unknown scenarios or custom paths, wait for basic infrastructure
@@ -506,7 +507,7 @@ func waitForFullStackComponents(ctx context.Context, client *kubernetes.Client, 
 
 func waitForDeployments(ctx context.Context, client *kubernetes.Client, components []struct{ namespace, name string }, timeout time.Duration) error {
 	logger := utils.NewLogger("wait")
-	
+
 	for _, comp := range components {
 		logger.Info("Waiting for %s/%s...", comp.namespace, comp.name)
 		if err := client.WaitForDeployment(ctx, comp.namespace, comp.name, timeout); err != nil {
@@ -519,21 +520,21 @@ func waitForDeployments(ctx context.Context, client *kubernetes.Client, componen
 
 func printScenarioAccess(scenario string) {
 	logger := utils.NewLogger("access")
-	
+
 	logger.Info("Access services:")
-	
+
 	// Always available
 	logger.Info("  PostgreSQL: kubectl port-forward -n %s svc/postgres 5432:5432", constants.InfraNamespace)
 	logger.Info("  Redis: kubectl port-forward -n %s svc/redis 6379:6379", constants.InfraNamespace)
 
 	switch scenario {
-	case constants.ScenarioDevelopment, constants.ScenarioMonitoring, constants.ScenarioFullStack:
+	case "development", "monitoring-only", "full-stack":
 		logger.Info("  Grafana: kubectl port-forward -n %s svc/grafana 3000:3000 (admin/admin)", constants.MonitoringNamespace)
 		logger.Info("  Prometheus: kubectl port-forward -n %s svc/prometheus 9090:9090", constants.MonitoringNamespace)
 	}
 
 	switch scenario {
-	case constants.ScenarioServiceMesh, constants.ScenarioFullStack:
+	case "service-mesh", "full-stack":
 		logger.Info("  Kiali: istioctl dashboard kiali")
 		logger.Info("  Jaeger: kubectl port-forward -n %s svc/otel-visualizer 16686:16686", constants.TracingNamespace)
 	}
@@ -543,9 +544,9 @@ func runConnectivityTests(ctx context.Context, client *kubernetes.Client) error 
 	if client == nil {
 		return fmt.Errorf("kubernetes client is nil")
 	}
-	
+
 	logger := utils.NewLogger("test")
-	
+
 	// Check infrastructure components
 	checks := []struct {
 		name      string
@@ -584,9 +585,9 @@ func runMonitoringTests(ctx context.Context, client *kubernetes.Client) error {
 	if client == nil {
 		return fmt.Errorf("kubernetes client is nil")
 	}
-	
+
 	logger := utils.NewLogger("test")
-	
+
 	// Check monitoring components
 	checks := []struct {
 		name      string
@@ -646,9 +647,9 @@ func runServiceMeshTests(ctx context.Context, client *kubernetes.Client) error {
 	if client == nil {
 		return fmt.Errorf("kubernetes client is nil")
 	}
-	
+
 	logger := utils.NewLogger("test")
-	
+
 	// Check Istio components
 	checks := []struct {
 		name      string

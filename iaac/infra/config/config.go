@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 	"gopkg.in/yaml.v3"
@@ -18,6 +19,17 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getBlueprintPath returns the blueprint path using the blueprint manager if available
+func getBlueprintPath() string {
+	// Try to use blueprint manager if available
+	manager, err := blueprint.GetGlobalManager()
+	if err == nil && manager != nil {
+		return manager.GetBasePath()
+	}
+	// Fallback to default
+	return "iaac/blueprint"
 }
 
 // Config represents the application configuration
@@ -47,10 +59,12 @@ type Config struct {
 
 // AppConfig contains application-specific settings
 type AppConfig struct {
-	Name          string `yaml:"name" validate:"required,min=1,max=63"`
-	SecretName    string `yaml:"secret_name" validate:"required,min=1,max=63"`
-	BlueprintPath string `yaml:"blueprint_path" validate:"omitempty"`
-	DatabaseName  string `yaml:"database_name" validate:"omitempty"`
+	Name              string `yaml:"name" validate:"required,min=1,max=63"`
+	SecretName        string `yaml:"secret_name" validate:"required,min=1,max=63"`
+	BlueprintPath     string `yaml:"blueprint_path" validate:"omitempty"`
+	BlueprintConfig   string `yaml:"blueprint_config" validate:"omitempty"`
+	DatabaseName      string `yaml:"database_name" validate:"omitempty"`
+	PreferredScenario string `yaml:"preferred_scenario" validate:"omitempty"`
 }
 
 // ClusterConfig contains k3d cluster settings
@@ -130,10 +144,12 @@ func DefaultConfig() *Config {
 		Debug:   false,
 		LogFile: "",
 		App: AppConfig{
-			Name:          getEnvOrDefault("IAAC_APP_NAME", "myapp"),
-			SecretName:    getEnvOrDefault("IAAC_SECRET_NAME", constants.AppSecretName),
-			BlueprintPath: getEnvOrDefault("IAAC_BLUEPRINT_PATH", constants.DefaultBlueprintPath),
-			DatabaseName:  getEnvOrDefault("IAAC_DATABASE_NAME", "semantic_cache"),
+			Name:              getEnvOrDefault("IAAC_APP_NAME", "myapp"),
+			SecretName:        getEnvOrDefault("IAAC_SECRET_NAME", constants.AppSecretName),
+			BlueprintPath:     getEnvOrDefault("IAAC_BLUEPRINT_PATH", getBlueprintPath()),
+			BlueprintConfig:   getEnvOrDefault("IAAC_BLUEPRINT_CONFIG", ""),
+			DatabaseName:      getEnvOrDefault("IAAC_DATABASE_NAME", "semantic_cache"),
+			PreferredScenario: getEnvOrDefault("IAAC_PREFERRED_SCENARIO", ""),
 		},
 		Cluster: ClusterConfig{
 			Name:        getEnvOrDefault("IAAC_CLUSTER_NAME", constants.DefaultClusterName),
@@ -329,4 +345,89 @@ func PrintConfig(config *Config) error {
 	logger.Info("Current configuration:")
 	fmt.Println(string(data))
 	return nil
+}
+
+// GetBlueprintManager returns a blueprint manager configured based on this config
+func (c *Config) GetBlueprintManager() (*blueprint.Manager, error) {
+	// If blueprint config is specified, use it
+	if c.App.BlueprintConfig != "" {
+		return blueprint.NewManager(c.App.BlueprintConfig)
+	}
+
+	// Otherwise, try to find one based on the blueprint path
+	if c.App.BlueprintPath != "" {
+		configPath, err := blueprint.FindBlueprintConfig(c.App.BlueprintPath)
+		if err == nil {
+			return blueprint.NewManager(configPath)
+		}
+	}
+
+	// Fall back to global manager
+	return blueprint.GetGlobalManager()
+}
+
+// GetScenarioPath returns the path to a scenario using the blueprint system
+func (c *Config) GetScenarioPath(scenario string) (string, error) {
+	manager, err := c.GetBlueprintManager()
+	if err != nil {
+		// Fallback to using blueprint package directly
+		return blueprint.GetScenarioPath(scenario), nil
+	}
+
+	return manager.GetScenarioPath(scenario)
+}
+
+// GetModulePath returns the path to a module using the blueprint system
+func (c *Config) GetModulePath(module string) (string, error) {
+	manager, err := c.GetBlueprintManager()
+	if err != nil {
+		// Fallback to using blueprint package directly
+		return blueprint.GetModulePath(module), nil
+	}
+
+	return manager.GetModulePath(module)
+}
+
+// GetOverlayPath returns the path to an overlay using the blueprint system
+func (c *Config) GetOverlayPath(overlay string) (string, error) {
+	manager, err := c.GetBlueprintManager()
+	if err != nil {
+		// Fallback to using blueprint package directly
+		return blueprint.GetOverlayPath(overlay), nil
+	}
+
+	return manager.GetOverlayPath(overlay)
+}
+
+// ValidateScenario validates a scenario name using the blueprint system
+func (c *Config) ValidateScenario(scenario string) error {
+	manager, err := c.GetBlueprintManager()
+	if err != nil {
+		// Fallback to using blueprint package directly
+		return blueprint.ValidateScenario(scenario)
+	}
+
+	return manager.GetConfig().ValidateScenario(scenario)
+}
+
+// GetScenarioNamespaces returns expected namespaces for a scenario
+func (c *Config) GetScenarioNamespaces(scenario string) ([]string, error) {
+	manager, err := c.GetBlueprintManager()
+	if err != nil {
+		// Fallback to using blueprint package directly
+		return blueprint.GetScenarioNamespaces(scenario), nil
+	}
+
+	return manager.GetScenarioNamespaces(scenario)
+}
+
+// ListAvailableScenarios returns all available scenarios
+func (c *Config) ListAvailableScenarios() ([]string, error) {
+	manager, err := c.GetBlueprintManager()
+	if err != nil {
+		// Fallback to using blueprint package directly
+		return blueprint.ListScenarios(), nil
+	}
+
+	return manager.GetConfig().ListScenarios(), nil
 }

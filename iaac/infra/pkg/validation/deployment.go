@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
 )
 
 // DeploymentValidator validates deployed resources in the cluster
@@ -21,56 +23,56 @@ func NewDeploymentValidator(client interface{}) *DeploymentValidator {
 // Validate validates deployed resources based on options
 func (v *DeploymentValidator) Validate(opts DeploymentValidationOptions) (*ValidationResult, error) {
 	result := NewValidationResult()
-	
+
 	if v.client == nil {
 		result.AddError("Kubernetes client not initialized")
 		return result, nil
 	}
-	
+
 	ctx := context.Background()
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(opts.Timeout)*time.Second)
 		defer cancel()
 	}
-	
+
 	// Track checks performed
 	checks := []string{}
-	
+
 	// Validate cluster connectivity
 	if err := v.validateClusterConnectivity(ctx, result); err != nil {
 		return result, err
 	}
 	checks = append(checks, "cluster-connectivity")
-	
+
 	// Validate namespaces
 	v.validateNamespaces(ctx, opts, result)
 	checks = append(checks, "namespaces")
-	
+
 	// Validate core infrastructure
 	v.validateInfrastructure(ctx, opts, result)
 	checks = append(checks, "infrastructure")
-	
+
 	// Validate applications
 	v.validateApplications(ctx, opts, result)
 	checks = append(checks, "applications")
-	
+
 	// Validate network policies
 	v.validateNetworkPolicies(ctx, opts, result)
 	checks = append(checks, "network-policies")
-	
+
 	// Validate resource quotas
 	v.validateResourceQuotas(ctx, opts, result)
 	checks = append(checks, "resource-quotas")
-	
+
 	// Validate persistent volumes
 	v.validatePersistentVolumes(ctx, opts, result)
 	checks = append(checks, "persistent-volumes")
-	
+
 	// Scenario-specific validation
 	v.validateScenarioSpecific(ctx, opts, result)
 	checks = append(checks, fmt.Sprintf("scenario-%s", opts.Scenario))
-	
+
 	result.Details["checks"] = checks
 	return result, nil
 }
@@ -84,15 +86,16 @@ func (v *DeploymentValidator) validateClusterConnectivity(ctx context.Context, r
 	//     result.AddError("Cannot connect to cluster: %v", err)
 	//     return err
 	// }
-	
+
 	result.AddInfo("Cluster connectivity verified")
 	return nil
 }
 
 // validateNamespaces checks if expected namespaces exist
 func (v *DeploymentValidator) validateNamespaces(ctx context.Context, opts DeploymentValidationOptions, result *ValidationResult) {
-	expectedNamespaces := getExpectedNamespaces(opts.Scenario)
-	
+	// Get expected namespaces from blueprint config or fallback
+	expectedNamespaces := blueprint.GetScenarioNamespaces(opts.Scenario)
+
 	// If a specific namespace is requested, only check that one
 	if opts.Namespace != "" {
 		found := checkNamespaceExists(ctx, v.client, opts.Namespace)
@@ -103,7 +106,7 @@ func (v *DeploymentValidator) validateNamespaces(ctx context.Context, opts Deplo
 		}
 		return
 	}
-	
+
 	// Check all expected namespaces
 	for _, ns := range expectedNamespaces {
 		found := checkNamespaceExists(ctx, v.client, ns)
@@ -119,10 +122,10 @@ func (v *DeploymentValidator) validateNamespaces(ctx context.Context, opts Deplo
 func (v *DeploymentValidator) validateInfrastructure(ctx context.Context, opts DeploymentValidationOptions, result *ValidationResult) {
 	// Check PostgreSQL
 	v.validatePostgresDeployment(ctx, result)
-	
+
 	// Check Redis
 	v.validateRedisDeployment(ctx, result)
-	
+
 	// Check Ingress controller
 	v.validateIngressController(ctx, result)
 }
@@ -133,10 +136,10 @@ func (v *DeploymentValidator) validateApplications(ctx context.Context, opts Dep
 	if opts.Namespace != "" {
 		namespace = opts.Namespace
 	}
-	
+
 	// TODO: Check for application deployments
 	// This would look for deployments in the app namespace
-	
+
 	result.AddInfo("Checking applications in namespace: %s", namespace)
 }
 
@@ -151,13 +154,13 @@ func (v *DeploymentValidator) validateNetworkPolicies(ctx context.Context, opts 
 		{"allow-dns", "infra"},
 		{"allow-dns", "app"},
 	}
-	
+
 	for _, policy := range expectedPolicies {
 		// Skip if checking specific namespace and this isn't it
 		if opts.Namespace != "" && opts.Namespace != policy.namespace {
 			continue
 		}
-		
+
 		exists := checkNetworkPolicyExists(ctx, v.client, policy.namespace, policy.name)
 		if !exists {
 			result.AddError("Network policy '%s' missing in namespace '%s'", policy.name, policy.namespace)
@@ -174,13 +177,13 @@ func (v *DeploymentValidator) validateResourceQuotas(ctx context.Context, opts D
 		{"infra-quota", "infra"},
 		{"app-quota", "app"},
 	}
-	
+
 	for _, quota := range quotas {
 		// Skip if checking specific namespace and this isn't it
 		if opts.Namespace != "" && opts.Namespace != quota.namespace {
 			continue
 		}
-		
+
 		exists := checkResourceQuotaExists(ctx, v.client, quota.namespace, quota.name)
 		if !exists {
 			result.AddWarning("Resource quota '%s' missing in namespace '%s'", quota.name, quota.namespace)
@@ -197,7 +200,7 @@ func (v *DeploymentValidator) validatePersistentVolumes(ctx context.Context, opt
 		{"postgres-pvc", "infra"},
 		{"redis-pvc", "infra"},
 	}
-	
+
 	for _, pvc := range pvcs {
 		status := checkPVCStatus(ctx, v.client, pvc.namespace, pvc.name)
 		if status != "Bound" {
@@ -208,30 +211,55 @@ func (v *DeploymentValidator) validatePersistentVolumes(ctx context.Context, opt
 
 // validateScenarioSpecific performs scenario-specific validations
 func (v *DeploymentValidator) validateScenarioSpecific(ctx context.Context, opts DeploymentValidationOptions, result *ValidationResult) {
+	// Try to get scenario validation from blueprint config
+	manager, err := blueprint.GetGlobalManager()
+	if err == nil {
+		requiredComponents, tests, err := manager.GetScenarioValidation(opts.Scenario)
+		if err == nil {
+			// Use config-driven validation
+			result.AddInfo("Using blueprint configuration for scenario validation")
+			for _, component := range requiredComponents {
+				if !v.checkComponentExists(ctx, component) {
+					result.AddError("Required component '%s' not found for scenario '%s'", component, opts.Scenario)
+				}
+			}
+			result.Details["required_tests"] = tests
+			return
+		}
+	}
+
+	// Fallback to hardcoded validation
 	switch opts.Scenario {
 	case "minimal":
 		// Minimal scenario should only have base components
 		v.validateMinimalScenario(ctx, opts, result)
-		
+
 	case "development":
 		// Development scenario should have dev tools
 		v.validateDevelopmentScenario(ctx, opts, result)
-		
+
 	case "service-mesh":
 		// Service mesh scenario should have Istio
 		v.validateServiceMeshScenario(ctx, opts, result)
-		
+
 	case "monitoring-only":
 		// Monitoring scenario should have observability stack
 		v.validateMonitoringScenario(ctx, opts, result)
-		
+
 	case "full-stack":
 		// Full stack should have everything
 		v.validateFullStackScenario(ctx, opts, result)
-		
+
 	default:
 		result.AddWarning("Unknown scenario '%s' - skipping scenario-specific validation", opts.Scenario)
 	}
+}
+
+// checkComponentExists checks if a component exists in the cluster
+func (v *DeploymentValidator) checkComponentExists(ctx context.Context, component string) bool {
+	// This would check for deployments/statefulsets/daemonsets with matching name or label
+	// TODO: Implement actual check
+	return true
 }
 
 // Scenario-specific validators
@@ -239,7 +267,7 @@ func (v *DeploymentValidator) validateScenarioSpecific(ctx context.Context, opts
 func (v *DeploymentValidator) validateMinimalScenario(ctx context.Context, opts DeploymentValidationOptions, result *ValidationResult) {
 	// Minimal should NOT have monitoring, istio, or dev tools
 	unwantedNamespaces := []string{"monitoring", "istio-system", "dev-tools"}
-	
+
 	for _, ns := range unwantedNamespaces {
 		if checkNamespaceExists(ctx, v.client, ns) {
 			result.AddWarning("Minimal scenario should not have namespace '%s'", ns)
@@ -252,20 +280,20 @@ func (v *DeploymentValidator) validateDevelopmentScenario(ctx context.Context, o
 	if !checkNamespaceExists(ctx, v.client, "dev-tools") {
 		result.AddError("Development scenario missing 'dev-tools' namespace")
 	}
-	
+
 	// TODO: Check for specific dev tools deployments
 }
 
 func (v *DeploymentValidator) validateServiceMeshScenario(ctx context.Context, opts DeploymentValidationOptions, result *ValidationResult) {
 	// Should have Istio namespaces
 	istioNamespaces := []string{"istio-system", "istio-ingress"}
-	
+
 	for _, ns := range istioNamespaces {
 		if !checkNamespaceExists(ctx, v.client, ns) {
 			result.AddError("Service mesh scenario missing namespace '%s'", ns)
 		}
 	}
-	
+
 	// TODO: Check for Istio components (istiod, gateways, etc.)
 }
 
@@ -274,7 +302,7 @@ func (v *DeploymentValidator) validateMonitoringScenario(ctx context.Context, op
 	if !checkNamespaceExists(ctx, v.client, "monitoring") {
 		result.AddError("Monitoring scenario missing 'monitoring' namespace")
 	}
-	
+
 	// Check for monitoring components
 	monitoringComponents := []string{"prometheus", "grafana", "alertmanager"}
 	for _, component := range monitoringComponents {
@@ -282,7 +310,7 @@ func (v *DeploymentValidator) validateMonitoringScenario(ctx context.Context, op
 			result.AddError("Monitoring scenario missing '%s' deployment", component)
 		}
 	}
-	
+
 	// Should have logging namespace
 	if !checkNamespaceExists(ctx, v.client, "logging") {
 		result.AddError("Monitoring scenario missing 'logging' namespace")
@@ -304,12 +332,12 @@ func (v *DeploymentValidator) validatePostgresDeployment(ctx context.Context, re
 		result.AddError("PostgreSQL deployment not found")
 		return
 	}
-	
+
 	// Check service
 	if !checkServiceExists(ctx, v.client, "infra", "postgres") {
 		result.AddError("PostgreSQL service not found")
 	}
-	
+
 	// Check if pods are running
 	if !checkPodsRunning(ctx, v.client, "infra", "app=postgres") {
 		result.AddError("PostgreSQL pods are not running")
@@ -322,12 +350,12 @@ func (v *DeploymentValidator) validateRedisDeployment(ctx context.Context, resul
 		result.AddError("Redis deployment not found")
 		return
 	}
-	
+
 	// Check service
 	if !checkServiceExists(ctx, v.client, "infra", "redis") {
 		result.AddError("Redis service not found")
 	}
-	
+
 	// Check if pods are running
 	if !checkPodsRunning(ctx, v.client, "infra", "app=redis") {
 		result.AddError("Redis pods are not running")
@@ -340,7 +368,7 @@ func (v *DeploymentValidator) validateIngressController(ctx context.Context, res
 		result.AddWarning("Ingress controller namespace not found")
 		return
 	}
-	
+
 	// Check for controller deployment
 	if !checkDeploymentExists(ctx, v.client, "ingress-nginx", "ingress-nginx-controller") {
 		result.AddError("Ingress controller deployment not found")
@@ -348,25 +376,6 @@ func (v *DeploymentValidator) validateIngressController(ctx context.Context, res
 }
 
 // Helper functions
-
-func getExpectedNamespaces(scenario string) []string {
-	base := []string{"infra", "app"}
-	
-	switch scenario {
-	case "minimal":
-		return base
-	case "development":
-		return append(base, "dev-tools")
-	case "service-mesh":
-		return append(base, "istio-system", "istio-ingress")
-	case "monitoring-only":
-		return append(base, "monitoring", "logging")
-	case "full-stack":
-		return append(base, "monitoring", "logging", "istio-system", "istio-ingress", "dev-tools")
-	default:
-		return base
-	}
-}
 
 // These are placeholder implementations that should use the actual Kubernetes client
 func checkNamespaceExists(ctx context.Context, client interface{}, namespace string) bool {
