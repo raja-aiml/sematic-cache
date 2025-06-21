@@ -65,7 +65,10 @@ Available scenarios:
 			logger := utils.NewLogger("cluster")
 
 			// Create cluster
-			cm := k3d.NewClusterManager(*clusterName)
+			cm, err := k3d.NewClusterManager(*clusterName)
+			if err != nil {
+				return fmt.Errorf("failed to create cluster manager: %w", err)
+			}
 			if err := cm.CreateCluster(ctx); err != nil {
 				return fmt.Errorf("failed to create cluster: %w", err)
 			}
@@ -151,7 +154,10 @@ func clusterDownCmd(clusterName *string) *cobra.Command {
 
 			logger.Info("Destroying cluster %s...", *clusterName)
 
-			cm := k3d.NewClusterManager(*clusterName)
+			cm, err := k3d.NewClusterManager(*clusterName)
+			if err != nil {
+				return fmt.Errorf("failed to create cluster manager: %w", err)
+			}
 			if err := cm.DeleteCluster(ctx); err != nil {
 				return fmt.Errorf("failed to delete cluster: %w", err)
 			}
@@ -170,7 +176,10 @@ func clusterStatusCmd(clusterName *string) *cobra.Command {
 			ctx := context.Background()
 			logger := utils.NewLogger("status")
 
-			cm := k3d.NewClusterManager(*clusterName)
+			cm, err := k3d.NewClusterManager(*clusterName)
+			if err != nil {
+				return fmt.Errorf("failed to create cluster manager: %w", err)
+			}
 			if !cm.IsRunning(ctx) {
 				logger.Error("Cluster %s is not running", *clusterName)
 				return fmt.Errorf("cluster not running")
@@ -292,7 +301,10 @@ func clusterTestCmd(clusterName *string, scenario *string) *cobra.Command {
 			logger := utils.NewLogger("test")
 
 			// Check cluster
-			cm := k3d.NewClusterManager(*clusterName)
+			cm, err := k3d.NewClusterManager(*clusterName)
+			if err != nil {
+				return fmt.Errorf("failed to create cluster manager: %w", err)
+			}
 			if !cm.IsRunning(ctx) {
 				return fmt.Errorf("cluster %s is not running", *clusterName)
 			}

@@ -7,7 +7,8 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 ### 1. ALWAYS USE SDK OVER CLI COMMANDS
 - **MANDATORY**: Use official Go SDKs/libraries instead of CLI commands
 - **FORBIDDEN**: Running external commands via exec/shell unless absolutely necessary
-- **EXCEPTION**: Only when no SDK exists (e.g., k3d) and must be documented
+- **EXCEPTION**: Only when no SDK exists and must be documented
+- **K3D SDK AVAILABLE**: Use `github.com/k3d-io/k3d/v5` SDK instead of CLI commands
 - **Example**: Use Docker SDK instead of `docker` CLI, Kubernetes client-go instead of `kubectl`
 
 ### 2. APPROVED TECHNOLOGY STACK
@@ -40,8 +41,9 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 **Container/Orchestration:**
 - ✅ **Docker SDK** (github.com/docker/docker)
 - ✅ **Kubernetes client-go** (k8s.io/client-go)
+- ✅ **K3D SDK** (github.com/k3d-io/k3d/v5) - For local Kubernetes clusters
 - ✅ **Kustomize** libraries for manifest generation
-- ❌ Docker CLI commands, kubectl exec
+- ❌ Docker CLI commands, kubectl exec, k3d CLI commands
 
 ### 3. INTERFACE COMPLIANCE
 - **MANDATORY**: Always check existing interfaces before implementation
@@ -320,6 +322,8 @@ Before submitting code, ensure:
 ## Examples of Good Practices
 
 ### Using SDK instead of CLI
+
+**Docker Example:**
 ```go
 // BAD - Using CLI
 out, err := exec.Command("docker", "build", "-t", tag, ".").Output()
@@ -335,6 +339,32 @@ err = client.Build(ctx, docker.BuildOptions{
     Tags: []string{tag},
     Context: ".",
 })
+```
+
+**K3D Example:**
+```go
+// BAD - Using CLI
+args := []string{"cluster", "create", clusterName}
+if _, err := utils.RunCommand(ctx, "k3d", args, nil); err != nil {
+    return fmt.Errorf("failed to create cluster: %w", err)
+}
+
+// GOOD - Using SDK
+import (
+    "github.com/k3d-io/k3d/v5/pkg/client"
+    "github.com/k3d-io/k3d/v5/pkg/runtimes"
+    k3dtypes "github.com/k3d-io/k3d/v5/pkg/types"
+)
+
+runtime, err := runtimes.GetRuntime("docker")
+if err != nil {
+    return fmt.Errorf("failed to get runtime: %w", err)
+}
+
+cluster, err := client.ClusterCreate(ctx, clusterConfig, runtime)
+if err != nil {
+    return fmt.Errorf("failed to create cluster: %w", err)
+}
 ```
 
 ### Proper Interface Implementation
@@ -359,5 +389,119 @@ func (c *MyCache) Set(prompt string, value string) error {
 // Verify at compile time
 var _ CacheBackend = (*MyCache)(nil)
 ```
+
+## K3D SDK Integration Guidelines
+
+### K3D SDK Usage
+The K3D SDK (`github.com/k3d-io/k3d/v5`) provides comprehensive Go APIs for managing k3d clusters programmatically. **All k3d operations MUST use the SDK instead of CLI commands.**
+
+### Key K3D SDK Packages
+```go
+import (
+    "github.com/k3d-io/k3d/v5/pkg/client"    // Core cluster operations
+    "github.com/k3d-io/k3d/v5/pkg/config"    // Configuration management
+    "github.com/k3d-io/k3d/v5/pkg/runtimes"  // Container runtime integration
+    k3dtypes "github.com/k3d-io/k3d/v5/pkg/types" // Type definitions
+)
+```
+
+### Required Interface Pattern
+```go
+// Define interface for testability and abstraction
+type ClusterOperations interface {
+    CreateCluster(ctx context.Context) error
+    DeleteCluster(ctx context.Context) error
+    GetCluster(ctx context.Context) (*k3dtypes.Cluster, error)
+    IsRunning(ctx context.Context) bool
+    GetKubeconfig(ctx context.Context) ([]byte, error)
+}
+
+// Implementation using SDK
+type SDKClusterManager struct {
+    runtime     runtimes.Runtime
+    config      *k3dtypes.ClusterConfig
+    clusterName string
+}
+
+// Compile-time interface compliance check
+var _ ClusterOperations = (*SDKClusterManager)(nil)
+```
+
+### Essential SDK Operations
+```go
+// Initialize runtime
+runtime, err := runtimes.GetRuntime("docker")
+if err != nil {
+    return fmt.Errorf("failed to initialize runtime: %w", err)
+}
+
+// Create cluster
+cluster, err := client.ClusterCreate(ctx, clusterConfig, runtime)
+if err != nil {
+    return fmt.Errorf("failed to create cluster: %w", err)
+}
+
+// Get cluster info
+cluster, err := client.ClusterGet(ctx, runtime, &k3dtypes.Cluster{Name: clusterName})
+if err != nil {
+    return fmt.Errorf("failed to get cluster: %w", err)
+}
+
+// Delete cluster
+err = client.ClusterDelete(ctx, cluster, runtime, k3dtypes.ClusterDeleteOpts{})
+if err != nil {
+    return fmt.Errorf("failed to delete cluster: %w", err)
+}
+
+// Get kubeconfig
+kubeconfig, err := client.KubeconfigGet(ctx, runtime, cluster, k3dtypes.ClusterGetKubeconfigOpts{})
+if err != nil {
+    return fmt.Errorf("failed to get kubeconfig: %w", err)
+}
+```
+
+### Testing Requirements for K3D
+1. **Unit Tests**: Mock runtime interface for fast unit tests
+2. **Integration Tests**: Use `// +build integration` tag for real k3d operations
+3. **Table-Driven Tests**: Test various cluster configurations
+4. **Benchmark Tests**: Performance testing for cluster operations
+5. **Error Handling**: Test all failure scenarios
+
+### K3D Configuration Management
+```go
+// Load configuration from file
+config, err := config.ReadConfig(configPath)
+if err != nil {
+    return fmt.Errorf("failed to read config: %w", err)
+}
+
+// Save configuration to file
+err = config.WriteConfig(clusterConfig, configPath)
+if err != nil {
+    return fmt.Errorf("failed to write config: %w", err)
+}
+```
+
+### K3D Integration Test Setup
+```bash
+# Run only unit tests (default)
+go test ./pkg/k3d/...
+
+# Run integration tests (requires Docker)
+go test -tags=integration ./pkg/k3d/...
+
+# Skip integration tests in CI
+SKIP_INTEGRATION_TESTS=true go test -tags=integration ./pkg/k3d/...
+```
+
+### Migration from CLI to SDK
+When migrating existing CLI-based k3d code:
+
+1. **Replace `utils.RunCommand("k3d", args)`** with appropriate SDK calls
+2. **Add proper error handling** with context wrapping
+3. **Implement interfaces** for testability
+4. **Add comprehensive tests** (unit + integration)
+5. **Update imports** to use k3d SDK packages
+6. **Verify integration** with existing codebase
 
 This document is the source of truth for all development decisions in this repository.

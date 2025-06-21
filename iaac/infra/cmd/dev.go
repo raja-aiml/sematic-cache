@@ -65,7 +65,7 @@ func devBuildCmd(imageName, clusterName *string) *cobra.Command {
 				return fmt.Errorf("failed to create Docker builder: %w", err)
 			}
 			defer builder.Close()
-			
+
 			dockerfilePath := filepath.Join(projectRoot, "Dockerfile")
 
 			if err := builder.BuildSimple(ctx, dockerfilePath, *imageName, projectRoot); err != nil {
