@@ -111,10 +111,10 @@ func BenchmarkTopKSelection(b *testing.B) {
 				// Copy candidates to avoid modifying original
 				candCopy := make([]scoredCandidate, len(candidates))
 				copy(candCopy, candidates)
-				
+
 				// Traditional O(n log n) sorting
 				sortBySimilarity(candCopy)
-				
+
 				// Take top-K
 				if size.topK < len(candCopy) {
 					candCopy = candCopy[:size.topK]
@@ -204,7 +204,7 @@ func BenchmarkObjectPooling(b *testing.B) {
 
 	// Setup optimized reducer
 	reducer, _ := NewOptimizedDimensionReducer(config)
-	
+
 	// Train on sample data
 	trainEmbeddings := generateRandomEmbeddings(1000, 1536)
 	reducer.Learn(ctx, trainEmbeddings)
@@ -246,17 +246,17 @@ func BenchmarkBatchProcessing(b *testing.B) {
 	}
 
 	pca := NewPCAGonumReducer(config)
-	
+
 	// Train on sample data
 	trainEmbeddings := generateRandomEmbeddings(1000, 1536)
 	pca.Fit(ctx, trainEmbeddings)
 
 	// Test different batch sizes
 	batchSizes := []int{1, 10, 100, 1000}
-	
+
 	for _, batchSize := range batchSizes {
 		testEmbeddings := generateRandomEmbeddings(batchSize, 1536)
-		
+
 		b.Run(fmt.Sprintf("BatchSize_%d", batchSize), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -287,7 +287,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 		reducer, _ := NewDimensionReducer(config)
 		trainData := generateRandomEmbeddings(1000, 1536)
 		reducer.Learn(ctx, trainData)
-		
+
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -299,7 +299,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 		reducer, _ := NewOptimizedDimensionReducer(config)
 		trainData := generateRandomEmbeddings(1000, 1536)
 		reducer.Learn(ctx, trainData)
-		
+
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -316,11 +316,11 @@ func CosineSimilarity(a, b []float32) float64 {
 		normA += float64(a[i]) * float64(a[i])
 		normB += float64(b[i]) * float64(b[i])
 	}
-	
+
 	if normA == 0 || normB == 0 {
 		return 0
 	}
-	
+
 	return dotProduct / (Sqrt(normA) * Sqrt(normB))
 }
 

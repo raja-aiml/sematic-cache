@@ -160,9 +160,13 @@ task logs
 ## 🔧 Configuration
 
 ### Environment Variables
-Copy `.env.example` to `.env` and customize:
+Configuration files are now centralized in the `iaac/config` directory:
 ```bash
-cp .env.example .env
+# Copy and customize the environment file
+cp ../config/blueprint.env.example ../config/blueprint.env
+
+# Or use the iaac CLI with config options
+iaac --config-dir ../config cluster up
 ```
 
 Key configurations:

@@ -30,7 +30,7 @@ func main() {
 	if apiKey == "" {
 		apiKey = os.Getenv("OPENAI_API_KEY")
 	}
-	
+
 	// Log API key status for debugging
 	if apiKey == "" {
 		log.Println("WARNING: No OpenAI API key found. Embeddings will fail.")
@@ -39,7 +39,7 @@ func main() {
 	} else {
 		log.Printf("INFO: Using API key: %s...%s", apiKey[:8], apiKey[len(apiKey)-4:])
 	}
-	
+
 	openaiClient := openai.NewClient(apiKey)
 	embedFunc := func(prompt string) ([]float32, error) {
 		return openaiClient.Embedding(context.Background(), prompt)
@@ -68,7 +68,7 @@ func main() {
 
 	// Example 2: Demonstrate cache hits from different tiers
 	fmt.Println("\n=== Example 2: Cache Hits ===")
-	
+
 	// First access - should hit memory (L1)
 	start := time.Now()
 	answer, found := cache.Get("What is machine learning?")
@@ -79,17 +79,17 @@ func main() {
 
 	// Simulate memory eviction by flushing just the memory tier
 	// In real scenario, this would happen naturally with LRU eviction
-	
+
 	// Example 3: Similarity search with caching
 	fmt.Println("\n=== Example 3: Similarity Search ===")
-	
+
 	// Query with similar but not exact prompt
 	similarQuery := "What is ML?"
 	start = time.Now()
 	answer, found = cache.Get(similarQuery)
 	elapsed = time.Since(start)
 	if found {
-		fmt.Printf("Similarity match (%.2fms): Found answer for '%s'\n", 
+		fmt.Printf("Similarity match (%.2fms): Found answer for '%s'\n",
 			float64(elapsed.Nanoseconds())/1000000, similarQuery)
 		fmt.Printf("Answer: %s\n", answer[:30]+"...")
 	}
@@ -99,7 +99,7 @@ func main() {
 	answer, found = cache.Get(similarQuery)
 	elapsed = time.Since(start)
 	if found {
-		fmt.Printf("Exact match after caching (%.2fμs): %s\n", 
+		fmt.Printf("Exact match after caching (%.2fμs): %s\n",
 			float64(elapsed.Nanoseconds())/1000, answer[:30]+"...")
 	}
 
@@ -121,7 +121,7 @@ func main() {
 	fmt.Println("=== Example 5: Top-K Search ===")
 	embedding, _ := embedFunc("machine learning and AI")
 	results := cache.GetTopKByEmbedding(embedding, 3)
-	
+
 	fmt.Printf("Found %d similar items:\n", len(results))
 	for i, result := range results {
 		fmt.Printf("%d. %s (similarity: %.3f)\n", i+1, result.Prompt, result.Similarity)

@@ -72,7 +72,7 @@ func NewDimensionReducer(config *Config) (*DimensionReducer, error) {
 	if varianceRetained == 0 {
 		varianceRetained = config.VarianceThreshold
 	}
-	
+
 	reducerConfig := ReducerConfig{
 		OutputDimensions: targetDim,
 		VarianceRetained: varianceRetained,
@@ -512,7 +512,7 @@ func (dr *DimensionReducer) UpdateHitRates(beforeReduction, afterReduction float
 	// Update hit rates atomically
 	atomic.StoreUint64(&dr.metrics.hitRateBeforeReduction, math.Float64bits(beforeReduction))
 	atomic.StoreUint64(&dr.metrics.hitRateAfterReduction, math.Float64bits(afterReduction))
-	
+
 	// Calculate and store accuracy score
 	accuracy := 0.0
 	if beforeReduction > 0 {

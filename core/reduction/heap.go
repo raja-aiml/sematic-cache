@@ -58,7 +58,7 @@ func (h *MinHeap) GetTopK() []HeapItem {
 	// Extract all items
 	result := make([]HeapItem, h.Len())
 	copy(result, h.items)
-	
+
 	// Sort by similarity descending
 	// Since we have a min-heap, the items are already the top-K
 	// but not necessarily in order. Sort them properly.
@@ -69,7 +69,7 @@ func (h *MinHeap) GetTopK() []HeapItem {
 			}
 		}
 	}
-	
+
 	return result
 }
 
@@ -97,7 +97,7 @@ func (s *TopKSelector) SelectTopK(candidates []scoredCandidate) []SearchCandidat
 
 	// Use heap for efficient top-K selection
 	minHeap := NewMinHeap(s.k)
-	
+
 	for i, candidate := range candidates {
 		minHeap.Add(HeapItem{
 			Index:      i,
@@ -105,15 +105,15 @@ func (s *TopKSelector) SelectTopK(candidates []scoredCandidate) []SearchCandidat
 			Data:       candidate,
 		})
 	}
-	
+
 	// Get top-K items sorted by similarity
 	topItems := minHeap.GetTopK()
 	results := make([]SearchCandidate, len(topItems))
-	
+
 	for i, item := range topItems {
 		results[i] = item.Data.(scoredCandidate).candidate
 	}
-	
+
 	return results
 }
 
@@ -131,7 +131,7 @@ func (s *TopKSelector) SelectTopKResults(results []scoredResult) []SearchResult 
 
 	// Use heap for efficient top-K selection
 	minHeap := NewMinHeap(s.k)
-	
+
 	for i, result := range results {
 		minHeap.Add(HeapItem{
 			Index:      i,
@@ -139,15 +139,15 @@ func (s *TopKSelector) SelectTopKResults(results []scoredResult) []SearchResult 
 			Data:       result,
 		})
 	}
-	
+
 	// Get top-K items sorted by similarity
 	topItems := minHeap.GetTopK()
 	output := make([]SearchResult, len(topItems))
-	
+
 	for i, item := range topItems {
 		output[i] = item.Data.(scoredResult).result
 	}
-	
+
 	return output
 }
 
@@ -169,18 +169,18 @@ func NewBatchTopK(k, workers int) *BatchTopK {
 func (b *BatchTopK) ProcessBatch(queries []TopKQuery) [][]SearchResult {
 	n := len(queries)
 	results := make([][]SearchResult, n)
-	
+
 	// Process queries in parallel using worker pool
 	chunkSize := (n + b.workers - 1) / b.workers
 	done := make(chan int, b.workers)
-	
+
 	for w := 0; w < b.workers; w++ {
 		start := w * chunkSize
 		end := start + chunkSize
 		if end > n {
 			end = n
 		}
-		
+
 		go func(start, end int) {
 			selector := NewTopKSelector(b.k)
 			for i := start; i < end; i++ {
@@ -189,12 +189,12 @@ func (b *BatchTopK) ProcessBatch(queries []TopKQuery) [][]SearchResult {
 			done <- 1
 		}(start, end)
 	}
-	
+
 	// Wait for all workers
 	for w := 0; w < b.workers; w++ {
 		<-done
 	}
-	
+
 	return results
 }
 

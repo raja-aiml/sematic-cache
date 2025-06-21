@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/raja-aiml/sematic-cache/deploy/local/cmd"
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,10 @@ This tool provides infrastructure-as-code capabilities using k3d, Docker SDK, an
 func init() {
 	// Disable completion command
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
+	// Add global flags
+	rootCmd.PersistentFlags().String("config-dir", "", "Config directory path (default: ./config or ../config)")
+	rootCmd.PersistentFlags().String("env-file", "", "Path to environment file (default: <config-dir>/blueprint.env)")
 
 	// Add commands
 	rootCmd.AddCommand(cmd.ClusterCmd())
@@ -78,9 +83,66 @@ func versionCmd() *cobra.Command {
 }
 
 func configCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Configuration management commands",
 		Long:  `Manage configuration files, validate settings, and export configurations.`,
+	}
+
+	// Add subcommands
+	cmd.AddCommand(configShowCmd())
+	cmd.AddCommand(configPathCmd())
+
+	return cmd
+}
+
+func configShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "Show current configuration",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			paths, err := config.ResolveConfigPaths(cmd)
+			if err != nil {
+				return fmt.Errorf("failed to resolve config paths: %w", err)
+			}
+
+			fmt.Printf("Configuration:\n")
+			fmt.Printf("  Config Directory: %s\n", paths.ConfigDir)
+			fmt.Printf("  Environment File: %s\n", paths.EnvFile)
+
+			// Check if files exist
+			if _, err := os.Stat(paths.ConfigDir); err == nil {
+				fmt.Printf("  Config Dir Status: ✓ Exists\n")
+			} else {
+				fmt.Printf("  Config Dir Status: ✗ Not found\n")
+			}
+
+			if _, err := os.Stat(paths.EnvFile); err == nil {
+				fmt.Printf("  Env File Status: ✓ Exists\n")
+			} else if _, err := os.Stat(paths.EnvFile + ".example"); err == nil {
+				fmt.Printf("  Env File Status: ⚠ Using .example file\n")
+			} else {
+				fmt.Printf("  Env File Status: ✗ Not found\n")
+			}
+
+			return nil
+		},
+	}
+}
+
+func configPathCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "path",
+		Short: "Show resolved configuration path",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			paths, err := config.ResolveConfigPaths(cmd)
+			if err != nil {
+				return fmt.Errorf("failed to resolve config paths: %w", err)
+			}
+
+			// Output just the path for scripting
+			fmt.Println(paths.ConfigDir)
+			return nil
+		},
 	}
 }

@@ -10,11 +10,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// LoadEnvFile loads environment variables from default locations
+// Deprecated: Use config.LoadEnvFile with explicit path instead
 func LoadEnvFile() error {
 	// Look for .env file in multiple locations
 	envPaths := []string{
-		".env",
-		"../../.env",
+		"config/blueprint.env",
+		"../config/blueprint.env",
+		"../../iaac/config/blueprint.env",
 		filepath.Join(os.Getenv("HOME"), ".semantic-cache.env"),
 	}
 

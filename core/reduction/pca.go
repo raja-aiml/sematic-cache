@@ -24,7 +24,7 @@ type PCAReducer struct {
 func NewPCAReducer(config *Config) *PCAReducer {
 	if config == nil {
 		config = &Config{
-			TargetDim: 128,
+			TargetDim:   128,
 			Standardize: true,
 		}
 	}

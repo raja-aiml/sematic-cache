@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/agent"
+	pkgconfig "github.com/raja-aiml/sematic-cache/deploy/local/pkg/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -188,12 +190,27 @@ func loadAgentConfig() (*agent.Config, error) {
 	// Load from config file if specified
 	if agentConfigFile != "" {
 		viper.SetConfigFile(agentConfigFile)
-		if err := viper.ReadInConfig(); err != nil {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
+	} else {
+		// Try to find agent.yaml in config directory
+		if configPaths, err := pkgconfig.ResolveConfigPaths(cmd); err == nil {
+			agentConfigPath := filepath.Join(configPaths.ConfigDir, "agent.yaml")
+			if _, err := os.Stat(agentConfigPath); err == nil {
+				viper.SetConfigFile(agentConfigPath)
+			}
 		}
+	}
 
-		if err := viper.Unmarshal(config); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	// Read config if file was set
+	if viper.ConfigFileUsed() != "" {
+		if err := viper.ReadInConfig(); err != nil {
+			// Don't fail if config file doesn't exist
+			if !os.IsNotExist(err) {
+				return nil, fmt.Errorf("failed to read config file: %w", err)
+			}
+		} else {
+			if err := viper.Unmarshal(config); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+			}
 		}
 	}
 

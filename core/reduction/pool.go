@@ -6,12 +6,12 @@ import (
 
 // ObjectPools manages pools for frequently allocated objects
 type ObjectPools struct {
-	candidatePool      sync.Pool
-	resultPool         sync.Pool
-	embeddingPool      sync.Pool
-	float32SlicePool   sync.Pool
-	scoredCandPool     sync.Pool
-	scoredResultPool   sync.Pool
+	candidatePool    sync.Pool
+	resultPool       sync.Pool
+	embeddingPool    sync.Pool
+	float32SlicePool sync.Pool
+	scoredCandPool   sync.Pool
+	scoredResultPool sync.Pool
 }
 
 // Global pools instance
@@ -101,7 +101,7 @@ func GetEmbedding(size int) []float32 {
 		slice := pools.float32SlicePool.Get().([]float32)
 		return slice[:0]
 	}
-	
+
 	slice := pools.embeddingPool.Get().([]float32)
 	if cap(slice) < size {
 		return make([]float32, 0, size)
@@ -114,10 +114,10 @@ func PutEmbedding(e []float32) {
 	if e == nil {
 		return
 	}
-	
+
 	// Reset slice but keep capacity
 	e = e[:0]
-	
+
 	if cap(e) <= 384 {
 		pools.float32SlicePool.Put(e)
 	} else if cap(e) <= 1536 {
@@ -167,11 +167,11 @@ var candidateSlicePool = &CandidateSlicePool{
 func GetCandidateSlice(cap int) []SearchCandidate {
 	// Round up to nearest power of 2 for better pooling
 	poolCap := nextPowerOf2(cap)
-	
+
 	candidateSlicePool.mu.RLock()
 	pool, exists := candidateSlicePool.pools[poolCap]
 	candidateSlicePool.mu.RUnlock()
-	
+
 	if !exists {
 		candidateSlicePool.mu.Lock()
 		pool, exists = candidateSlicePool.pools[poolCap]
@@ -185,7 +185,7 @@ func GetCandidateSlice(cap int) []SearchCandidate {
 		}
 		candidateSlicePool.mu.Unlock()
 	}
-	
+
 	slice := pool.Get().([]SearchCandidate)
 	return slice[:0]
 }
@@ -195,13 +195,13 @@ func PutCandidateSlice(s []SearchCandidate) {
 	if s == nil {
 		return
 	}
-	
+
 	poolCap := nextPowerOf2(cap(s))
-	
+
 	candidateSlicePool.mu.RLock()
 	pool, exists := candidateSlicePool.pools[poolCap]
 	candidateSlicePool.mu.RUnlock()
-	
+
 	if exists {
 		// Clear the slice before returning to pool
 		for i := range s {
@@ -226,11 +226,11 @@ var resultSlicePool = &ResultSlicePool{
 func GetResultSlice(cap int) []SearchResult {
 	// Round up to nearest power of 2 for better pooling
 	poolCap := nextPowerOf2(cap)
-	
+
 	resultSlicePool.mu.RLock()
 	pool, exists := resultSlicePool.pools[poolCap]
 	resultSlicePool.mu.RUnlock()
-	
+
 	if !exists {
 		resultSlicePool.mu.Lock()
 		pool, exists = resultSlicePool.pools[poolCap]
@@ -244,7 +244,7 @@ func GetResultSlice(cap int) []SearchResult {
 		}
 		resultSlicePool.mu.Unlock()
 	}
-	
+
 	slice := pool.Get().([]SearchResult)
 	return slice[:0]
 }
@@ -254,13 +254,13 @@ func PutResultSlice(s []SearchResult) {
 	if s == nil {
 		return
 	}
-	
+
 	poolCap := nextPowerOf2(cap(s))
-	
+
 	resultSlicePool.mu.RLock()
 	pool, exists := resultSlicePool.pools[poolCap]
 	resultSlicePool.mu.RUnlock()
-	
+
 	if exists {
 		// Clear the slice before returning to pool
 		for i := range s {
@@ -275,12 +275,12 @@ func nextPowerOf2(n int) int {
 	if n <= 0 {
 		return 1
 	}
-	
+
 	// Handle case where n is already a power of 2
 	if n&(n-1) == 0 {
 		return n
 	}
-	
+
 	// Find the next power of 2
 	power := 1
 	for power < n {
@@ -322,22 +322,22 @@ func PutEmbeddingBatch(b *EmbeddingBatch) {
 	if b == nil {
 		return
 	}
-	
+
 	// Clear embeddings
 	for i := range b.Embeddings {
 		b.Embeddings[i] = nil
 	}
 	b.Embeddings = b.Embeddings[:0]
-	
+
 	embeddingBatchPool.pool.Put(b)
 }
 
 // PoolStats provides statistics about pool usage
 type PoolStats struct {
-	CandidatePoolHits   uint64
-	ResultPoolHits      uint64
-	EmbeddingPoolHits   uint64
-	SlicePoolSizes      []int
+	CandidatePoolHits uint64
+	ResultPoolHits    uint64
+	EmbeddingPoolHits uint64
+	SlicePoolSizes    []int
 }
 
 // GetPoolStats returns current pool statistics (for monitoring)
@@ -348,7 +348,7 @@ func GetPoolStats() PoolStats {
 		sizes = append(sizes, size)
 	}
 	candidateSlicePool.mu.RUnlock()
-	
+
 	return PoolStats{
 		SlicePoolSizes: sizes,
 	}

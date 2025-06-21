@@ -165,12 +165,12 @@ func TestResourceLimits(t *testing.T) {
 	}
 
 	limits := ResourceLimits{
-		MaxMemoryMB:      100,
-		MaxGoroutines:    2,
-		OperationTimeout: 1 * time.Second,
-		BatchTimeout:     5 * time.Second,
-		MaxBatchSize:     10,
-		MaxQueueSize:     20,
+		MaxMemoryMB:         100,
+		MaxGoroutines:       2,
+		OperationTimeout:    1 * time.Second,
+		BatchTimeout:        5 * time.Second,
+		MaxBatchSize:        10,
+		MaxQueueSize:        20,
 		MemoryCheckInterval: 100 * time.Millisecond,
 	}
 
@@ -203,7 +203,7 @@ func TestResourceLimits(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			query := []float32{float32(idx), float32(idx+1), float32(idx+2), float32(idx+3)}
+			query := []float32{float32(idx), float32(idx + 1), float32(idx + 2), float32(idx + 3)}
 			_, err := reducer.ReduceForSearch(ctx, query)
 			errors[idx] = err
 		}(i)
@@ -246,12 +246,12 @@ func TestBackpressure(t *testing.T) {
 	}
 
 	limits := ResourceLimits{
-		MaxMemoryMB:      100,
-		MaxGoroutines:    1, // Single worker to force queueing
-		OperationTimeout: 100 * time.Millisecond,
-		BatchTimeout:     1 * time.Second,
-		MaxBatchSize:     10,
-		MaxQueueSize:     5, // Small queue to test backpressure
+		MaxMemoryMB:         100,
+		MaxGoroutines:       1, // Single worker to force queueing
+		OperationTimeout:    100 * time.Millisecond,
+		BatchTimeout:        1 * time.Second,
+		MaxBatchSize:        10,
+		MaxQueueSize:        5, // Small queue to test backpressure
 		MemoryCheckInterval: 100 * time.Millisecond,
 	}
 
@@ -313,7 +313,7 @@ func TestAdaptiveLimits(t *testing.T) {
 	defer reducer.Shutdown()
 
 	// Create adaptive limits manager
-	adaptive := NewAdaptiveLimits(reducer, 10.0) // 10ms target latency
+	adaptive := NewAdaptiveLimits(reducer, 10.0)     // 10ms target latency
 	adaptive.adjustInterval = 100 * time.Millisecond // Fast for testing
 	adaptive.Start()
 	defer adaptive.Stop()
@@ -339,7 +339,7 @@ func TestAdaptiveLimits(t *testing.T) {
 
 	// Check if limits were adjusted
 	newLimits := reducer.limits
-	t.Logf("Adaptive limits: goroutines=%d, queue=%d", 
+	t.Logf("Adaptive limits: goroutines=%d, queue=%d",
 		newLimits.MaxGoroutines, newLimits.MaxQueueSize)
 }
 

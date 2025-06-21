@@ -74,22 +74,22 @@ type DimensionReducerConfig struct {
 // NewDimensionReducerWithFactory creates a dimension reducer using the factory pattern
 func NewDimensionReducerWithFactory(config DimensionReducerConfig) (*DimensionReducer, error) {
 	factory := NewReducerFactory()
-	
+
 	// Create the appropriate reducer based on configuration
 	var reducer Reducer
 	var err error
-	
+
 	if config.EnableOptimization && config.Type == PCAReducerType {
 		// Use optimized Gonum implementation for PCA if optimization is enabled
 		reducer, err = factory.CreateReducer(PCAGonumReducerType, config.ReducerConfig)
 	} else {
 		reducer, err = factory.CreateReducer(config.Type, config.ReducerConfig)
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reducer: %w", err)
 	}
-	
+
 	return &DimensionReducer{
 		config:      config.ReducerConfig,
 		reducer:     reducer,

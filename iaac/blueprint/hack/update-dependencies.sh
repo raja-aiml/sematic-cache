@@ -79,21 +79,26 @@ check_update_tool "Loki" "$LOKI_VERSION" "echo $LOKI_LATEST" "infra/modules/obse
 echo -e "\n🕸️  Service Mesh:"
 echo "-----------------"
 
-ISTIO_VERSION=$(grep -o 'ISTIO_VERSION=.*' "$PROJECT_ROOT/.env.example" | cut -d= -f2)
+CONFIG_FILE="$PROJECT_ROOT/../config/blueprint.env.example"
+if [ ! -f "$CONFIG_FILE" ]; then
+    CONFIG_FILE="$PROJECT_ROOT/.env.example"  # Fallback to old location
+fi
+
+ISTIO_VERSION=$(grep -o 'ISTIO_VERSION=.*' "$CONFIG_FILE" | cut -d= -f2)
 ISTIO_LATEST=$(curl -s https://api.github.com/repos/istio/istio/releases/latest | jq -r '.tag_name')
-check_update_tool "Istio" "$ISTIO_VERSION" "echo $ISTIO_LATEST" ".env.example"
+check_update_tool "Istio" "$ISTIO_VERSION" "echo $ISTIO_LATEST" "$CONFIG_FILE"
 
 # Update K3D/K3s
 echo -e "\n☸️  K3D/K3s:"
 echo "------------"
 
-K3D_VERSION=$(grep -o 'K3D_VERSION=.*' "$PROJECT_ROOT/.env.example" | cut -d= -f2)
+K3D_VERSION=$(grep -o 'K3D_VERSION=.*' "$CONFIG_FILE" | cut -d= -f2)
 K3D_LATEST=$(curl -s https://api.github.com/repos/k3d-io/k3d/releases/latest | jq -r '.tag_name')
-check_update_tool "K3D" "$K3D_VERSION" "echo $K3D_LATEST" ".env.example"
+check_update_tool "K3D" "$K3D_VERSION" "echo $K3D_LATEST" "$CONFIG_FILE"
 
-K3S_VERSION=$(grep -o 'K3S_VERSION=.*' "$PROJECT_ROOT/.env.example" | cut -d= -f2)
+K3S_VERSION=$(grep -o 'K3S_VERSION=.*' "$CONFIG_FILE" | cut -d= -f2)
 K3S_LATEST=$(curl -s https://api.github.com/repos/k3s-io/k3s/releases/latest | jq -r '.tag_name' | sed 's/+/-/')
-check_update_tool "K3s" "$K3S_VERSION" "echo $K3S_LATEST" ".env.example"
+check_update_tool "K3s" "$K3S_VERSION" "echo $K3S_LATEST" "$CONFIG_FILE"
 
 # Generate update report
 echo -e "\n📋 Update Report"

@@ -370,4 +370,3 @@ func TestPCAReducer_ThreadSafety(t *testing.T) {
 		<-done
 	}
 }
-

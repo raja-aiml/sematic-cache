@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/config"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/docker"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/kubernetes"
@@ -44,6 +45,11 @@ func devBuildCmd(imageName, clusterName *string) *cobra.Command {
 		Use:   "build",
 		Short: "Build Docker image and import to k3d",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load configuration
+			if err := config.LoadConfig(cmd); err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			ctx := context.Background()
 			logger := utils.NewLogger("build")
 

@@ -11,13 +11,13 @@ import (
 
 // ResourceLimits defines resource constraints for dimension reduction
 type ResourceLimits struct {
-	MaxMemoryMB          int64         // Maximum memory usage in MB
-	MaxGoroutines        int           // Maximum concurrent operations
-	OperationTimeout     time.Duration // Timeout for individual operations
-	BatchTimeout         time.Duration // Timeout for batch operations
-	MaxBatchSize         int           // Maximum batch size
-	MaxQueueSize         int           // Maximum queue size for backpressure
-	MemoryCheckInterval  time.Duration // How often to check memory
+	MaxMemoryMB         int64         // Maximum memory usage in MB
+	MaxGoroutines       int           // Maximum concurrent operations
+	OperationTimeout    time.Duration // Timeout for individual operations
+	BatchTimeout        time.Duration // Timeout for batch operations
+	MaxBatchSize        int           // Maximum batch size
+	MaxQueueSize        int           // Maximum queue size for backpressure
+	MemoryCheckInterval time.Duration // How often to check memory
 }
 
 // DefaultResourceLimits returns sensible default limits
@@ -35,27 +35,27 @@ func DefaultResourceLimits() ResourceLimits {
 
 // ResourceLimitedReducer wraps a reducer with resource management
 type ResourceLimitedReducer struct {
-	reducer     *ObservableReducer
-	limits      ResourceLimits
-	
+	reducer *ObservableReducer
+	limits  ResourceLimits
+
 	// Resource tracking
 	currentMemoryMB  int64
 	activeOperations int32
 	queuedOperations int32
-	
+
 	// Backpressure
-	semaphore    chan struct{}
-	queue        chan *queuedOperation
-	
+	semaphore chan struct{}
+	queue     chan *queuedOperation
+
 	// Memory monitoring
 	memoryTicker *time.Ticker
 	stopMonitor  chan struct{}
-	
+
 	// Metrics
-	rejectedOps   uint64
-	timeoutOps    uint64
-	memoryErrors  uint64
-	
+	rejectedOps  uint64
+	timeoutOps   uint64
+	memoryErrors uint64
+
 	mu sync.RWMutex
 }
 
@@ -133,36 +133,36 @@ func (rlr *ResourceLimitedReducer) learnInBatches(ctx context.Context, embedding
 	// Use incremental PCA for batch learning
 	// Create a default config since we don't have access to the internal config
 	config := &Config{
-		TargetDim:         10, // Default reduced dimensions
+		TargetDim:         10,   // Default reduced dimensions
 		VarianceThreshold: 0.95, // Default value
 	}
 	incPCA := NewIncrementalPCAReducer(config, rlr.limits.MaxBatchSize)
-	
+
 	for i := 0; i < len(embeddings); i += rlr.limits.MaxBatchSize {
 		end := i + rlr.limits.MaxBatchSize
 		if end > len(embeddings) {
 			end = len(embeddings)
 		}
-		
+
 		batch := embeddings[i:end]
-		
+
 		// Check context and memory
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		
+
 		if err := rlr.checkMemoryLimit(len(batch)); err != nil {
 			return err
 		}
-		
+
 		// Train on batch
 		if err := incPCA.PartialFit(ctx, batch); err != nil {
 			return fmt.Errorf("batch %d failed: %w", i/rlr.limits.MaxBatchSize, err)
 		}
 	}
-	
+
 	// Update the main reducer with the learned model
 	// (This would require adding a method to update from incremental PCA)
 	return nil
@@ -247,13 +247,13 @@ func (rlr *ResourceLimitedReducer) checkMemoryLimit(numEmbeddings int) error {
 	// Estimate memory usage (rough approximation)
 	info := rlr.reducer.reducer.GetReductionInfo()
 	embeddingMemoryMB := int64(numEmbeddings * info.OriginalDim * 4 / (1024 * 1024))
-	
+
 	currentMB := atomic.LoadInt64(&rlr.currentMemoryMB)
 	if currentMB+embeddingMemoryMB > rlr.limits.MaxMemoryMB {
 		return fmt.Errorf("memory limit exceeded: current=%dMB, required=%dMB, limit=%dMB",
 			currentMB, embeddingMemoryMB, rlr.limits.MaxMemoryMB)
 	}
-	
+
 	return nil
 }
 
@@ -275,11 +275,11 @@ func (rlr *ResourceLimitedReducer) startMemoryMonitor() {
 func (rlr *ResourceLimitedReducer) updateMemoryUsage() {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	// Convert to MB and store
 	currentMB := int64(m.Alloc / (1024 * 1024))
 	atomic.StoreInt64(&rlr.currentMemoryMB, currentMB)
-	
+
 	// Update Prometheus metric
 	memoryUsageGauge.WithLabelValues("total").Set(float64(currentMB))
 }
@@ -330,40 +330,40 @@ func (rlr *ResourceLimitedReducer) batchedHybridSearch(
 	topK int,
 	similarityFunc func(a, b []float32) float64,
 ) ([]SearchResult, error) {
-	
+
 	// Process candidates in batches and collect top-K from each
 	batchSize := rlr.limits.MaxBatchSize
 	var allResults []SearchResult
-	
+
 	for i := 0; i < len(candidates); i += batchSize {
 		end := i + batchSize
 		if end > len(candidates) {
 			end = len(candidates)
 		}
-		
+
 		batch := candidates[i:end]
-		
+
 		// Check context
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
 		}
-		
+
 		// Search in batch
 		batchResults, err := rlr.reducer.HybridSearch(ctx, queryEmbedding, batch, topK, similarityFunc)
 		if err != nil {
 			return nil, fmt.Errorf("batch %d failed: %w", i/batchSize, err)
 		}
-		
+
 		allResults = append(allResults, batchResults...)
 	}
-	
+
 	// Final re-ranking of all batch results
 	if len(allResults) <= topK {
 		return allResults, nil
 	}
-	
+
 	// Use heap for final selection
 	selector := NewTopKSelector(topK)
 	scored := make([]scoredResult, len(allResults))
@@ -373,7 +373,7 @@ func (rlr *ResourceLimitedReducer) batchedHybridSearch(
 			similarity: result.Similarity,
 		}
 	}
-	
+
 	return selector.SelectTopKResults(scored), nil
 }
 
@@ -403,9 +403,9 @@ type ResourceMetrics struct {
 func (rlr *ResourceLimitedReducer) UpdateLimits(newLimits ResourceLimits) {
 	rlr.mu.Lock()
 	defer rlr.mu.Unlock()
-	
+
 	rlr.limits = newLimits
-	
+
 	// Recreate semaphore with new limit
 	close(rlr.semaphore)
 	rlr.semaphore = make(chan struct{}, newLimits.MaxGoroutines)
@@ -459,21 +459,21 @@ func (al *AdaptiveLimits) adjustLoop() {
 func (al *AdaptiveLimits) adjustLimits() {
 	metrics := al.reducer.GetMetrics()
 	currentLimits := al.reducer.limits
-	
+
 	// Adjust based on queue size
 	if metrics.QueuedOperations > int32(currentLimits.MaxQueueSize)*8/10 {
 		// Queue is getting full, increase workers
 		newLimits := currentLimits
 		newLimits.MaxGoroutines = min(currentLimits.MaxGoroutines+2, runtime.NumCPU()*2)
 		al.reducer.UpdateLimits(newLimits)
-	} else if metrics.QueuedOperations < int32(currentLimits.MaxQueueSize)*2/10 && 
+	} else if metrics.QueuedOperations < int32(currentLimits.MaxQueueSize)*2/10 &&
 		currentLimits.MaxGoroutines > runtime.NumCPU() {
 		// Queue is mostly empty, decrease workers
 		newLimits := currentLimits
 		newLimits.MaxGoroutines = max(currentLimits.MaxGoroutines-1, runtime.NumCPU())
 		al.reducer.UpdateLimits(newLimits)
 	}
-	
+
 	// Adjust based on rejection rate
 	if metrics.RejectedOps > 0 {
 		// Increase queue size if rejecting operations

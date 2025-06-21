@@ -99,7 +99,7 @@ func TestPCAReducer_ValidationErrors(t *testing.T) {
 
 		embeddings := [][]float32{
 			{1, 2, 3},
-			{4, 5},     // Wrong dimension
+			{4, 5}, // Wrong dimension
 			{6, 7, 8},
 		}
 		err := p.Fit(ctx, embeddings)
@@ -359,10 +359,10 @@ func TestDimensionReducer_ValidationErrors(t *testing.T) {
 		}
 
 		// Should not update with invalid rates
-		dr.UpdateHitRates(-0.5, 0.7)  // Negative rate
-		dr.UpdateHitRates(1.5, 0.7)   // Rate > 1
-		dr.UpdateHitRates(0.8, -0.2)  // Negative rate
-		dr.UpdateHitRates(0.8, 1.2)   // Rate > 1
+		dr.UpdateHitRates(-0.5, 0.7) // Negative rate
+		dr.UpdateHitRates(1.5, 0.7)  // Rate > 1
+		dr.UpdateHitRates(0.8, -0.2) // Negative rate
+		dr.UpdateHitRates(0.8, 1.2)  // Rate > 1
 
 		metrics := dr.GetMetrics()
 		if metrics.HitRateBeforeReduction != 0 || metrics.HitRateAfterReduction != 0 {
@@ -397,8 +397,8 @@ func TestDimensionReducer_ValidationErrors(t *testing.T) {
 
 // Helper function for testing
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr || 
-		   len(s) >= len(substr) && contains(s[1:], substr)
+	return len(s) >= len(substr) && s[:len(substr)] == substr ||
+		len(s) >= len(substr) && contains(s[1:], substr)
 }
 
 // testCosineSimilarity is a test similarity function
@@ -406,17 +406,17 @@ func testCosineSimilarity(a, b []float32) float64 {
 	if len(a) != len(b) {
 		return 0
 	}
-	
+
 	var dotProduct, normA, normB float64
 	for i := range a {
 		dotProduct += float64(a[i] * b[i])
 		normA += float64(a[i] * a[i])
 		normB += float64(b[i] * b[i])
 	}
-	
+
 	if normA == 0 || normB == 0 {
 		return 0
 	}
-	
+
 	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
 }

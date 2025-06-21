@@ -1,4 +1,4 @@
-# Infrastructure as Code Tool (iaac)
+# Infrastructure as Code CLI Tool
 
 A comprehensive CLI tool for managing application deployments in local Kubernetes environments with natural language support.
 
@@ -10,290 +10,396 @@ A comprehensive CLI tool for managing application deployments in local Kubernete
 - **Infrastructure Validation**: Validate configurations and deployments
 - **Workflow Automation**: Automate complex deployment workflows
 
-## NLP Agent
-
-The iaac tool includes a powerful NLP agent that allows you to use natural language for infrastructure management.
-
-## Features
-
-- **Natural Language Processing**: Convert plain English queries to CLI commands
-- **Interactive Mode**: Chat-like interface for continuous interaction
-- **Safety Mechanisms**: Built-in protection against dangerous operations
-- **Command Validation**: Ensures only valid commands are executed
-- **Audit Logging**: Complete trail of all executed commands
-- **Confidence Scoring**: Shows interpretation confidence levels
-
 ## Installation
 
-1. Ensure you have an OpenAI API key:
-   ```bash
-   export OPENAI_API_KEY="your-api-key-here"
-   ```
-
-2. Build the iaac binary:
-   ```bash
-   go build -o iaac ./cmd/
-   ```
-
-## Usage
-
-### Single Query Mode
-
-Execute a single natural language query:
+### From Source
 
 ```bash
-iaac agent "create a new cluster with 3 nodes"
+go build -o iaac .
 ```
 
-### Interactive Mode
-
-Start an interactive session:
+### Using Go Install
 
 ```bash
-iaac agent --interactive
-```
-
-### Configuration File
-
-Use a custom configuration file:
-
-```bash
-iaac agent --config agent.yaml "show all clusters"
+go install github.com/raja-aiml/sematic-cache/deploy/local@latest
 ```
 
 ## Configuration
 
-Create an `agent.yaml` file based on the provided `agent.yaml.example`:
+The tool uses a centralized configuration directory. By default, it looks for configuration in:
+- `./config`
+- `../config`
+- `../../iaac/config`
+
+### Global Flags
+
+```bash
+--config-dir string   Config directory path (default: ./config or ../config)
+--env-file string     Path to environment file (default: <config-dir>/blueprint.env)
+```
+
+### Examples
+
+```bash
+# Use default config location
+iaac cluster up
+
+# Use custom config directory
+iaac --config-dir /path/to/config cluster up
+
+# Use specific environment file
+iaac --env-file /path/to/custom.env cluster up
+
+# Check current configuration
+iaac config show
+```
+
+## Commands
+
+### Cluster Management
+
+Manage k3d clusters with blueprint scenarios.
+
+```bash
+# Create cluster with minimal scenario
+iaac cluster up --scenario minimal
+
+# Create cluster with full stack
+iaac cluster up --scenario full-stack
+
+# Destroy cluster
+iaac cluster down
+
+# Check cluster status
+iaac cluster ps
+
+# View cluster logs
+iaac cluster logs
+
+# Run cluster tests
+iaac cluster test
+```
+
+#### Available Scenarios
+
+- `minimal`: Basic PostgreSQL and Redis
+- `development`: Full development stack with debug tools
+- `service-mesh`: Istio service mesh with observability
+- `monitoring-only`: Just the observability stack
+- `full-stack`: Complete production-like environment
+
+### Development Commands
+
+Build and deploy applications.
+
+```bash
+# Build Docker image and import to k3d
+iaac dev build
+
+# Deploy application with secrets
+iaac dev deploy
+
+# View application logs
+iaac dev logs --follow
+
+# Check deployment status
+iaac dev status
+
+# Run application tests
+iaac dev test
+
+# Remove deployment
+iaac dev remove
+```
+
+### Natural Language Agent
+
+Use natural language to execute commands.
+
+```bash
+# Single query
+iaac agent "create a new cluster with 3 nodes"
+
+# Interactive mode
+iaac agent --interactive
+
+# With custom configuration
+iaac agent --config config/agent.yaml "deploy my application"
+```
+
+#### Agent Configuration
+
+Create `config/agent.yaml`:
 
 ```yaml
-# OpenAI Configuration
 openai_key: ${OPENAI_API_KEY}
 openai_model: gpt-4-turbo-preview
 openai_max_tokens: 1000
 
-# Safety Configuration
 enable_dangerous_commands: false
 require_confirmation: true
 
-# Command restrictions
 command_whitelist:
   - cluster
-  - blueprint
-  - deploy
+  - dev
+  - workflow
 
 command_blacklist:
   - "cluster delete"
-  - "cluster reset"
-
-# Execution settings
-command_timeout: 30s
-audit_log_path: ./logs/audit.log
+  - "dev remove"
 ```
 
-## Natural Language Examples
+### Workflow Commands
 
-### Cluster Management
-
-```
-"Create a new k3d cluster called development"
-→ iaac cluster create --name=development
-
-"Show me all running clusters"
-→ iaac cluster list --status=running
-
-"Delete the test cluster"
-→ iaac cluster delete --name=test
-
-"Create a 3 node cluster with k3s version 1.28"
-→ iaac cluster create --nodes=3 --k3s-version=1.28
-```
-
-### Deployment Operations
-
-```
-"Deploy nginx to the production cluster"
-→ iaac deploy apply --name=nginx --cluster=production
-
-"Apply the manifest from config/app.yaml"
-→ iaac deploy apply --file=config/app.yaml
-
-"Show deployment status for my application"
-→ iaac deploy status --name=my-application
-```
-
-### Blueprint Management
-
-```
-"Validate the blueprint configuration"
-→ iaac blueprint validate --file=blueprint.yaml
-
-"List all available blueprints"
-→ iaac blueprint list
-
-"Show blueprint details for production"
-→ iaac blueprint show --name=production
-```
-
-## Interactive Mode Commands
-
-When in interactive mode, you can use these special commands:
-
-- `help` or `?` - Show help information
-- `commands` - List all available commands
-- `examples` - Show example natural language queries
-- `clear` - Clear the screen
-- `exit` or `quit` - Exit interactive mode
-
-## Safety Features
-
-### Command Validation
-
-The agent validates all commands before execution:
-- Checks against whitelist/blacklist
-- Validates required parameters
-- Ensures command exists in registry
-
-### Dangerous Command Protection
-
-Commands marked as dangerous (delete, destroy, etc.) require:
-- Explicit enabling in configuration
-- User confirmation before execution
-- Clear warning messages
-
-### Audit Trail
-
-All executed commands are logged with:
-- Timestamp
-- User
-- Original query
-- Executed command
-- Success/failure status
-- Execution duration
-
-## Command Registry
-
-Generate command documentation for the agent:
+Automate complex deployment workflows.
 
 ```bash
-# Generate JSON registry
+# Full deployment workflow
+iaac workflow full
+
+# Setup infrastructure only
+iaac workflow setup
+
+# Build application only
+iaac workflow build
+
+# Deploy application only
+iaac workflow deploy
+
+# Run tests
+iaac workflow test
+
+# Show workflow status
+iaac workflow status
+
+# Clean up everything
+iaac workflow reset
+```
+
+### Manifest Management
+
+Generate and manage Kubernetes manifests.
+
+```bash
+# Generate manifests for a scenario
+iaac manifest generate --scenario minimal
+
+# Generate with custom overlay
+iaac manifest generate --overlay dev
+
+# Render manifests with environment substitution
+iaac manifest render --path ./manifests
+
+# Show manifest differences
+iaac manifest diff --scenario minimal
+```
+
+### Validation Commands
+
+Validate configurations and deployments.
+
+```bash
+# Validate blueprint structure
+iaac validate blueprint --path ./blueprint
+
+# Validate deployed resources
+iaac validate deployment --namespace app
+
+# Validate manifest files
+iaac validate manifests --path ./manifests
+```
+
+### Test Commands
+
+Run validation tests.
+
+```bash
+# Run tests for current scenario
+iaac test --scenario minimal
+
+# Run tests in parallel
+iaac test --parallel
+
+# Generate test report
+iaac test --report json --output report.json
+
+# Run with custom timeout
+iaac test --timeout 600
+```
+
+### Configuration Commands
+
+Manage configuration.
+
+```bash
+# Show current configuration
+iaac config show
+
+# Get configuration directory path
+iaac config path
+```
+
+### Debug Commands
+
+Comprehensive debugging tools.
+
+```bash
+# Full diagnostic analysis
+iaac debug analyze full
+
+# Quick analysis
+iaac debug analyze quick
+
+# Test API endpoints
+iaac debug test quick
+
+# Manage secrets
+iaac debug secrets create
+iaac debug secrets update
+iaac debug secrets view
+```
+
+## Environment Variables
+
+Key environment variables (set in `config/blueprint.env`):
+
+```bash
+# Cluster Configuration
+K3D_CLUSTER_NAME=semantic-cache
+K3D_K3S_VERSION=v1.31.5-k3s1
+K3D_NODE_COUNT=3
+
+# Application Settings
+APP_VERSION=latest
+APP_PORT=8080
+
+# Database Configuration
+DB_NAME=cache_db
+DB_PASSWORD=your_password
+
+# Redis Configuration
+REDIS_PASSWORD=your_redis_password
+```
+
+## Documentation Generation
+
+Generate command documentation for the NLP agent:
+
+```bash
+# Generate JSON documentation
 iaac docs --output commands.json
 
 # Generate Markdown documentation
 iaac docs --format markdown --output commands.md
 ```
 
-The registry is used by the agent to understand available commands and their options.
+## Examples
 
-## Best Practices
+### Quick Start
 
-1. **Be Specific**: Include names, numbers, and specific details in your queries
-   - Good: "Create a cluster named dev with 3 nodes"
-   - Less specific: "Create a cluster"
+```bash
+# Set up configuration
+cp config/blueprint.env.example config/blueprint.env
+# Edit blueprint.env with your settings
 
-2. **Use Natural Language**: Write queries as you would ask a colleague
-   - "Can you show me all the running clusters?"
-   - "I need to deploy nginx to production"
+# Create cluster and deploy
+iaac workflow full
 
-3. **Review Before Execution**: Always review the interpreted command before confirming
+# Or step by step
+iaac cluster up
+iaac dev build
+iaac dev deploy
+iaac dev test
+```
 
-4. **Start with Safe Commands**: Begin with read-only operations like "list" or "show"
+### Using Natural Language
 
-5. **Use Interactive Mode**: For complex tasks, interactive mode provides better feedback
+```bash
+# Start interactive agent
+iaac agent -i
+
+# Example queries:
+> create a new cluster
+> deploy my application
+> show all running pods
+> run tests
+```
+
+### Custom Scenarios
+
+```bash
+# Deploy with custom manifests
+iaac manifest generate --path ./my-manifests
+iaac cluster up --kustomize-path ./my-manifests
+```
 
 ## Troubleshooting
 
-### Common Issues
+### Configuration Issues
 
-1. **"OpenAI API key not set"**
-   - Set the `OPENAI_API_KEY` environment variable
-   - Or add it to your configuration file
+```bash
+# Check configuration paths
+iaac config show
 
-2. **"Command not found in registry"**
-   - Regenerate the command registry: `iaac docs`
-   - Ensure the command exists in the CLI
+# Use explicit paths
+iaac --config-dir $(pwd)/config cluster up
+```
 
-3. **"Dangerous commands are disabled"**
-   - Enable in configuration: `enable_dangerous_commands: true`
-   - Or use the flag: `--enable-dangerous`
+### Docker Issues
 
-4. **Low confidence interpretations**
-   - Rephrase your query with more specific details
-   - Use command names directly in your query
+```bash
+# Ensure Docker is running
+docker ps
+
+# Check Docker permissions
+docker run hello-world
+```
+
+### Cluster Issues
+
+```bash
+# List existing clusters
+k3d cluster list
+
+# Delete conflicting cluster
+k3d cluster delete semantic-cache
+```
 
 ### Debug Mode
 
-Enable debug logging for troubleshooting:
-
 ```bash
-iaac agent --debug "your query"
+# Enable debug logging
+export LOG_LEVEL=debug
+iaac cluster up
+
+# Or use debug commands
+iaac debug analyze full
 ```
 
-## Architecture
+## Project Structure
 
-The agent consists of several components:
-
-1. **NLP Engine**: OpenAI integration for natural language understanding
-2. **Command Registry**: Database of available commands and options
-3. **Command Parser**: Converts NLP output to executable commands
-4. **Safety Validator**: Ensures commands are safe to execute
-5. **Executor**: Runs commands with timeout and error handling
-6. **Audit Logger**: Records all operations
-
-## Security Considerations
-
-1. **API Key Security**: Store OpenAI API keys securely
-2. **Command Restrictions**: Use whitelists for production environments
-3. **Audit Logs**: Regularly review audit logs for suspicious activity
-4. **Confirmation Prompts**: Always require confirmation for destructive operations
-
-## Advanced Usage
-
-### Custom Command Builders
-
-Implement custom command builders for specialized use cases:
-
-```go
-type CustomBuilder struct{}
-
-func (b *CustomBuilder) Build(cmd *InterpretedCommand) ([]string, error) {
-    // Custom command building logic
-}
 ```
-
-### Extending the NLP Engine
-
-Add custom interpretation logic:
-
-```go
-type CustomNLPEngine struct {
-    *OpenAINLPEngine
-}
-
-func (e *CustomNLPEngine) Interpret(ctx context.Context, query string, registry *CommandRegistry) (*InterpretedCommand, error) {
-    // Custom interpretation logic
-}
+iaac/infra/
+├── cmd/              # CLI commands
+├── pkg/              # Core packages
+│   ├── agent/       # NLP agent
+│   ├── blueprint/   # Blueprint management
+│   ├── config/      # Configuration loader
+│   ├── docker/      # Docker operations
+│   ├── k3d/         # K3D cluster management
+│   ├── kubernetes/  # Kubernetes client
+│   ├── llm/         # LLM integration
+│   ├── secrets/     # Secret management
+│   └── utils/       # Utilities
+├── config/          # Default configuration
+├── docs/            # Documentation
+└── main.go          # Entry point
 ```
-
-## Examples Repository
-
-Find more examples and use cases in the examples directory:
-
-- `examples/cluster-management.md` - Cluster operation examples
-- `examples/deployment-scenarios.md` - Deployment workflows
-- `examples/blueprint-usage.md` - Blueprint management examples
 
 ## Contributing
 
-To contribute to the NLP agent:
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development guidelines.
 
-1. Add new command patterns to the registry
-2. Improve natural language understanding
-3. Add safety validations
-4. Enhance error messages and suggestions
+## License
 
-## Support
-
-For issues or questions:
-- Check the troubleshooting section
-- Review the examples
-- Submit issues to the repository
+This project is licensed under the MIT License.

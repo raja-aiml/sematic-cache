@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/blueprint"
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/config"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/k3d"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/kubernetes"
@@ -55,6 +56,11 @@ Available scenarios:
   - monitoring-only: Just the observability stack
   - full-stack: Complete production-like environment`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load configuration
+			if err := config.LoadConfig(cmd); err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			ctx := context.Background()
 			logger := utils.NewLogger("cluster")
 

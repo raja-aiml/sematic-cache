@@ -134,9 +134,9 @@ func init() {
 
 // ObservableReducer wraps a dimension reducer with observability
 type ObservableReducer struct {
-	reducer              *OptimizedDimensionReducer
-	qualityThreshold     float64
-	degradationCallback  func(ctx context.Context, metrics *QualityMetrics)
+	reducer             *OptimizedDimensionReducer
+	qualityThreshold    float64
+	degradationCallback func(ctx context.Context, metrics *QualityMetrics)
 }
 
 // NewObservableReducer creates a new observable dimension reducer
@@ -250,7 +250,7 @@ func (or *ObservableReducer) HybridSearch(
 	start := time.Now()
 	results, err := or.reducer.OptimizedHybridSearch(ctx, queryEmbedding, candidates, topK, similarityFunc)
 	duration := time.Since(start)
-	
+
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
@@ -268,11 +268,11 @@ func (or *ObservableReducer) HybridSearch(
 // checkQualityDegradation monitors for quality issues
 func (or *ObservableReducer) checkQualityDegradation(ctx context.Context) {
 	metrics := or.reducer.GetMetrics()
-	
+
 	// Check if accuracy has degraded below threshold
 	if metrics.AccuracyScore > 0 && metrics.AccuracyScore < or.qualityThreshold {
 		qualityDegradationTotal.Inc()
-		
+
 		// Create alert span
 		_, span := tracer.Start(ctx, "QualityDegradationAlert",
 			trace.WithAttributes(
@@ -285,9 +285,9 @@ func (or *ObservableReducer) checkQualityDegradation(ctx context.Context) {
 		// Call degradation callback if set
 		if or.degradationCallback != nil {
 			qm := &QualityMetrics{
-				totalQueries:           metrics.TotalQueries,
-				reducedDimQueries:      metrics.ReducedDimQueries,
-				fullDimReranks:         metrics.FullDimReranks,
+				totalQueries:      metrics.TotalQueries,
+				reducedDimQueries: metrics.ReducedDimQueries,
+				fullDimReranks:    metrics.FullDimReranks,
 			}
 			setFloat64Atomic(&qm.avgReductionTimeMs, metrics.AvgReductionTimeMs)
 			setFloat64Atomic(&qm.avgRerankTimeMs, metrics.AvgRerankTimeMs)
@@ -304,11 +304,11 @@ func (or *ObservableReducer) checkQualityDegradation(ctx context.Context) {
 // UpdateMemoryMetrics updates memory usage metrics
 func (or *ObservableReducer) UpdateMemoryMetrics(ctx context.Context) {
 	info := or.reducer.GetReductionInfo()
-	
+
 	// Estimate memory usage
 	pcaMemory := float64(info.OriginalDim*info.ReducedDim*4) / (1024 * 1024) // Components matrix in MB
 	memoryUsageGauge.WithLabelValues("pca_components").Set(pcaMemory)
-	
+
 	// Get pool stats
 	poolStats := GetPoolStats()
 	poolMemory := float64(len(poolStats.SlicePoolSizes)*1000*4) / (1024 * 1024) // Rough estimate

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/config"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/constants"
 	"github.com/raja-aiml/sematic-cache/deploy/local/pkg/utils"
 	"github.com/spf13/cobra"
@@ -105,6 +106,11 @@ func workflowSetupCmd(wm *WorkflowManager) *cobra.Command {
 		Use:   "setup",
 		Short: "Create cluster and deploy infrastructure",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load configuration
+			if err := config.LoadConfig(cmd); err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			ctx := context.Background()
 			return runSetup(ctx, wm)
 		},

@@ -45,7 +45,7 @@ func TestNewDimensionReducerValidation(t *testing.T) {
 			wantError: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewDimensionReducer(tt.config)
@@ -61,7 +61,7 @@ func TestLearnEdgeCases(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name       string
 		embeddings [][]float32
@@ -105,7 +105,7 @@ func TestLearnEdgeCases(t *testing.T) {
 			errorMsg:  "failed to fit reducer: target dimension (5) cannot exceed original dimension (3)",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := reducer.Learn(ctx, tt.embeddings)
@@ -124,32 +124,32 @@ func TestReduceForSearchErrors(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
 	ctx := context.Background()
-	
+
 	// Test before learning
 	_, err := reducer.ReduceForSearch(ctx, []float32{1, 2, 3, 4, 5, 6})
 	if err == nil {
 		t.Error("Expected error when reducing before learning")
 	}
-	
+
 	// Learn with valid data
 	embeddings := generateTestEmbeddings(10, 10)
 	err = reducer.Learn(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to learn: %v", err)
 	}
-	
+
 	// Test with wrong dimension
 	_, err = reducer.ReduceForSearch(ctx, []float32{1, 2, 3})
 	if err == nil {
 		t.Error("Expected error when reducing embedding with wrong dimension")
 	}
-	
+
 	// Test with nil embedding
 	_, err = reducer.ReduceForSearch(ctx, nil)
 	if err == nil {
 		t.Error("Expected error when reducing nil embedding")
 	}
-	
+
 	// Test with correct dimension
 	reduced, err := reducer.ReduceForSearch(ctx, embeddings[0])
 	if err != nil {
@@ -165,20 +165,20 @@ func TestHybridSearchErrors(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
 	ctx := context.Background()
-	
+
 	// Learn first
 	embeddings := generateTestEmbeddings(20, 10)
 	err := reducer.Learn(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to learn: %v", err)
 	}
-	
+
 	// Test with nil candidates
 	_, err = reducer.HybridSearch(ctx, embeddings[0], nil, 5, cosineSimilarity)
 	if err == nil {
 		t.Error("Expected error with nil candidates")
 	}
-	
+
 	// Test with empty candidates - should return empty results, not error
 	results, err := reducer.HybridSearch(ctx, embeddings[0], []SearchCandidate{}, 5, cosineSimilarity)
 	if err != nil {
@@ -187,19 +187,19 @@ func TestHybridSearchErrors(t *testing.T) {
 	if len(results) != 0 {
 		t.Error("Expected empty results with empty candidates")
 	}
-	
+
 	// Test with valid candidates
 	candidates := []SearchCandidate{
 		{ID: "1", Embedding: embeddings[0], ReducedEmbedding: make([]float32, 3)},
 		{ID: "2", Embedding: embeddings[1], ReducedEmbedding: make([]float32, 3)},
 	}
-	
+
 	// Test with topK = 0 - should return error
 	_, err = reducer.HybridSearch(ctx, embeddings[0], candidates, 0, cosineSimilarity)
 	if err == nil {
 		t.Error("Expected error with topK=0")
 	}
-	
+
 	// Test with mismatched query embedding dimension
 	_, err = reducer.HybridSearch(ctx, []float32{1, 2, 3}, candidates, 1, cosineSimilarity)
 	if err == nil {
@@ -212,7 +212,7 @@ func TestFullDimensionSearch(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
 	ctx := context.Background()
-	
+
 	// Generate test data
 	embeddings := generateTestEmbeddings(20, 10)
 	candidates := make([]SearchCandidate, len(embeddings))
@@ -223,28 +223,28 @@ func TestFullDimensionSearch(t *testing.T) {
 			Metadata:  map[string]interface{}{"index": i},
 		}
 	}
-	
+
 	// Learn
 	err := reducer.Learn(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to learn: %v", err)
 	}
-	
+
 	// Test full dimension search
 	query := embeddings[0]
 	topK := 5
 	results := reducer.fullDimensionSearch(query, candidates, topK, cosineSimilarity)
-	
+
 	// Verify results
 	if len(results) != topK {
 		t.Errorf("Expected %d results, got %d", topK, len(results))
 	}
-	
+
 	// First result should be the query itself
 	if results[0].Candidate.ID != "id_0" {
 		t.Errorf("First result should be the query itself, got %s", results[0].Candidate.ID)
 	}
-	
+
 	// Results should be sorted by similarity
 	for i := 1; i < len(results); i++ {
 		if results[i].Similarity > results[i-1].Similarity {
@@ -259,32 +259,32 @@ func TestReduceBatchErrors(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
 	ctx := context.Background()
-	
+
 	// Test before learning
 	_, err := reducer.ReduceBatch(ctx, [][]float32{{1, 2, 3}})
 	if err == nil {
 		t.Error("Expected error when reducing batch before learning")
 	}
-	
+
 	// Learn
 	embeddings := generateTestEmbeddings(10, 10)
 	err = reducer.Learn(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to learn: %v", err)
 	}
-	
+
 	// Test with nil batch
 	_, err = reducer.ReduceBatch(ctx, nil)
 	if err == nil {
 		t.Error("Expected error with nil batch")
 	}
-	
+
 	// Test with empty batch
 	_, err = reducer.ReduceBatch(ctx, [][]float32{})
 	if err == nil {
 		t.Error("Expected error with empty batch")
 	}
-	
+
 	// Test with mixed dimensions
 	mixedBatch := [][]float32{
 		embeddings[0],
@@ -301,17 +301,17 @@ func TestEstimateSearchSpeedupEdgeCases(t *testing.T) {
 	// Test before learning
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
-	
+
 	speedup := reducer.EstimateSearchSpeedup()
 	if speedup != 1.0 {
 		t.Errorf("Expected speedup 1.0 before learning, got %f", speedup)
 	}
-	
+
 	// Test with zero dimensions (edge case)
 	reducer.originalDim = 0
 	reducer.reducedDim = 0
 	reducer.isLearned = true
-	
+
 	speedup = reducer.EstimateSearchSpeedup()
 	if speedup != 1.0 {
 		t.Errorf("Expected speedup 1.0 with zero dimensions, got %f", speedup)
@@ -382,13 +382,13 @@ func TestValidateEmbeddings(t *testing.T) {
 				{1, 2, 3},
 				{4, 5, 6},
 			},
-			minSamples: 2,
-			checkDim:   true,
+			minSamples:  2,
+			checkDim:    true,
 			expectedDim: 3,
-			wantError:  false,
+			wantError:   false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := func() error {
@@ -432,14 +432,14 @@ func TestConcurrentHybridSearch(t *testing.T) {
 	config := &Config{TargetDim: 10}
 	reducer, _ := NewDimensionReducer(config)
 	ctx := context.Background()
-	
+
 	// Generate test data
 	embeddings := generateTestEmbeddings(100, 50)
 	err := reducer.Learn(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to learn: %v", err)
 	}
-	
+
 	// Create candidates
 	candidates := make([]SearchCandidate, len(embeddings))
 	for i, emb := range embeddings {
@@ -451,33 +451,33 @@ func TestConcurrentHybridSearch(t *testing.T) {
 			Metadata:         map[string]interface{}{"index": i},
 		}
 	}
-	
+
 	// Concurrent searches
 	var wg sync.WaitGroup
 	numGoroutines := 20
 	numSearches := 50
 	errors := make(chan error, numGoroutines*numSearches)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			for j := 0; j < numSearches; j++ {
-				queryIdx := (id * numSearches + j) % len(embeddings)
+				queryIdx := (id*numSearches + j) % len(embeddings)
 				query := embeddings[queryIdx]
-				
+
 				results, err := reducer.HybridSearch(ctx, query, candidates, 10, cosineSimilarity)
 				if err != nil {
 					errors <- err
 					return
 				}
-				
+
 				// Verify results
 				if len(results) != 10 {
 					errors <- fmt.Errorf("expected 10 results, got %d", len(results))
 					return
 				}
-				
+
 				// First result should be the query itself
 				expectedID := fmt.Sprintf("id_%d", queryIdx)
 				if results[0].Candidate.ID != expectedID {
@@ -487,10 +487,10 @@ func TestConcurrentHybridSearch(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 	close(errors)
-	
+
 	// Check for errors
 	for err := range errors {
 		t.Errorf("Concurrent search error: %v", err)
@@ -501,23 +501,23 @@ func TestConcurrentHybridSearch(t *testing.T) {
 func TestShouldUseReductionEdgeCases(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
-	
+
 	// Before learning
 	if reducer.ShouldUseReduction() {
 		t.Error("Should not use reduction before learning")
 	}
-	
+
 	// After learning with poor compression
 	ctx := context.Background()
 	embeddings := generateTestEmbeddings(10, 10)
 	reducer.Learn(ctx, embeddings)
-	
+
 	// Set very high reduced dimension (poor compression)
 	reducer.reducedDim = 9
 	if reducer.ShouldUseReduction() {
 		t.Error("Should not use reduction with compression ratio > 0.8")
 	}
-	
+
 	// Test with poor hit rate drop
 	reducer.reducedDim = 3
 	reducer.UpdateHitRates(0.9, 0.4) // Large drop in hit rate
@@ -532,26 +532,26 @@ func TestMetricsCalculation(t *testing.T) {
 		OriginalDim: 100,
 		ReducedDim:  25,
 	}
-	
+
 	metrics.Calculate()
-	
+
 	expectedRatio := 0.25
 	if metrics.CompressionRatio != expectedRatio {
 		t.Errorf("CompressionRatio = %f, want %f", metrics.CompressionRatio, expectedRatio)
 	}
-	
+
 	expectedSaved := int64((100 - 25) * 4) // 75 * 4 bytes
 	if metrics.MemorySavedBytes != expectedSaved {
 		t.Errorf("MemorySavedBytes = %d, want %d", metrics.MemorySavedBytes, expectedSaved)
 	}
-	
+
 	// Test with zero original dimension
 	metrics2 := &ReductionMetrics{
 		OriginalDim: 0,
 		ReducedDim:  0,
 	}
 	metrics2.Calculate()
-	
+
 	if metrics2.CompressionRatio != 0 {
 		t.Errorf("CompressionRatio should be 0 with zero dimensions, got %f", metrics2.CompressionRatio)
 	}
@@ -615,7 +615,7 @@ func TestConfigValidate(t *testing.T) {
 			wantError: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
@@ -634,14 +634,14 @@ func TestSearchReduced(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
 	ctx := context.Background()
-	
+
 	// Generate and learn embeddings
 	embeddings := generateTestEmbeddings(50, 20)
 	err := reducer.Learn(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to learn: %v", err)
 	}
-	
+
 	// Create candidates with reduced embeddings
 	candidates := make([]SearchCandidate, len(embeddings))
 	for i, emb := range embeddings {
@@ -653,14 +653,14 @@ func TestSearchReduced(t *testing.T) {
 			Metadata:         map[string]interface{}{"index": i},
 		}
 	}
-	
+
 	// Test with topK larger than candidates
 	queryReduced, _ := reducer.ReduceForSearch(ctx, embeddings[0])
 	results := reducer.searchReduced(queryReduced, candidates, 100, cosineSimilarity)
 	if len(results) != len(candidates) {
 		t.Errorf("Expected %d results when topK > candidates, got %d", len(candidates), len(results))
 	}
-	
+
 	// Test with candidates missing reduced embeddings
 	candidatesNoReduced := make([]SearchCandidate, 10)
 	for i := 0; i < 10; i++ {
@@ -670,7 +670,7 @@ func TestSearchReduced(t *testing.T) {
 			// No ReducedEmbedding
 		}
 	}
-	
+
 	results = reducer.searchReduced(queryReduced, candidatesNoReduced, 5, cosineSimilarity)
 	if len(results) != 0 {
 		t.Errorf("Expected 0 results with no reduced embeddings, got %d", len(results))
@@ -681,10 +681,10 @@ func TestSearchReduced(t *testing.T) {
 func TestRerankWithFullDims(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
-	
+
 	// Generate test data
 	embeddings := generateTestEmbeddings(20, 10)
-	
+
 	// Create candidates from search results
 	candidates := make([]SearchCandidate, 10)
 	for i := 0; i < 10; i++ {
@@ -693,21 +693,21 @@ func TestRerankWithFullDims(t *testing.T) {
 			Embedding: embeddings[i],
 		}
 	}
-	
+
 	// Rerank with full dimensions
 	query := embeddings[0]
 	reranked := reducer.rerankWithFullDims(query, candidates, 5, cosineSimilarity)
-	
+
 	// Verify results
 	if len(reranked) != 5 {
 		t.Errorf("Expected 5 reranked results, got %d", len(reranked))
 	}
-	
+
 	// First result should still be id_0
 	if reranked[0].Candidate.ID != "id_0" {
 		t.Errorf("First reranked result should be id_0, got %s", reranked[0].Candidate.ID)
 	}
-	
+
 	// Results should be sorted by similarity
 	for i := 1; i < len(reranked); i++ {
 		if reranked[i].Similarity > reranked[i-1].Similarity {
@@ -715,7 +715,7 @@ func TestRerankWithFullDims(t *testing.T) {
 			break
 		}
 	}
-	
+
 	// Test with topK larger than candidates
 	rerankedAll := reducer.rerankWithFullDims(query, candidates, 20, cosineSimilarity)
 	if len(rerankedAll) != len(candidates) {
@@ -725,8 +725,8 @@ func TestRerankWithFullDims(t *testing.T) {
 
 // Helper function to check if string contains substring
 func containsSubstr(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr || 
-		   len(s) > len(substr) && containsSubstrHelper(s[1:], substr)
+	return len(s) >= len(substr) && s[:len(substr)] == substr ||
+		len(s) > len(substr) && containsSubstrHelper(s[1:], substr)
 }
 
 func containsSubstrHelper(s, substr string) bool {
@@ -743,16 +743,16 @@ func containsSubstrHelper(s, substr string) bool {
 func TestLearnWithContextCancellation(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
-	
+
 	// Create a context that we can cancel
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Generate large embeddings to make Learn take some time
 	embeddings := generateTestEmbeddings(1000, 100)
-	
+
 	// Cancel context immediately
 	cancel()
-	
+
 	// Try to learn with cancelled context
 	err := reducer.Learn(ctx, embeddings)
 	// The current implementation doesn't check context, so it will succeed
@@ -768,12 +768,12 @@ func TestReducerWithVarianceThreshold(t *testing.T) {
 		VarianceThreshold: 0.95,
 		Standardize:       true,
 	}
-	
+
 	reducer, err := NewDimensionReducer(config)
 	if err != nil {
 		t.Fatalf("Failed to create reducer: %v", err)
 	}
-	
+
 	// Generate embeddings with clear principal components
 	embeddings := make([][]float32, 100)
 	for i := range embeddings {
@@ -787,24 +787,24 @@ func TestReducerWithVarianceThreshold(t *testing.T) {
 			}
 		}
 	}
-	
+
 	ctx := context.Background()
 	err = reducer.Learn(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to learn: %v", err)
 	}
-	
+
 	// Check that reduced dimension was chosen based on variance
 	if reducer.reducedDim >= 10 {
 		t.Errorf("Expected reduced dimension < 10 with variance threshold, got %d", reducer.reducedDim)
 	}
-	
+
 	// Test reduction
 	reduced, err := reducer.ReduceForSearch(ctx, embeddings[0])
 	if err != nil {
 		t.Fatalf("Failed to reduce: %v", err)
 	}
-	
+
 	if len(reduced) != reducer.reducedDim {
 		t.Errorf("Reduced embedding dimension mismatch: got %d, want %d", len(reduced), reducer.reducedDim)
 	}
@@ -814,29 +814,29 @@ func TestReducerWithVarianceThreshold(t *testing.T) {
 func TestUpdateMetrics(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	reducer, _ := NewDimensionReducer(config)
-	
+
 	// Set up some basic state
 	reducer.originalDim = 10
 	reducer.reducedDim = 5
 	reducer.isLearned = true
-	
+
 	// Generate test embeddings
 	embeddings := generateTestEmbeddings(10, 10)
-	
+
 	// Test updateLearnMetrics
 	duration := 10 * time.Millisecond
 	reducer.updateLearnMetrics(embeddings, duration)
-	
+
 	// Check that variance and memory were updated
 	metrics := reducer.GetMetrics()
 	if metrics.MemorySavedMB <= 0 {
 		t.Error("MemorySavedMB should be positive")
 	}
-	
+
 	// Test updateReductionMetrics
 	duration = 5 * time.Millisecond
 	reducer.updateReductionMetrics(duration)
-	
+
 	metrics = reducer.GetMetrics()
 	if metrics.ReducedDimQueries != 1 {
 		t.Errorf("ReducedDimQueries = %d, want 1", metrics.ReducedDimQueries)
@@ -844,12 +844,12 @@ func TestUpdateMetrics(t *testing.T) {
 	if metrics.AvgReductionTimeMs <= 0 {
 		t.Error("AvgReductionTimeMs should be positive")
 	}
-	
+
 	// Test updateSearchMetrics
 	phase1Time := 3 * time.Millisecond
 	phase2Time := 2 * time.Millisecond
 	reducer.updateSearchMetrics(phase1Time, phase2Time, 100, 20)
-	
+
 	metrics = reducer.GetMetrics()
 	if metrics.TotalQueries != 1 {
 		t.Errorf("TotalQueries = %d, want 1", metrics.TotalQueries)
@@ -927,7 +927,7 @@ func TestValidateSearchInputs(t *testing.T) {
 			wantError:  false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := func() error {
@@ -967,9 +967,9 @@ func TestSortFunctions(t *testing.T) {
 		{candidate: SearchCandidate{ID: "2"}, similarity: 0.7},
 		{candidate: SearchCandidate{ID: "3"}, similarity: 0.3},
 	}
-	
+
 	sortBySimilarity(candidates)
-	
+
 	// Should be sorted in descending order
 	expected := []float64{0.9, 0.7, 0.5, 0.3}
 	for i, c := range candidates {
@@ -977,7 +977,7 @@ func TestSortFunctions(t *testing.T) {
 			t.Errorf("candidates[%d].similarity = %f, want %f", i, c.similarity, expected[i])
 		}
 	}
-	
+
 	// Test sortResultsBySimilarity
 	results := []scoredResult{
 		{result: SearchResult{Similarity: 0.5}, similarity: 0.5},
@@ -985,9 +985,9 @@ func TestSortFunctions(t *testing.T) {
 		{result: SearchResult{Similarity: 0.7}, similarity: 0.7},
 		{result: SearchResult{Similarity: 0.3}, similarity: 0.3},
 	}
-	
+
 	sortResultsBySimilarity(results)
-	
+
 	// Should be sorted in descending order
 	for i, r := range results {
 		if r.similarity != expected[i] {
@@ -1000,27 +1000,27 @@ func TestSortFunctions(t *testing.T) {
 func TestCalculateTotalVariance(t *testing.T) {
 	config := &Config{TargetDim: 3}
 	reducer, _ := NewDimensionReducer(config)
-	
+
 	// Set up variance ratios
 	reducer.varianceRatio = []float64{0.5, 0.3, 0.1, 0.05, 0.05}
-	
+
 	// Calculate total variance
 	variance := reducer.calculateTotalVariance()
-	
+
 	// Should sum all variance ratios (the function sums all, not just up to reducedDim)
 	// With the initial values, it should be 1.0
-	if math.Abs(variance - 1.0) > 0.0001 {
+	if math.Abs(variance-1.0) > 0.0001 {
 		t.Errorf("Expected 1.0 variance (sum of all ratios), got %f", variance)
 	}
-	
+
 	// Set as learned with proper dimensions
 	reducer.isLearned = true
 	reducer.reducedDim = 3
-	
+
 	variance = reducer.calculateTotalVariance()
 	expected := 1.0 // Still sums all values regardless of reducedDim
-	
-	if math.Abs(variance - expected) > 0.0001 {
+
+	if math.Abs(variance-expected) > 0.0001 {
 		t.Errorf("calculateTotalVariance() = %f, want %f", variance, expected)
 	}
 }

@@ -35,7 +35,7 @@ func TestNewPCAReducerValidation(t *testing.T) {
 			wantError: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pca := NewPCAReducer(tt.config)
@@ -52,7 +52,7 @@ func TestPCAFitEdgeCases(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name       string
 		embeddings [][]float32
@@ -70,7 +70,7 @@ func TestPCAFitEdgeCases(t *testing.T) {
 			wantError:  false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := pca.Fit(ctx, tt.embeddings)
@@ -89,33 +89,33 @@ func TestPCATransformEdgeCases(t *testing.T) {
 	config := &Config{TargetDim: 3}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Fit first
 	embeddings := generateTestEmbeddings(10, 5)
 	err := pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to fit: %v", err)
 	}
-	
+
 	// Test transform with nil embeddings
 	_, err = pca.Transform(ctx, nil)
 	if err == nil {
 		t.Error("Expected error with nil embeddings")
 	}
-	
+
 	// Test transform with empty embeddings
 	_, err = pca.Transform(ctx, [][]float32{})
 	if err == nil {
 		t.Error("Expected error with empty embeddings")
 	}
-	
+
 	// Test transform with wrong dimension
 	wrongDim := [][]float32{{1, 2, 3}}
 	_, err = pca.Transform(ctx, wrongDim)
 	if err == nil {
 		t.Error("Expected error with wrong dimension")
 	}
-	
+
 	// Test transform before fit
 	pca2 := NewPCAReducer(config)
 	_, err = pca2.Transform(ctx, embeddings)
@@ -129,42 +129,42 @@ func TestPCAInverseTransformEdgeCases(t *testing.T) {
 	config := &Config{TargetDim: 3}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Test before fit
 	_, err := pca.InverseTransform(ctx, [][]float32{{1, 2, 3}})
 	if err == nil {
 		t.Error("Expected error when inverse transforming before fit")
 	}
-	
+
 	// Fit first
 	embeddings := generateTestEmbeddings(10, 5)
 	err = pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to fit: %v", err)
 	}
-	
+
 	// Transform some data
 	reduced, err := pca.Transform(ctx, embeddings[:5])
 	if err != nil {
 		t.Fatalf("Failed to transform: %v", err)
 	}
-	
+
 	// Test inverse transform
 	reconstructed, err := pca.InverseTransform(ctx, reduced)
 	if err != nil {
 		t.Errorf("InverseTransform failed: %v", err)
 	}
-	
+
 	if len(reconstructed) != len(reduced) {
 		t.Errorf("Expected %d reconstructed embeddings, got %d", len(reduced), len(reconstructed))
 	}
-	
+
 	// Test with nil
 	_, err = pca.InverseTransform(ctx, nil)
 	if err == nil {
 		t.Error("Expected error with nil reduced embeddings")
 	}
-	
+
 	// Test with wrong dimension
 	wrongDim := [][]float32{{1, 2}} // Should be 3D
 	_, err = pca.InverseTransform(ctx, wrongDim)
@@ -178,38 +178,38 @@ func TestGetReconstructionError(t *testing.T) {
 	config := &Config{TargetDim: 3}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Test before fit
 	_, err := pca.GetReconstructionError(ctx, [][]float32{{1, 2, 3, 4, 5}})
 	if err == nil {
 		t.Error("Expected error before fit")
 	}
-	
+
 	// Fit
 	embeddings := generateTestEmbeddings(20, 10)
 	err = pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to fit: %v", err)
 	}
-	
+
 	// Test reconstruction error
 	testEmbeddings := embeddings[:5]
 	avgError, err := pca.GetReconstructionError(ctx, testEmbeddings)
 	if err != nil {
 		t.Errorf("GetReconstructionError failed: %v", err)
 	}
-	
+
 	// Error should be positive
 	if avgError < 0 {
 		t.Errorf("Reconstruction error should be positive, got %f", avgError)
 	}
-	
+
 	// Test with perfect reconstruction (using components as input)
 	// This is a synthetic test - in practice, error won't be exactly 0
 	if pca.ReducedDim() == pca.OriginalDim() && avgError > 0.1 {
 		t.Errorf("Expected very low reconstruction error with full dimensions, got %f", avgError)
 	}
-	
+
 	// Test with nil embeddings
 	_, err = pca.GetReconstructionError(ctx, nil)
 	if err == nil {
@@ -222,41 +222,41 @@ func TestExportComponents(t *testing.T) {
 	config := &Config{TargetDim: 3}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Test before fit
 	data := pca.ExportComponents()
 	if data.Components != nil {
 		t.Error("Expected nil components when exporting before fit")
 	}
-	
+
 	// Fit
 	embeddings := generateTestEmbeddings(20, 10)
 	err := pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to fit: %v", err)
 	}
-	
+
 	// Export components
 	data = pca.ExportComponents()
-	
+
 	// Verify dimensions
 	if data.OriginalDim != 10 {
 		t.Errorf("Expected originalDim 10, got %v", data.OriginalDim)
 	}
-	
+
 	if data.ReducedDim != 3 {
 		t.Errorf("Expected targetDim 3, got %v", data.ReducedDim)
 	}
-	
+
 	// Verify arrays have correct length
 	if len(data.Mean) != 10 {
 		t.Errorf("Expected mean length 10, got %d", len(data.Mean))
 	}
-	
+
 	if len(data.Components) != 3 {
 		t.Errorf("Expected 3 components, got %d", len(data.Components))
 	}
-	
+
 	// Check first component dimension
 	if len(data.Components) > 0 && len(data.Components[0]) != 10 {
 		t.Errorf("Expected component dimension 10, got %d", len(data.Components[0]))
@@ -268,40 +268,40 @@ func TestGetTopFeatures(t *testing.T) {
 	config := &Config{TargetDim: 3}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Test before fit
 	topFeatures := pca.GetTopFeatures(0, 5)
 	if topFeatures != nil {
 		t.Error("Expected nil top features before fit")
 	}
-	
+
 	// Create embeddings with clear patterns
 	embeddings := make([][]float32, 50)
 	for i := range embeddings {
 		embeddings[i] = make([]float32, 10)
 		// Make first few features have high variance
-		embeddings[i][0] = float32(i) * 2.0        // High variance
-		embeddings[i][1] = float32(i) * 1.5        // Medium variance
-		embeddings[i][2] = float32(i) * 1.0        // Medium variance
-		embeddings[i][3] = float32(i%2) * 0.5       // Low variance
+		embeddings[i][0] = float32(i) * 2.0   // High variance
+		embeddings[i][1] = float32(i) * 1.5   // Medium variance
+		embeddings[i][2] = float32(i) * 1.0   // Medium variance
+		embeddings[i][3] = float32(i%2) * 0.5 // Low variance
 		for j := 4; j < 10; j++ {
 			embeddings[i][j] = 0.1 // Very low variance
 		}
 	}
-	
+
 	// Fit
 	err := pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to fit: %v", err)
 	}
-	
+
 	// Test getting top features for first component
 	topFeatures = pca.GetTopFeatures(0, 5)
-	
+
 	if len(topFeatures) != 5 {
 		t.Errorf("Expected 5 top features, got %d", len(topFeatures))
 	}
-	
+
 	// Features should be sorted by absolute weight
 	for i := 1; i < len(topFeatures); i++ {
 		if math.Abs(float64(topFeatures[i].Weight)) > math.Abs(float64(topFeatures[i-1].Weight)) {
@@ -309,19 +309,19 @@ func TestGetTopFeatures(t *testing.T) {
 			break
 		}
 	}
-	
+
 	// Test with invalid component index
 	invalidFeatures := pca.GetTopFeatures(10, 5)
 	if invalidFeatures != nil {
 		t.Error("Expected nil with invalid component index")
 	}
-	
+
 	// Test with topN larger than features
 	allFeatures := pca.GetTopFeatures(0, 20)
 	if len(allFeatures) != 10 {
 		t.Errorf("Expected 10 features when topN > features, got %d", len(allFeatures))
 	}
-	
+
 	// Test with topN = 0
 	noFeatures := pca.GetTopFeatures(0, 0)
 	if len(noFeatures) != 0 {
@@ -372,7 +372,7 @@ func TestValidateEmbeddingsForTransform(t *testing.T) {
 			wantError:   false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := func() error {
@@ -444,7 +444,7 @@ func TestValidateReducedEmbeddings(t *testing.T) {
 			wantError:   false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := func() error {
@@ -472,7 +472,6 @@ func TestValidateReducedEmbeddings(t *testing.T) {
 		})
 	}
 }
-
 
 // TestNormalize tests the normalize function
 func TestNormalize(t *testing.T) {
@@ -507,20 +506,20 @@ func TestNormalize(t *testing.T) {
 			expectedNorm: 5,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Make a copy since normalize modifies in place
 			vec := make([]float64, len(tt.vector))
 			copy(vec, tt.vector)
-			
+
 			norm := normalize(vec)
-			
+
 			// Check norm
 			if math.Abs(norm-tt.expectedNorm) > 0.0001 {
 				t.Errorf("normalize() norm = %f, want %f", norm, tt.expectedNorm)
 			}
-			
+
 			// Check normalized vector
 			for i := range vec {
 				if math.Abs(vec[i]-tt.expected[i]) > 0.0001 {
@@ -564,7 +563,7 @@ func TestDotProduct(t *testing.T) {
 			expected: 32, // 4 + 10 + 18
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := dotProduct(tt.a, tt.b)
@@ -580,31 +579,31 @@ func TestFitTransform(t *testing.T) {
 	config := &Config{TargetDim: 3}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Test with valid embeddings
 	embeddings := generateTestEmbeddings(20, 10)
 	reduced, err := pca.FitTransform(ctx, embeddings)
 	if err != nil {
 		t.Errorf("FitTransform failed: %v", err)
 	}
-	
+
 	// Check dimensions
 	if len(reduced) != len(embeddings) {
 		t.Errorf("Expected %d reduced embeddings, got %d", len(embeddings), len(reduced))
 	}
-	
+
 	for i, r := range reduced {
 		if len(r) != 3 {
 			t.Errorf("Reduced embedding %d has dimension %d, expected 3", i, len(r))
 		}
 	}
-	
+
 	// PCA should be fitted - check by trying to transform
 	_, err = pca.Transform(ctx, embeddings[:1])
 	if err != nil {
 		t.Error("PCA should be fitted after FitTransform")
 	}
-	
+
 	// Test with edge cases
 	_, err = pca.FitTransform(ctx, nil)
 	if err == nil {
@@ -620,30 +619,30 @@ func TestPCAWithStandardization(t *testing.T) {
 	}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Create embeddings with different scales
 	embeddings := make([][]float32, 50)
 	for i := range embeddings {
 		embeddings[i] = make([]float32, 5)
-		embeddings[i][0] = float32(i) * 1000      // Large scale
-		embeddings[i][1] = float32(i) * 0.001     // Small scale
-		embeddings[i][2] = float32(i)             // Normal scale
-		embeddings[i][3] = float32(i%10)          // Bounded
-		embeddings[i][4] = 5.0                    // Constant
+		embeddings[i][0] = float32(i) * 1000  // Large scale
+		embeddings[i][1] = float32(i) * 0.001 // Small scale
+		embeddings[i][2] = float32(i)         // Normal scale
+		embeddings[i][3] = float32(i % 10)    // Bounded
+		embeddings[i][4] = 5.0                // Constant
 	}
-	
+
 	// Fit with standardization
 	err := pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to fit with standardization: %v", err)
 	}
-	
+
 	// Transform
 	reduced, err := pca.Transform(ctx, embeddings[:5])
 	if err != nil {
 		t.Errorf("Transform failed: %v", err)
 	}
-	
+
 	// Verify dimensions
 	if len(reduced) != 5 || len(reduced[0]) != 3 {
 		t.Errorf("Unexpected reduced dimensions: %dx%d", len(reduced), len(reduced[0]))
@@ -668,18 +667,18 @@ func TestTruncatedSVDEdgeCases(t *testing.T) {
 	config := &Config{TargetDim: 2}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Create matrix with 2 samples, 5 features
 	embeddings := [][]float32{
 		{1, 2, 3, 4, 5},
 		{6, 7, 8, 9, 10},
 	}
-	
+
 	err := pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Errorf("Fit failed: %v", err)
 	}
-	
+
 	// Should reduce to targetDim = 2 (since we have 2 samples and 5 features)
 	if pca.ReducedDim() != 2 {
 		t.Errorf("Expected reduced dim 2, got %d", pca.ReducedDim())
@@ -691,19 +690,19 @@ func TestConcurrentPCAOperations(t *testing.T) {
 	config := &Config{TargetDim: 5}
 	pca := NewPCAReducer(config)
 	ctx := context.Background()
-	
+
 	// Fit first
 	embeddings := generateTestEmbeddings(100, 20)
 	err := pca.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("Failed to fit: %v", err)
 	}
-	
+
 	// Concurrent operations
 	numGoroutines := 20
 	numOps := 50
 	errors := make(chan error, numGoroutines*numOps)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			for j := 0; j < numOps; j++ {
@@ -738,7 +737,7 @@ func TestConcurrentPCAOperations(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	// Wait a bit and check for errors
 	done := make(chan bool)
 	go func() {
@@ -746,7 +745,7 @@ func TestConcurrentPCAOperations(t *testing.T) {
 		close(errors)
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Check if any errors occurred
@@ -769,30 +768,30 @@ func TestPCAConsistency(t *testing.T) {
 		TargetDim:  3,
 		RandomSeed: 42,
 	}
-	
+
 	embeddings := generateTestEmbeddings(20, 10)
 	ctx := context.Background()
-	
+
 	// Create two PCA instances with same config
 	pca1 := NewPCAReducer(config)
 	pca2 := NewPCAReducer(config)
-	
+
 	// Fit both
 	err := pca1.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("PCA1 fit failed: %v", err)
 	}
-	
+
 	err = pca2.Fit(ctx, embeddings)
 	if err != nil {
 		t.Fatalf("PCA2 fit failed: %v", err)
 	}
-	
+
 	// Transform same data
 	testData := embeddings[:5]
 	reduced1, _ := pca1.Transform(ctx, testData)
 	reduced2, _ := pca2.Transform(ctx, testData)
-	
+
 	// Results should be similar (allowing for numerical differences)
 	for i := range reduced1 {
 		for j := range reduced1[i] {

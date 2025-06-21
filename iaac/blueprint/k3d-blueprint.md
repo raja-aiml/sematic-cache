@@ -7,7 +7,7 @@
 k3d-blueprint/
 ├── .gitignore                    # Patterns to exclude from version control
 ├── .gitattributes               # Git attribute rules (e.g., line endings, diffs)
-├── .env.example                 # Template for environment variables
+├── ../config/blueprint.env.example  # Template for environment variables (in iaac/config/)
 ├── README.md                    # Project overview, quick start, and usage
 ├── Taskfile.yaml                # Task runner definitions (task CLI)
 │

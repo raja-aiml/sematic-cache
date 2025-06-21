@@ -12,25 +12,25 @@ import (
 
 // IncrementalPCAReducer implements incremental PCA for online learning
 type IncrementalPCAReducer struct {
-	mu                sync.RWMutex
-	config            *Config
-	batchSize         int
-	nSamplesSeen      int
-	
+	mu           sync.RWMutex
+	config       *Config
+	batchSize    int
+	nSamplesSeen int
+
 	// Incremental statistics
 	mean              []float64
 	components        *mat.Dense
 	explainedVariance []float64
 	singularValues    []float64
-	
+
 	// Running sums for incremental updates
-	sumOfSquares      *mat.Dense
-	nComponentsSeen   int
-	
+	sumOfSquares    *mat.Dense
+	nComponentsSeen int
+
 	// Dimensions
 	originalDim int
 	reducedDim  int
-	
+
 	// State
 	isInitialized bool
 }
@@ -40,7 +40,7 @@ func NewIncrementalPCAReducer(config *Config, batchSize int) *IncrementalPCARedu
 	if batchSize <= 0 {
 		batchSize = 100
 	}
-	
+
 	return &IncrementalPCAReducer{
 		config:    config,
 		batchSize: batchSize,
@@ -122,13 +122,13 @@ func (p *IncrementalPCAReducer) PartialFit(ctx context.Context, embeddings [][]f
 func (p *IncrementalPCAReducer) initializeFromBatch(_ context.Context, embeddings [][]float32) error {
 	n := len(embeddings)
 	d := len(embeddings[0])
-	
+
 	p.originalDim = d
 	p.nSamplesSeen = n
 
 	// Initialize mean
 	p.mean = make([]float64, d)
-	
+
 	// Convert to matrix and compute mean
 	X := mat.NewDense(n, d, nil)
 	for i := 0; i < n; i++ {
@@ -137,7 +137,7 @@ func (p *IncrementalPCAReducer) initializeFromBatch(_ context.Context, embedding
 			p.mean[j] += float64(embeddings[i][j])
 		}
 	}
-	
+
 	for j := 0; j < d; j++ {
 		p.mean[j] /= float64(n)
 	}
@@ -182,7 +182,7 @@ func (p *IncrementalPCAReducer) initializeFromBatch(_ context.Context, embedding
 	// Get components
 	vt := new(mat.Dense)
 	svd.VTo(vt)
-	
+
 	p.components = mat.NewDense(p.reducedDim, d, nil)
 	for i := 0; i < p.reducedDim; i++ {
 		for j := 0; j < d; j++ {
@@ -193,7 +193,7 @@ func (p *IncrementalPCAReducer) initializeFromBatch(_ context.Context, embedding
 	// Initialize sum of squares for future updates
 	p.sumOfSquares = mat.NewDense(d, d, nil)
 	p.sumOfSquares.Mul(X.T(), X)
-	
+
 	p.isInitialized = true
 	p.nComponentsSeen = p.reducedDim
 
@@ -203,7 +203,7 @@ func (p *IncrementalPCAReducer) initializeFromBatch(_ context.Context, embedding
 // updateComponentsIncremental updates PCA components incrementally
 func (p *IncrementalPCAReducer) updateComponentsIncremental(_ context.Context, X *mat.Dense, _ int) error {
 	_, d := X.Dims()
-	
+
 	// Update sum of squares
 	batchSS := mat.NewDense(d, d, nil)
 	batchSS.Mul(X.T(), X)
@@ -230,7 +230,7 @@ func (p *IncrementalPCAReducer) updateComponentsIncremental(_ context.Context, X
 		value  float64
 		vector []float64
 	}
-	
+
 	pairs := make([]eigenPair, d)
 	for i := 0; i < d; i++ {
 		realPart := real(values[i])
@@ -259,7 +259,7 @@ func (p *IncrementalPCAReducer) updateComponentsIncremental(_ context.Context, X
 	p.components = mat.NewDense(p.reducedDim, d, nil)
 	p.singularValues = make([]float64, p.reducedDim)
 	p.explainedVariance = make([]float64, p.reducedDim)
-	
+
 	totalVariance := 0.0
 	for i := 0; i < d && i < len(pairs); i++ {
 		if i < len(pairs) && pairs[i].value > 0 {
@@ -272,7 +272,7 @@ func (p *IncrementalPCAReducer) updateComponentsIncremental(_ context.Context, X
 		for j := 0; j < d; j++ {
 			p.components.Set(i, j, pairs[i].vector[j])
 		}
-		
+
 		// Update singular values and explained variance
 		p.singularValues[i] = math.Sqrt(pairs[i].value * float64(p.nSamplesSeen-1))
 		if totalVariance > 0 {
@@ -449,7 +449,7 @@ func (p *IncrementalPCAReducer) ExplainedVarianceRatio() []float64 {
 func (p *IncrementalPCAReducer) GetMean() []float64 {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	mean := make([]float64, len(p.mean))
 	copy(mean, p.mean)
 	return mean
@@ -459,7 +459,7 @@ func (p *IncrementalPCAReducer) GetMean() []float64 {
 func (p *IncrementalPCAReducer) AdaptiveBatchSize() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	// Simple adaptive strategy: increase batch size as we see more samples
 	if p.nSamplesSeen < 1000 {
 		return p.batchSize
@@ -474,11 +474,11 @@ func (p *IncrementalPCAReducer) AdaptiveBatchSize() int {
 func (p *IncrementalPCAReducer) ShouldUpdate(newBatch [][]float32, driftThreshold float64) (bool, float64) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	if !p.isInitialized || len(newBatch) == 0 {
 		return true, 0.0
 	}
-	
+
 	// Calculate mean of new batch
 	d := len(newBatch[0])
 	batchMean := make([]float64, d)
@@ -490,7 +490,7 @@ func (p *IncrementalPCAReducer) ShouldUpdate(newBatch [][]float32, driftThreshol
 	for j := range batchMean {
 		batchMean[j] /= float64(len(newBatch))
 	}
-	
+
 	// Calculate drift as L2 distance between means
 	drift := 0.0
 	for j := 0; j < d; j++ {
@@ -498,6 +498,6 @@ func (p *IncrementalPCAReducer) ShouldUpdate(newBatch [][]float32, driftThreshol
 		drift += diff * diff
 	}
 	drift = math.Sqrt(drift)
-	
+
 	return drift > driftThreshold, drift
 }

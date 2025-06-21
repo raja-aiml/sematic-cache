@@ -11,16 +11,16 @@ import (
 
 // OptimizedDimensionReducer manages dimension reduction with performance optimizations
 type OptimizedDimensionReducer struct {
-	mu              sync.RWMutex
-	reducer         Reducer            // Use generic Reducer interface
-	config          ReducerConfig
-	metrics         *QualityMetrics
-	originalDim     int
-	reducedDim      int
-	varianceRatio   []float64
-	isLearned       bool
-	topKSelector    *TopKSelector
-	useObjectPool   bool
+	mu            sync.RWMutex
+	reducer       Reducer // Use generic Reducer interface
+	config        ReducerConfig
+	metrics       *QualityMetrics
+	originalDim   int
+	reducedDim    int
+	varianceRatio []float64
+	isLearned     bool
+	topKSelector  *TopKSelector
+	useObjectPool bool
 }
 
 // NewOptimizedDimensionReducer creates a new optimized dimension reducer
@@ -40,7 +40,7 @@ func NewOptimizedDimensionReducer(config *Config) (*OptimizedDimensionReducer, e
 	if varianceRetained == 0 {
 		varianceRetained = config.VarianceThreshold
 	}
-	
+
 	reducerConfig := ReducerConfig{
 		OutputDimensions: targetDim,
 		VarianceRetained: varianceRetained,
@@ -64,22 +64,22 @@ func NewOptimizedDimensionReducer(config *Config) (*OptimizedDimensionReducer, e
 // NewOptimizedDimensionReducerWithFactory creates an optimized reducer using the factory pattern
 func NewOptimizedDimensionReducerWithFactory(config DimensionReducerConfig) (*OptimizedDimensionReducer, error) {
 	factory := NewReducerFactory()
-	
+
 	// Create the appropriate reducer based on configuration
 	var reducer Reducer
 	var err error
-	
+
 	// For optimized reducer, prefer Gonum implementations when available
 	if config.Type == PCAReducerType {
 		reducer, err = factory.CreateReducer(PCAGonumReducerType, config.ReducerConfig)
 	} else {
 		reducer, err = factory.CreateReducer(config.Type, config.ReducerConfig)
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reducer: %w", err)
 	}
-	
+
 	return &OptimizedDimensionReducer{
 		config:        config.ReducerConfig,
 		metrics:       &QualityMetrics{},
@@ -140,28 +140,28 @@ func (dr *OptimizedDimensionReducer) ReduceForSearch(ctx context.Context, embedd
 	dr.mu.RUnlock()
 
 	startTime := time.Now()
-	
+
 	// Use object pool if enabled
 	var reduced []float32
 	if dr.useObjectPool {
 		reduced = GetEmbedding(dr.reducedDim)
 		defer PutEmbedding(reduced)
 	}
-	
+
 	reducedBatch, err := dr.reducer.Transform(ctx, [][]float32{embedding})
 	if err != nil {
 		return nil, err
 	}
 
 	dr.updateReductionMetrics(time.Since(startTime))
-	
+
 	// Copy result if using pool
 	if dr.useObjectPool {
 		result := make([]float32, len(reducedBatch[0]))
 		copy(result, reducedBatch[0])
 		return result, nil
 	}
-	
+
 	return reducedBatch[0], nil
 }
 
@@ -225,7 +225,7 @@ func (dr *OptimizedDimensionReducer) optimizedSearchReduced(
 		}
 
 		sim := similarityFunc(queryReduced, candidate.ReducedEmbedding)
-		
+
 		if dr.useObjectPool {
 			sc := GetScoredCandidate()
 			sc.candidate = candidate
@@ -269,7 +269,7 @@ func (dr *OptimizedDimensionReducer) optimizedRerankWithFullDims(
 
 	for _, candidate := range candidates {
 		sim := similarityFunc(queryFull, candidate.Embedding)
-		
+
 		if dr.useObjectPool {
 			sr := GetScoredResult()
 			sr.result = SearchResult{
@@ -321,7 +321,7 @@ func (dr *OptimizedDimensionReducer) optimizedFullDimensionSearch(
 
 	for _, candidate := range candidates {
 		sim := similarityFunc(queryFull, candidate.Embedding)
-		
+
 		if dr.useObjectPool {
 			sr := GetScoredResult()
 			sr.result = SearchResult{
@@ -372,22 +372,22 @@ func (dr *OptimizedDimensionReducer) BatchHybridSearch(
 
 	// Process in parallel batches
 	batchProcessor := NewBatchTopK(topK, 4) // 4 workers
-	
+
 	// Prepare queries
 	topKQueries := make([]TopKQuery, len(queries))
-	
+
 	// Process each query
 	var wg sync.WaitGroup
 	errors := make([]error, len(queries))
-	
+
 	for i := range queries {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			
+
 			// Get candidates scored by similarity
 			scored := make([]scoredResult, 0, len(candidateSets[idx]))
-			
+
 			for _, candidate := range candidateSets[idx] {
 				sim := similarityFunc(queries[idx], candidate.Embedding)
 				scored = append(scored, scoredResult{
@@ -399,23 +399,23 @@ func (dr *OptimizedDimensionReducer) BatchHybridSearch(
 					similarity: sim,
 				})
 			}
-			
+
 			topKQueries[idx] = TopKQuery{Candidates: scored}
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Check for errors
 	for _, err := range errors {
 		if err != nil {
 			return nil, err
 		}
 	}
-	
+
 	// Process batch
 	results := batchProcessor.ProcessBatch(topKQueries)
-	
+
 	return results, nil
 }
 
