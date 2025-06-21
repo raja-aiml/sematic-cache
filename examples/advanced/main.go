@@ -58,11 +58,14 @@ func (n *NaiveANNIndex) Search(query []float32, k int) ([]string, error) {
 func main() {
 	// Prepare a naive ANN index and a cache using inner-product similarity.
 	ann := NewNaiveANNIndex()
-	cache := core.NewCache(10,
+	cache, err := core.NewCache(10,
 		core.WithInnerProduct(),
 		core.WithANNIndex(ann),
 		core.WithMinSimilarity(0.0),
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	// Sample data: prompt -> (vector, answer)
 	data := map[string]struct {
@@ -97,11 +100,14 @@ func main() {
 		}
 		return sum / float64(len(sims))
 	}
-	cache2 := core.NewCache(10,
+	cache2, err := core.NewCache(10,
 		core.WithInnerProduct(),
 		core.WithANNIndex(ann),
 		core.WithAdaptiveThreshold(meanThreshold),
 	)
+	if err != nil {
+		panic(err)
+	}
 	for prompt, d := range data {
 		cache2.Set(prompt, d.vec, d.ans)
 	}

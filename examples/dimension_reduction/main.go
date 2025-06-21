@@ -29,8 +29,8 @@ func main() {
 			OutputDimensions: 384,  // Reduce from 1536 to 384 dimensions
 			VarianceRetained: 0.95, // Retain 95% variance
 		},
-		Type:               reduction.PCAReducerType,  // Use PCA algorithm
-		EnableOptimization: true,                      // Use optimized Gonum implementation
+		Type:               reduction.PCAReducerType, // Use PCA algorithm
+		EnableOptimization: true,                     // Use optimized Gonum implementation
 	}
 
 	// Create dimension reducer using factory
@@ -101,12 +101,15 @@ func main() {
 	}
 
 	// Step 3: Create cache with dimension reduction and A/B testing
-	cache := core.NewCache(10000,
+	cache, err := core.NewCache(10000,
 		core.WithMinSimilarity(0.8),
 		core.WithEmbeddingFunc(embedFunc),
 		core.WithDimensionReduction(reducer),
 		core.WithABTestManager(abTestManager),
 	)
+	if err != nil {
+		log.Fatalf("failed to create cache: %v", err)
+	}
 
 	// Step 4: Populate cache with sample data
 	fmt.Println("Populating cache with sample data...")

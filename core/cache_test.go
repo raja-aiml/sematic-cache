@@ -7,7 +7,10 @@ import (
 )
 
 func TestCacheSetGet(t *testing.T) {
-	c := NewCache(2)
+	c, err := NewCache(2)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	c.Set("p1", []float32{1, 0}, "a1")
 	c.Set("p2", []float32{0, 1}, "a2")
 
@@ -25,7 +28,10 @@ func TestCacheSetGet(t *testing.T) {
 // Test entry expiration via TTL.
 func TestTTLExpiration(t *testing.T) {
 	// TTL of 50ms
-	c := NewCache(2, WithTTL(50*time.Millisecond))
+	c, err := NewCache(2, WithTTL(50*time.Millisecond))
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	c.Set("p1", []float32{1}, "a1")
 	// immediately retrievable
 	if v, ok := c.Get("p1"); !ok || v != "a1" {
@@ -40,7 +46,10 @@ func TestTTLExpiration(t *testing.T) {
 
 // Test cache metrics: hits, misses, hit rate.
 func TestStats(t *testing.T) {
-	c := NewCache(2)
+	c, err := NewCache(2)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	// misses
 	c.Get("x")
 	// hits
@@ -57,7 +66,10 @@ func TestStats(t *testing.T) {
 
 // Test batch set and get operations.
 func TestBatchSetGet(t *testing.T) {
-	c := NewCache(5)
+	c, err := NewCache(5)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	prompts := []string{"a", "b", "c"}
 	embeddings := [][]float32{{1}, {2}, {3}}
 	answers := []string{"A", "B", "C"}
@@ -72,7 +84,10 @@ func TestBatchSetGet(t *testing.T) {
 }
 
 func TestCacheGetByEmbedding(t *testing.T) {
-	c := NewCache(2)
+	c, err := NewCache(2)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	c.Set("p1", []float32{1, 0}, "a1")
 	c.Set("p2", []float32{0, 1}, "a2")
 
@@ -83,7 +98,10 @@ func TestCacheGetByEmbedding(t *testing.T) {
 }
 
 func TestCacheFlushAndImport(t *testing.T) {
-	c := NewCache(3)
+	c, err := NewCache(3)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	c.Set("p1", []float32{1, 0}, "a1")
 	c.Flush()
 	if _, ok := c.Get("p1"); ok {
@@ -106,7 +124,10 @@ func TestCacheSetPrompt(t *testing.T) {
 		}
 		return nil, fmt.Errorf("unknown prompt")
 	}
-	c := NewCache(2, WithEmbeddingFunc(embFn))
+	c, err := NewCache(2, WithEmbeddingFunc(embFn))
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	if err := c.SetPrompt("p", "a"); err != nil {
 		t.Fatalf("SetPrompt error: %v", err)
 	}
@@ -118,7 +139,10 @@ func TestCacheSetPrompt(t *testing.T) {
 // Test that GetByEmbedding respects the min similarity threshold.
 func TestGetByEmbeddingThreshold(t *testing.T) {
 	// insert two orthogonal unit vectors
-	c := NewCache(2, WithMinSimilarity(0.8))
+	c, err := NewCache(2, WithMinSimilarity(0.8))
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	c.Set("p1", []float32{1, 0}, "a1")
 	c.Set("p2", []float32{0, 1}, "a2")
 	// query exactly matches p1 -> sim=1
@@ -133,7 +157,10 @@ func TestGetByEmbeddingThreshold(t *testing.T) {
 
 // Test top-K similarity search.
 func TestGetTopKByEmbedding(t *testing.T) {
-	c := NewCache(3)
+	c, err := NewCache(3)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	c.Set("p1", []float32{1, 0}, "a1")
 	c.Set("p2", []float32{0, 1}, "a2")
 	c.Set("p3", []float32{1, 1}, "a3")

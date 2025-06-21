@@ -352,14 +352,12 @@ func WithTTL(d time.Duration) Option {
 
 // WithEvictionPolicy sets the in-memory eviction strategy. Valid values are
 // "LRU", "FIFO", "LFU", and "RR" (random replacement).
-func WithEvictionPolicy(policy string) Option {
-	return func(c *Cache) {
-		switch policy {
-		case PolicyLRU, PolicyFIFO, PolicyLFU, PolicyRR:
-			c.evictionPolicy = policy
-		default:
-			panic(fmt.Sprintf("core: unknown eviction policy %q", policy))
-		}
+func WithEvictionPolicy(policy string) (Option, error) {
+	switch policy {
+	case PolicyLRU, PolicyFIFO, PolicyLFU, PolicyRR:
+		return func(c *Cache) { c.evictionPolicy = policy }, nil
+	default:
+		return nil, fmt.Errorf("core: unknown eviction policy %q", policy)
 	}
 }
 
@@ -416,10 +414,10 @@ func WithEvaluationFunc(fn func([]QueryResult) []QueryResult) Option {
 }
 
 // NewCache creates a cache with the given capacity.
-func NewCache(capacity int, opts ...Option) *Cache {
+func NewCache(capacity int, opts ...Option) (*Cache, error) {
 	// capacity must be positive
 	if capacity <= 0 {
-		panic("core: capacity must be > 0")
+		return nil, fmt.Errorf("core: capacity must be > 0")
 	}
 	c := &Cache{
 		entries:        make(map[string]*list.Element),
@@ -433,7 +431,7 @@ func NewCache(capacity int, opts ...Option) *Cache {
 	for _, opt := range opts {
 		opt(c)
 	}
-	return c
+	return c, nil
 }
 
 // Set stores an answer and embedding for the given prompt, without model metadata.

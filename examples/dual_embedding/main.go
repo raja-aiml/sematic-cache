@@ -24,11 +24,11 @@ func main() {
 	// Step 1: Create dimension reducer using factory pattern
 	reductionConfig := reduction.DimensionReducerConfig{
 		ReducerConfig: reduction.ReducerConfig{
-			OutputDimensions: 384,  // 75% reduction  
+			OutputDimensions: 384,  // 75% reduction
 			VarianceRetained: 0.95, // Retain 95% variance
 		},
-		Type:               reduction.PCAReducerType,  // Use standard PCA
-		EnableOptimization: false,                     // Use standard implementation for demo
+		Type:               reduction.PCAReducerType, // Use standard PCA
+		EnableOptimization: false,                    // Use standard implementation for demo
 	}
 
 	reducer, err := reduction.NewDimensionReducerWithFactory(reductionConfig)
@@ -38,11 +38,14 @@ func main() {
 
 	// Step 2: Create cache with dimension reduction
 	// This automatically enables dual embedding storage
-	cache := core.NewCache(1000,
+	cache, err := core.NewCache(1000,
 		core.WithEmbeddingFunc(embedFunc),
 		core.WithDimensionReduction(reducer),
 		core.WithMinSimilarity(0.8),
 	)
+	if err != nil {
+		log.Fatalf("failed to create cache: %v", err)
+	}
 
 	ctx := context.Background()
 

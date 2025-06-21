@@ -7,7 +7,14 @@ import (
 
 // TestLRUPolicy ensures that LRU eviction removes the least-recently-used item.
 func TestLRUPolicy(t *testing.T) {
-	cache := NewCache(2, WithEvictionPolicy(PolicyLRU))
+	opt, err := WithEvictionPolicy(PolicyLRU)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cache, err := NewCache(2, opt)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	cache.Set("a", []float32{1}, "A")
 	cache.Set("b", []float32{2}, "B")
 	// Access "a" to make it most-recent
@@ -30,7 +37,14 @@ func TestLRUPolicy(t *testing.T) {
 
 // TestFIFOPolicy ensures that FIFO eviction removes the entry inserted earliest.
 func TestFIFOPolicy(t *testing.T) {
-	cache := NewCache(2, WithEvictionPolicy(PolicyFIFO))
+	opt, err := WithEvictionPolicy(PolicyFIFO)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cache, err := NewCache(2, opt)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	cache.Set("a", []float32{1}, "A")
 	cache.Set("b", []float32{2}, "B")
 	// Access "a" should not affect FIFO order
@@ -52,7 +66,14 @@ func TestFIFOPolicy(t *testing.T) {
 
 // TestLFUPolicy ensures that LFU eviction removes the least-frequently-used item.
 func TestLFUPolicy(t *testing.T) {
-	cache := NewCache(2, WithEvictionPolicy(PolicyLFU))
+	opt, err := WithEvictionPolicy(PolicyLFU)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cache, err := NewCache(2, opt)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	cache.Set("a", []float32{1}, "A")
 	cache.Set("b", []float32{2}, "B")
 	// Access frequencies: a:2 (1 initial +1), b:1
@@ -76,7 +97,14 @@ func TestLFUPolicy(t *testing.T) {
 func TestRRPolicy(t *testing.T) {
 	// Seed for reproducibility within this test run
 	rand.Seed(42)
-	cache := NewCache(2, WithEvictionPolicy(PolicyRR))
+	opt, err := WithEvictionPolicy(PolicyRR)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cache, err := NewCache(2, opt)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	cache.Set("a", []float32{1}, "A")
 	cache.Set("b", []float32{2}, "B")
 	// Insert "c", should evict either 'a' or 'b'

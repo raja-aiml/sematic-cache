@@ -9,7 +9,10 @@ import (
 
 func main() {
 	// Create an in-memory cache with capacity of 100
-	cache := core.NewCache(100)
+	cache, err := core.NewCache(100)
+	if err != nil {
+		panic(err)
+	}
 
 	// Store a prompt-response pair
 	cache.Set("What is AI?", nil, "Artificial Intelligence is...")

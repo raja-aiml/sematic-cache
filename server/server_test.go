@@ -11,7 +11,10 @@ import (
 )
 
 func TestServerSetGet(t *testing.T) {
-	cache := core.NewCache(10)
+	cache, err := core.NewCache(10)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	srv := New(cache)
 
 	ts := httptest.NewServer(srv)
@@ -42,9 +45,12 @@ func TestServerSetGet(t *testing.T) {
 // TestServerQuery ensures /query returns the correct answer for a given embedding.
 func TestServerQuery(t *testing.T) {
 	// build cache with two entries
-	cache := core.NewCache(2,
+	cache, err := core.NewCache(2,
 		core.WithSimilarityFunc(core.InnerProduct),
 	)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	cache.Set("x", []float32{1, 0}, "AnswerX")
 	cache.Set("y", []float32{0, 1}, "AnswerY")
 	srv := New(cache)
@@ -70,9 +76,12 @@ func TestServerQuery(t *testing.T) {
 
 // TestServerTopK ensures /topk returns the top K results.
 func TestServerTopK(t *testing.T) {
-	cache := core.NewCache(3,
+	cache, err := core.NewCache(3,
 		core.WithSimilarityFunc(core.InnerProduct),
 	)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	data := map[string][]float32{
 		"a": {1, 0},
 		"b": {0, 1},
@@ -108,7 +117,11 @@ func TestServerTopK(t *testing.T) {
 
 // TestServerHealth checks the /health endpoint.
 func TestServerHealth(t *testing.T) {
-	srv := New(core.NewCache(1))
+	cache, err := core.NewCache(1)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
+	srv := New(cache)
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
 	resp, err := http.Get(ts.URL + "/health")
@@ -119,7 +132,10 @@ func TestServerHealth(t *testing.T) {
 
 // TestServerMetrics checks the /metrics endpoint.
 func TestServerMetrics(t *testing.T) {
-	cache := core.NewCache(1)
+	cache, err := core.NewCache(1)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	// generate one hit and one miss
 	cache.Set("p", []float32{1}, "a")
 	cache.Get("p")
@@ -141,7 +157,10 @@ func TestServerMetrics(t *testing.T) {
 }
 
 func TestServerFlush(t *testing.T) {
-	cache := core.NewCache(10)
+	cache, err := core.NewCache(10)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	srv := New(cache)
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
@@ -159,7 +178,10 @@ func TestServerFlush(t *testing.T) {
 
 // Test that model metadata is stored and returned by the server.
 func TestServerModelMetadata(t *testing.T) {
-	cache := core.NewCache(10)
+	cache, err := core.NewCache(10)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 	srv := New(cache)
 	ts := httptest.NewServer(srv)
 	defer ts.Close()

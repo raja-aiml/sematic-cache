@@ -62,7 +62,11 @@ func TestFactory_NewBackend(t *testing.T) {
 func TestFactory_Register(t *testing.T) {
 	// Create a mock factory
 	mockFactory := func(cfg *config.Config, embedFunc core.EmbeddingFunc) (core.CacheBackend, error) {
-		return core.NewCache(10), nil
+		cache, err := core.NewCache(10)
+		if err != nil {
+			return nil, err
+		}
+		return cache, nil
 	}
 
 	// Register it

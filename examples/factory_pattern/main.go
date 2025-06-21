@@ -91,11 +91,15 @@ func main() {
 		}
 
 		// Create cache with the reducer
-		cache := core.NewCache(100,
+		cache, err := core.NewCache(100,
 			core.WithEmbeddingFunc(embedFunc),
 			core.WithDimensionReduction(reducer),
 			core.WithMinSimilarity(0.8),
 		)
+		if err != nil {
+			log.Printf("failed to create cache: %v", err)
+			continue
+		}
 
 		// Populate cache
 		fmt.Printf("Populating cache...\n")
