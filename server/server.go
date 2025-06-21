@@ -1,132 +1,218 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
-	"github.com/raja-aiml/sematic-cache/storage"
+	"github.com/gin-gonic/gin"
+	"github.com/raja-aiml/sematic-cache/core"
 )
 
 // Server handles HTTP requests for the cache
 type Server struct {
-	cache storage.Backend
-	mux   *http.ServeMux
+	cache  core.CacheBackend
+	router *gin.Engine
+}
+
+// Request/Response structures
+type GetRequest struct {
+	Prompt string `json:"prompt" binding:"required"`
+}
+
+type SetRequest struct {
+	Prompt     string `json:"prompt" binding:"required"`
+	Answer     string `json:"answer" binding:"required"`
+	ModelName  string `json:"model_name,omitempty"`
+	ModelID    string `json:"model_id,omitempty"`
+	Embedding  []float32 `json:"embedding,omitempty"`
+}
+
+type SimilarRequest struct {
+	Query     string `json:"query" binding:"required"`
+	Embedding []float32 `json:"embedding,omitempty"`
+	TopK      int    `json:"top_k"`
+}
+
+type CacheResponse struct {
+	Prompt    string `json:"prompt"`
+	Answer    string `json:"answer"`
+	ModelName string `json:"model_name,omitempty"`
+	ModelID   string `json:"model_id,omitempty"`
+	Found     bool   `json:"found"`
+}
+
+type SimilarResponse struct {
+	Query   string              `json:"query"`
+	Results []core.QueryResult `json:"results"`
+}
+
+type StatsResponse struct {
+	Hits    uint64  `json:"hits"`
+	Misses  uint64  `json:"misses"`
+	HitRate float64 `json:"hit_rate"`
 }
 
 // New creates a new server instance
-func New(cache storage.Backend) *Server {
+func New(cache core.CacheBackend) *Server {
 	s := &Server{
-		cache: cache,
-		mux:   http.NewServeMux(),
+		cache:  cache,
+		router: gin.Default(),
 	}
 	s.setupRoutes()
 	return s
 }
 
+// NewWithMode creates a new server with specific Gin mode
+func NewWithMode(cache core.CacheBackend, mode string) *Server {
+	gin.SetMode(mode)
+	return New(cache)
+}
+
 // ServeHTTP implements http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	s.router.ServeHTTP(w, r)
+}
+
+// Router returns the Gin router for testing
+func (s *Server) Router() *gin.Engine {
+	return s.router
 }
 
 func (s *Server) setupRoutes() {
-	s.mux.HandleFunc("/health", s.handleHealth)
-	s.mux.HandleFunc("/cache/get", s.handleCacheGet)
-	s.mux.HandleFunc("/cache/set", s.handleCacheSet)
-	s.mux.HandleFunc("/cache/similar", s.handleCacheSimilar)
+	// Health check
+	s.router.GET("/health", s.handleHealth)
+	
+	// Cache operations
+	api := s.router.Group("/api/v1")
+	{
+		api.POST("/cache/get", s.handleCacheGet)
+		api.POST("/cache/set", s.handleCacheSet)
+		api.POST("/cache/similar", s.handleCacheSimilar)
+		api.GET("/cache/stats", s.handleCacheStats)
+		api.POST("/cache/flush", s.handleCacheFlush)
+	}
+
+	// Legacy endpoints for backward compatibility
+	s.router.POST("/cache/get", s.handleCacheGet)
+	s.router.POST("/cache/set", s.handleCacheSet)
+	s.router.POST("/cache/similar", s.handleCacheSimilar)
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
-}
-
-func (s *Server) handleCacheGet(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		Key string `json:"key"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	result, err := s.cache.Get(r.Context(), req.Key)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if result == nil {
-		http.Error(w, "Key not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"key":   req.Key,
-		"value": result,
+func (s *Server) handleHealth(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status": "healthy",
+		"service": "semantic-cache",
 	})
 }
 
-func (s *Server) handleCacheSet(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+func (s *Server) handleCacheGet(c *gin.Context) {
+	var req GetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	var req struct {
-		Key   string      `json:"key"`
-		Value interface{} `json:"value"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Normalize prompt
+	prompt := strings.TrimSpace(req.Prompt)
+	
+	// Get from cache
+	answer, found := s.cache.Get(prompt)
+	if !found {
+		c.JSON(http.StatusNotFound, CacheResponse{
+			Prompt: prompt,
+			Found:  false,
+		})
 		return
 	}
 
-	// Convert value to string for storage
-	valueStr := fmt.Sprintf("%v", req.Value)
-	if err := s.cache.Set(r.Context(), req.Key, valueStr); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// Get model info if available
+	modelName, modelID, _ := s.cache.GetModelInfo(prompt)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	c.JSON(http.StatusOK, CacheResponse{
+		Prompt:    prompt,
+		Answer:    answer,
+		ModelName: modelName,
+		ModelID:   modelID,
+		Found:     true,
+	})
 }
 
-func (s *Server) handleCacheSimilar(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+func (s *Server) handleCacheSet(c *gin.Context) {
+	var req SetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	var req struct {
-		Query string `json:"query"`
-		TopK  int    `json:"top_k"`
+	// Normalize prompt
+	prompt := strings.TrimSpace(req.Prompt)
+
+	if len(req.Embedding) > 0 {
+		// Set with provided embedding
+		s.cache.SetWithModel(prompt, req.Embedding, req.Answer, req.ModelName, req.ModelID)
+	} else {
+		// Set without embedding (will generate embedding internally if configured)
+		if err := s.cache.SetPromptWithModel(prompt, req.Answer, req.ModelName, req.ModelID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to set cache: %v", err)})
+			return
+		}
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"prompt": prompt,
+	})
+}
+
+func (s *Server) handleCacheSimilar(c *gin.Context) {
+	var req SimilarRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Default top-k
 	if req.TopK <= 0 {
-		req.TopK = 5 // default
+		req.TopK = 5
 	}
 
-	results, err := s.cache.GetSimilar(r.Context(), req.Query, req.TopK)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	var results []core.QueryResult
+
+	if len(req.Embedding) > 0 {
+		// Use provided embedding
+		results = s.cache.GetTopKByEmbedding(req.Embedding, req.TopK)
+	} else {
+		// For text query, we need to generate embedding first
+		// This requires the cache to have an embedding function configured
+		// For now, return an error
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "embedding required for similarity search",
+			"hint": "provide 'embedding' array in request or use a cache with embedding generation configured",
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"query":   req.Query,
-		"results": results,
+	c.JSON(http.StatusOK, SimilarResponse{
+		Query:   req.Query,
+		Results: results,
+	})
+}
+
+func (s *Server) handleCacheStats(c *gin.Context) {
+	hits, misses, hitRate := s.cache.Stats()
+	
+	c.JSON(http.StatusOK, StatsResponse{
+		Hits:    hits,
+		Misses:  misses,
+		HitRate: hitRate,
+	})
+}
+
+func (s *Server) handleCacheFlush(c *gin.Context) {
+	s.cache.Flush()
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"message": "cache flushed",
 	})
 }
