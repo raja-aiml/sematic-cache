@@ -3,6 +3,7 @@ package storage
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,13 +57,9 @@ type CompositeBackend struct {
 // NewCompositeBackend creates a new composite backend with configured tiers
 func NewCompositeBackend(tiers []*Tier, embedder core.EmbeddingFunc, threshold float64) *CompositeBackend {
 	// Sort tiers by priority
-	for i := 0; i < len(tiers)-1; i++ {
-		for j := i + 1; j < len(tiers); j++ {
-			if tiers[i].Priority > tiers[j].Priority {
-				tiers[i], tiers[j] = tiers[j], tiers[i]
-			}
-		}
-	}
+	sort.Slice(tiers, func(i, j int) bool {
+		return tiers[i].Priority < tiers[j].Priority
+	})
 
 	return &CompositeBackend{
 		tiers:        tiers,
