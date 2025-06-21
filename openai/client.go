@@ -250,6 +250,7 @@ func (c *Client) ChatStream(ctx context.Context, messages []ChatMessage, opts Ch
 	go func() {
 		defer close(out)
 		defer close(errChan)
+		defer stream.Close()
 		for stream.Next() {
 			chunk := stream.Current()
 			if len(chunk.Choices) > 0 {
