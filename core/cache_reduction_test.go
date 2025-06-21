@@ -34,11 +34,14 @@ func TestCache_WithDimensionReduction(t *testing.T) {
 	}
 
 	// Create cache with dimension reduction
-	cache := NewCache(100,
+	cache, err := NewCache(100,
 		WithEmbeddingFunc(embedFunc),
 		WithDimensionReduction(reducer),
 		WithMinSimilarity(0.7),
 	)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 
 	// Test that ensureDualEmbeddings is set
 	if !cache.ensureDualEmbeddings {
@@ -126,11 +129,14 @@ func TestCache_HybridSearch(t *testing.T) {
 	}
 
 	// Create cache
-	cache := NewCache(100,
+	cache, err := NewCache(100,
 		WithEmbeddingFunc(embedFunc),
 		WithDimensionReduction(reducer),
 		WithMinSimilarity(0.5),
 	)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 
 	// Add entries
 	entries := []struct {
@@ -199,9 +205,12 @@ func TestCache_EnsureReducedEmbeddings(t *testing.T) {
 	}
 
 	// Create cache without reducer initially
-	cache := NewCache(50,
+	cache, err := NewCache(50,
 		WithEmbeddingFunc(embedFunc),
 	)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 
 	// Add entries
 	for i := 0; i < 15; i++ {
@@ -220,7 +229,7 @@ func TestCache_EnsureReducedEmbeddings(t *testing.T) {
 
 	// Try to ensure reduced embeddings - should auto-train
 	ctx := context.Background()
-	err := cache.EnsureReducedEmbeddings(ctx)
+	err = cache.EnsureReducedEmbeddings(ctx)
 	if err != nil {
 		t.Fatalf("EnsureReducedEmbeddings failed: %v", err)
 	}
@@ -248,10 +257,13 @@ func TestCache_DimensionReductionMetrics(t *testing.T) {
 
 	reducer, _ := reduction.NewDimensionReducer(config)
 
-	cache := NewCache(100,
+	cache, err := NewCache(100,
 		WithEmbeddingFunc(embedFunc),
 		WithDimensionReduction(reducer),
 	)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 
 	// Add entries and train
 	for i := 0; i < 20; i++ {
@@ -295,11 +307,14 @@ func TestCache_RegularSearchFallback(t *testing.T) {
 
 	reducer, _ := reduction.NewDimensionReducer(config)
 
-	cache := NewCache(50,
+	cache, err := NewCache(50,
 		WithEmbeddingFunc(embedFunc),
 		WithDimensionReduction(reducer),
 		WithMinSimilarity(0.5),
 	)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
 
 	// Add entries
 	cache.SetPrompt("Short", "Short answer")

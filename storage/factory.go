@@ -79,7 +79,11 @@ func newMemoryBackend(cfg *config.Config, embedFunc core.EmbeddingFunc) (core.Ca
 
 	if cfg != nil {
 		if cfg.Cache.EvictionPolicy != "" {
-			opts = append(opts, core.WithEvictionPolicy(cfg.Cache.EvictionPolicy))
+			polOpt, err := core.WithEvictionPolicy(cfg.Cache.EvictionPolicy)
+			if err != nil {
+				return nil, err
+			}
+			opts = append(opts, polOpt)
 		}
 		if ttl := cfg.TTLDuration(); ttl > 0 {
 			opts = append(opts, core.WithTTL(ttl))
@@ -89,7 +93,11 @@ func newMemoryBackend(cfg *config.Config, embedFunc core.EmbeddingFunc) (core.Ca
 		}
 	}
 
-	return core.NewCache(capacity, opts...), nil
+	cache, err := core.NewCache(capacity, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return cache, nil
 }
 
 // newRedisBackend creates a Redis cluster cache backend
