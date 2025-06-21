@@ -87,7 +87,7 @@ This documentation can be used by the NLP agent to understand available operatio
 
 func runAgent(cmd *cobra.Command, args []string) error {
 	// Load configuration
-	config, err := loadAgentConfig()
+	config, err := loadAgentConfig(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
@@ -162,7 +162,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func loadAgentConfig() (*agent.Config, error) {
+func loadAgentConfig(cmd *cobra.Command) (*agent.Config, error) {
 	// Start with defaults
 	config := &agent.Config{
 		OpenAIModel:         "gpt-4-turbo-preview",

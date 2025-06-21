@@ -8,26 +8,24 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/raja-aiml/sematic-cache/deploy/local/internal/build"
 )
 
-// Provider implements BuildProvider using Docker CLI
-type Provider struct {
+// CLIProvider implements BuildProvider using Docker CLI
+type CLIProvider struct {
 	logger     *slog.Logger
 	binaryPath string
 }
 
-// NewProvider creates a new Docker provider
-func NewProvider(logger *slog.Logger) *Provider {
-	return &Provider{
-		logger:     logger.With("provider", "docker"),
+// NewCLIProvider creates a new Docker CLI provider
+func NewCLIProvider(logger *slog.Logger) *CLIProvider {
+	return &CLIProvider{
+		logger:     logger.With("provider", "docker-cli"),
 		binaryPath: "docker",
 	}
 }
 
 // Build implements BuildProvider
-func (p *Provider) Build(ctx context.Context, options build.ProviderBuildOptions) error {
+func (p *CLIProvider) Build(ctx context.Context, options ProviderBuildOptions) error {
 	p.logger.InfoContext(ctx, "Building with Docker",
 		"tags", options.Tags,
 		"dockerfile", options.Dockerfile,
@@ -84,7 +82,7 @@ func (p *Provider) Build(ctx context.Context, options build.ProviderBuildOptions
 }
 
 // Push implements BuildProvider
-func (p *Provider) Push(ctx context.Context, image string, auth *build.AuthConfig) error {
+func (p *CLIProvider) Push(ctx context.Context, image string, auth *AuthConfig) error {
 	p.logger.InfoContext(ctx, "Pushing image", "image", image)
 
 	// Login if auth provided
@@ -108,7 +106,7 @@ func (p *Provider) Push(ctx context.Context, image string, auth *build.AuthConfi
 }
 
 // Tag implements BuildProvider
-func (p *Provider) Tag(ctx context.Context, source, target string) error {
+func (p *CLIProvider) Tag(ctx context.Context, source, target string) error {
 	p.logger.InfoContext(ctx, "Tagging image",
 		"source", source,
 		"target", target,
@@ -123,7 +121,7 @@ func (p *Provider) Tag(ctx context.Context, source, target string) error {
 }
 
 // Pull implements BuildProvider
-func (p *Provider) Pull(ctx context.Context, image string, auth *build.AuthConfig) error {
+func (p *CLIProvider) Pull(ctx context.Context, image string, auth *AuthConfig) error {
 	p.logger.InfoContext(ctx, "Pulling image", "image", image)
 
 	// Login if auth provided
@@ -147,7 +145,7 @@ func (p *Provider) Pull(ctx context.Context, image string, auth *build.AuthConfi
 }
 
 // ImageExists implements BuildProvider
-func (p *Provider) ImageExists(ctx context.Context, image string) (bool, error) {
+func (p *CLIProvider) ImageExists(ctx context.Context, image string) (bool, error) {
 	cmd := exec.CommandContext(ctx, p.binaryPath, "image", "inspect", image)
 	if err := cmd.Run(); err != nil {
 		// If inspect fails, image doesn't exist
@@ -157,7 +155,7 @@ func (p *Provider) ImageExists(ctx context.Context, image string) (bool, error) 
 }
 
 // RemoveImage implements BuildProvider
-func (p *Provider) RemoveImage(ctx context.Context, image string) error {
+func (p *CLIProvider) RemoveImage(ctx context.Context, image string) error {
 	p.logger.InfoContext(ctx, "Removing image", "image", image)
 
 	cmd := exec.CommandContext(ctx, p.binaryPath, "rmi", image)
@@ -169,14 +167,14 @@ func (p *Provider) RemoveImage(ctx context.Context, image string) error {
 }
 
 // ListImages implements BuildProvider
-func (p *Provider) ListImages(ctx context.Context) ([]build.ImageInfo, error) {
+func (p *CLIProvider) ListImages(ctx context.Context) ([]ImageInfo, error) {
 	cmd := exec.CommandContext(ctx, p.binaryPath, "images", "--format", "json")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("docker images failed: %w", err)
 	}
 
-	var images []build.ImageInfo
+	var images []ImageInfo
 	lines := strings.Split(string(output), "\n")
 
 	for _, line := range lines {
@@ -200,12 +198,11 @@ func (p *Provider) ListImages(ctx context.Context) ([]build.ImageInfo, error) {
 		// Convert size
 		size := p.parseSize(dockerImage.Size)
 
-		img := build.ImageInfo{
+		img := ImageInfo{
 			ID:      dockerImage.ID,
 			Tags:    []string{dockerImage.Repository + ":" + dockerImage.Tag},
 			Size:    size,
-			Created: createdTime,
-			Digest:  dockerImage.Digest,
+			Created: createdTime.Unix(),
 		}
 
 		images = append(images, img)
@@ -215,7 +212,7 @@ func (p *Provider) ListImages(ctx context.Context) ([]build.ImageInfo, error) {
 }
 
 // login performs docker login
-func (p *Provider) login(ctx context.Context, auth *build.AuthConfig) error {
+func (p *CLIProvider) login(ctx context.Context, auth *AuthConfig) error {
 	args := []string{"login"}
 
 	if auth.Username != "" {
@@ -239,7 +236,7 @@ func (p *Provider) login(ctx context.Context, auth *build.AuthConfig) error {
 }
 
 // logout performs docker logout
-func (p *Provider) logout(ctx context.Context, server string) error {
+func (p *CLIProvider) logout(ctx context.Context, server string) error {
 	args := []string{"logout"}
 
 	if server != "" {
@@ -256,7 +253,7 @@ func (p *Provider) logout(ctx context.Context, server string) error {
 }
 
 // parseSize parses Docker size string to bytes
-func (p *Provider) parseSize(sizeStr string) int64 {
+func (p *CLIProvider) parseSize(sizeStr string) int64 {
 	// Simple parsing - in real implementation use proper parsing
 	sizeStr = strings.ToUpper(strings.TrimSpace(sizeStr))
 

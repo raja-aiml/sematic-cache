@@ -6,8 +6,6 @@ import (
 	"os/exec"
 	"testing"
 	"time"
-
-	"github.com/raja-aiml/sematic-cache/deploy/local/internal/build"
 )
 
 // isDockerAvailable checks if Docker daemon is accessible
@@ -17,33 +15,33 @@ func isDockerAvailable() bool {
 	return err == nil
 }
 
-func TestNewProvider(t *testing.T) {
+func TestNewCLIProvider(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 
 	if provider == nil {
 		t.Fatal("NewProvider returned nil")
 	}
 
 	if provider.binaryPath != "docker" {
-		t.Errorf("NewProvider() binaryPath = %v, want %v", provider.binaryPath, "docker")
+		t.Errorf("NewCLIProvider() binaryPath = %v, want %v", provider.binaryPath, "docker")
 	}
 
 	if provider.logger == nil {
-		t.Error("NewProvider() logger is nil")
+		t.Error("NewCLIProvider() logger is nil")
 	}
 }
 
 func TestProvider_Build(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	if isDockerAvailable() {
 		// Test with Docker available
 		t.Run("with_docker", func(t *testing.T) {
 			// Build will fail because Dockerfile doesn't exist in test directory
-			options := build.ProviderBuildOptions{
+			options := ProviderBuildOptions{
 				Dockerfile: "Dockerfile",
 				Context:    ".",
 				Tags:       []string{"test:latest"},
@@ -56,7 +54,7 @@ func TestProvider_Build(t *testing.T) {
 
 		// Test with build args
 		t.Run("with_docker_build_args", func(t *testing.T) {
-			options := build.ProviderBuildOptions{
+			options := ProviderBuildOptions{
 				Dockerfile: "Dockerfile",
 				Context:    ".",
 				Tags:       []string{"test:latest", "test:v1.0"},
@@ -74,7 +72,7 @@ func TestProvider_Build(t *testing.T) {
 	} else {
 		// Test without Docker
 		t.Run("without_docker", func(t *testing.T) {
-			options := build.ProviderBuildOptions{
+			options := ProviderBuildOptions{
 				Dockerfile: "Dockerfile",
 				Context:    ".",
 				Tags:       []string{"test:latest"},
@@ -89,7 +87,7 @@ func TestProvider_Build(t *testing.T) {
 
 func TestProvider_Push(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	if isDockerAvailable() {
@@ -104,7 +102,7 @@ func TestProvider_Push(t *testing.T) {
 
 		// Test with auth
 		t.Run("with_docker_auth", func(t *testing.T) {
-			auth := &build.AuthConfig{
+			auth := &AuthConfig{
 				Username: "testuser",
 				Password: "testpass",
 				Server:   "localhost:5000",
@@ -128,7 +126,7 @@ func TestProvider_Push(t *testing.T) {
 
 func TestProvider_Tag(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	if isDockerAvailable() {
@@ -153,7 +151,7 @@ func TestProvider_Tag(t *testing.T) {
 
 func TestProvider_Pull(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	if isDockerAvailable() {
@@ -168,7 +166,7 @@ func TestProvider_Pull(t *testing.T) {
 
 		// Test with auth
 		t.Run("with_docker_auth", func(t *testing.T) {
-			auth := &build.AuthConfig{
+			auth := &AuthConfig{
 				Username: "testuser",
 				Password: "testpass",
 				Server:   "localhost:5000",
@@ -192,7 +190,7 @@ func TestProvider_Pull(t *testing.T) {
 
 func TestProvider_ImageExists(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	if isDockerAvailable() {
@@ -225,7 +223,7 @@ func TestProvider_ImageExists(t *testing.T) {
 
 func TestProvider_RemoveImage(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	if isDockerAvailable() {
@@ -250,7 +248,7 @@ func TestProvider_RemoveImage(t *testing.T) {
 
 func TestProvider_ListImages(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	if isDockerAvailable() {
@@ -281,13 +279,11 @@ func TestProvider_ListImages(t *testing.T) {
 
 func TestImageInfo(t *testing.T) {
 	// Test ImageInfo struct
-	info := build.ImageInfo{
-		ID:       "sha256:abc123",
-		Tags:     []string{"test:latest", "test:v1.0"},
-		Size:     1024 * 1024 * 100, // 100MB
-		Created:  time.Now(),
-		Platform: "linux/amd64",
-		Digest:   "sha256:def456",
+	info := ImageInfo{
+		ID:      "sha256:abc123",
+		Tags:    []string{"test:latest", "test:v1.0"},
+		Size:    1024 * 1024 * 100, // 100MB
+		Created: time.Now().Unix(),
 	}
 
 	if info.ID != "sha256:abc123" {
@@ -305,7 +301,7 @@ func TestImageInfo(t *testing.T) {
 
 func TestAuthConfig(t *testing.T) {
 	// Test AuthConfig struct
-	auth := &build.AuthConfig{
+	auth := &AuthConfig{
 		Username: "user",
 		Password: "pass",
 		Server:   "docker.io",
@@ -343,7 +339,7 @@ func TestProvider_parseSize(t *testing.T) {
 		{"with_spaces", " 100 MB ", 104857600},
 	}
 
-	provider := &Provider{}
+	provider := &CLIProvider{}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -357,17 +353,17 @@ func TestProvider_parseSize(t *testing.T) {
 
 func TestProvider_login(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	tests := []struct {
 		name    string
-		auth    *build.AuthConfig
+		auth    *AuthConfig
 		wantErr bool
 	}{
 		{
 			name: "full_auth",
-			auth: &build.AuthConfig{
+			auth: &AuthConfig{
 				Username: "user",
 				Password: "pass",
 				Server:   "docker.io",
@@ -376,14 +372,14 @@ func TestProvider_login(t *testing.T) {
 		},
 		{
 			name: "username_only",
-			auth: &build.AuthConfig{
+			auth: &AuthConfig{
 				Username: "user",
 			},
 			wantErr: true,
 		},
 		{
 			name:    "empty_auth",
-			auth:    &build.AuthConfig{},
+			auth:    &AuthConfig{},
 			wantErr: true, // Docker login with empty auth will fail
 		},
 	}
@@ -404,7 +400,7 @@ func TestProvider_login(t *testing.T) {
 
 func TestProvider_logout(t *testing.T) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -431,21 +427,21 @@ func TestProvider_logout(t *testing.T) {
 }
 
 // Benchmark tests
-func BenchmarkNewProvider(b *testing.B) {
+func BenchmarkNewCLIProvider(b *testing.B) {
 	logger := slog.Default()
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_ = NewProvider(logger)
+		_ = NewCLIProvider(logger)
 	}
 }
 
 func BenchmarkProvider_Build(b *testing.B) {
 	logger := slog.Default()
-	provider := NewProvider(logger)
+	provider := NewCLIProvider(logger)
 	ctx := context.Background()
-	options := build.ProviderBuildOptions{
+	options := ProviderBuildOptions{
 		Dockerfile: "Dockerfile",
 		Context:    ".",
 		Tags:       []string{"bench:latest"},
