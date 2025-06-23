@@ -251,12 +251,13 @@ tasks:
   docs:
     desc: Show documentation
     cmds:
-      - echo "📚 Blueprint Documentation:"
-      - echo "Main README: ./README.md"
-      - echo "Validation README: ./validation-kit/README.md"
-      - echo "Scripts README: ./scripts/README.md"
-      - echo ""
-      - echo "Quick reference:"
-      - echo "  Cluster: {{.CLUSTER_NAME}}"
-      - echo "  Registry: {{.REGISTRY_NAME}}:{{.REGISTRY_PORT}}"
-      - echo "  Kubeconfig: {{.KUBECONFIG_FILE}}"
+      - |2
+        echo "📚 Blueprint Documentation:"
+        echo "Main README: ./README.md"
+        echo "Validation README: ./validation-kit/README.md"
+        echo "Scripts README: ./scripts/README.md"
+        echo ""
+        echo "Quick reference:"
+        echo "  Cluster {{.CLUSTER_NAME}}"
+        echo "  Registry {{.REGISTRY_NAME}}:{{.REGISTRY_PORT}}"
+        echo "  Kubeconfig {{.KUBECONFIG_FILE}}"

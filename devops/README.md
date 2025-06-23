@@ -6,6 +6,10 @@ This directory contains modular DevOps task definitions that can be included in 
 
 ```
 devops/
+├── tools/                       # Development tools (separate Go module)
+│   ├── cmd/devops/             # DevOps CLI tool
+│   ├── internal/               # Tool implementations
+│   └── README.md               # Tools documentation
 ├── Taskfile.build.common.yaml   # Go build, test, and CI tasks
 ├── Taskfile.deploy.common.yaml  # Kubernetes deployment and cluster tasks
 ├── Taskfile.example.yaml        # Usage examples
@@ -67,6 +71,33 @@ includes:
 - `deploy:scale:*` - Scaling operations
 - `deploy:debug:*` - Debugging tools
 - `deploy:cleanup` - Resource cleanup
+
+### DevOps Tools (`tools/`)
+
+**Purpose**: Development and operations CLI tools
+
+**Location**: `devops/tools/` (separate Go module)
+
+**Available Tools**:
+- **devops CLI** - Swiss-army knife for development operations
+  - `taskdoc` - Generate documentation for all Taskfiles
+  - `validate` - Validate Taskfile syntax
+  - `version` - Display version information
+
+**Usage**:
+```bash
+# Build the devops tool
+task build:devops
+
+# Generate Taskfile documentation
+./bin/devops taskdoc
+
+# Validate Taskfiles
+./bin/devops validate
+
+# Show version
+./bin/devops version
+```
 
 ## Usage Examples
 

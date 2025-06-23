@@ -208,12 +208,22 @@ Access URLs:
 
 ```
 ├── Dockerfile              # Application container build definition
-├── cmd/server/              # Application entry point
+├── cmd/server/             # Application entry point
 ├── core/                   # Core cache and agent logic
 ├── config/                 # Configuration management
+├── storage/                # Storage backend implementations
+├── server/                 # HTTP server and API handlers
+├── openai/                 # OpenAI API integration
+├── observability/          # Monitoring and tracing
+├── devops/                 # All DevOps related items
+│   ├── tools/              # Development tools (separate module)
+│   │   ├── cmd/devops/     # DevOps CLI tool
+│   │   └── internal/       # Tool implementations
+│   ├── Taskfile.*.yaml     # Common task definitions
+│   └── scripts/            # Shell scripts
 ├── iaac/                   # Infrastructure as Code
 │   ├── infra/              # Local deployment tooling
-│   └── blueprint/archive/  # Kubernetes deployment manifests
+│   └── blueprint/          # Kubernetes deployment manifests
 │       ├── app/            # Application deployments and services
 │       │   ├── sematic-cache/  # Sematic Cache API service
 │       │   └── web/        # Static web service
@@ -221,12 +231,23 @@ Access URLs:
 │       │   ├── postgres/   # PostgreSQL service
 │       │   ├── redis/      # Redis service
 │       │   └── ingress-nginx/  # Ingress controller
-│       └── scripts/        # Development and utility scripts
-├── storage/                # Storage backend implementations
-├── server/                 # HTTP server and API handlers
-├── openai/                 # OpenAI API integration
-└── observability/          # Monitoring and tracing
+│       └── scripts/        # Deployment scripts
+├── go.work                 # Go workspace configuration
+├── go.mod                  # Main module dependencies
+└── Taskfile.yaml           # Root task definitions
 ```
+
+### Modular Organization
+
+The project uses Go workspaces to maintain clean separation:
+- **Main application** (`/`) - Core semantic cache functionality
+- **DevOps tools** (`/devops/tools`) - Development and operations utilities
+- **IaaC module** (`/iaac/infra`) - Infrastructure deployment tooling
+
+This separation ensures:
+- Development tools don't bloat production builds
+- Clear boundaries between application and tooling
+- Independent dependency management
 
 ### Deployment Organization
 

@@ -13,7 +13,7 @@ includes:
     
   # Include IaaC orchestration
   iaac-ops:
-    taskfile: ./iaac/blueprint/archive/Taskfile.yaml
+    taskfile: ./iaac/blueprint/Taskfile.yaml
     dir: ./iaac/blueprint/archive
 
 vars:
@@ -309,3 +309,81 @@ tasks:
         echo "  task full      # Complete workflow"
         echo "  task status    # Check status"
         echo "  task logs      # View logs"
+        echo ""
+        echo "For detailed task documentation:"
+        echo "  task docs:generate  # Generate complete documentation"
+        echo "  task docs:flow      # Show task dependencies"
+
+  docs:generate:
+    desc: Generate complete Taskfile documentation
+    deps: [build:devops]
+    cmds:
+      - ./bin/devops taskdoc --output taskfile-docs.md
+      - 'echo "📄 Documentation generated: taskfile-docs.md"'
+
+  build:devops:
+    desc: Build the devops CLI tool
+    vars:
+      VERSION:
+        sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+      GIT_COMMIT:
+        sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+      BUILD_TIME:
+        sh: date -u '+%Y-%m-%d_%H:%M:%S'
+    cmds:
+      - mkdir -p bin
+      - |
+        cd devops/tools && go build -ldflags "\
+          -X github.com/raja-aiml/sematic-cache/devops/tools/internal/devops/cmd.Version={{.VERSION}} \
+          -X github.com/raja-aiml/sematic-cache/devops/tools/internal/devops/cmd.GitCommit={{.GIT_COMMIT}} \
+          -X github.com/raja-aiml/sematic-cache/devops/tools/internal/devops/cmd.BuildTime={{.BUILD_TIME}}" \
+          -o ../../bin/devops ./cmd/devops
+    sources:
+      - devops/tools/cmd/devops/**/*.go
+      - devops/tools/internal/devops/**/*.go
+      - devops/tools/internal/taskdoc/**/*.go
+    generates:
+      - bin/devops
+
+  docs:flow:
+    desc: Show task dependencies and flow
+    cmds:
+      - |
+        echo "🔀 Task Flow Overview"
+        echo "===================="
+        echo ""
+        echo "Root Taskfile.yaml"
+        echo "├── includes:"
+        echo "│   ├── build: (Go build tasks)"
+        echo "│   ├── deploy: (K8s deployment tasks)"
+        echo "│   └── iaac-ops: (Infrastructure tasks)"
+        echo "│"
+        echo "├── High-level workflows:"
+        echo "│   ├── full → setup → build → deploy → test"
+        echo "│   ├── quick → build → deploy → quick-test"
+        echo "│   └── dev → build → deploy:dev"
+        echo "│"
+        echo "└── Task categories:"
+        echo "    ├── build:* - Compilation & packaging"
+        echo "    ├── deploy:* - Kubernetes operations"
+        echo "    ├── test:* - Testing & validation"
+        echo "    ├── docker:* - Container operations"
+        echo "    └── cleanup/clean - Resource cleanup"
+
+  docs:tasks:
+    desc: List all available tasks with descriptions
+    cmds:
+      - task --list-all
+
+  docs:json:
+    desc: Generate Taskfile documentation in JSON format
+    deps: [build:devops]
+    cmds:
+      - ./bin/devops taskdoc --format json --output taskfile-docs.json
+      - 'echo "📄 JSON documentation generated: taskfile-docs.json"'
+
+  docs:flow:simple:
+    desc: Show simple task flow (text only)
+    deps: [build:devops]
+    cmds:
+      - ./bin/devops taskdoc --flow --output -

@@ -21,17 +21,17 @@ type GetRequest struct {
 }
 
 type SetRequest struct {
-	Prompt     string `json:"prompt" binding:"required"`
-	Answer     string `json:"answer" binding:"required"`
-	ModelName  string `json:"model_name,omitempty"`
-	ModelID    string `json:"model_id,omitempty"`
-	Embedding  []float32 `json:"embedding,omitempty"`
+	Prompt    string    `json:"prompt" binding:"required"`
+	Answer    string    `json:"answer" binding:"required"`
+	ModelName string    `json:"model_name,omitempty"`
+	ModelID   string    `json:"model_id,omitempty"`
+	Embedding []float32 `json:"embedding,omitempty"`
 }
 
 type SimilarRequest struct {
-	Query     string `json:"query" binding:"required"`
+	Query     string    `json:"query" binding:"required"`
 	Embedding []float32 `json:"embedding,omitempty"`
-	TopK      int    `json:"top_k"`
+	TopK      int       `json:"top_k"`
 }
 
 type CacheResponse struct {
@@ -43,7 +43,7 @@ type CacheResponse struct {
 }
 
 type SimilarResponse struct {
-	Query   string              `json:"query"`
+	Query   string             `json:"query"`
 	Results []core.QueryResult `json:"results"`
 }
 
@@ -82,7 +82,7 @@ func (s *Server) Router() *gin.Engine {
 func (s *Server) setupRoutes() {
 	// Health check
 	s.router.GET("/health", s.handleHealth)
-	
+
 	// Cache operations
 	api := s.router.Group("/api/v1")
 	{
@@ -101,7 +101,7 @@ func (s *Server) setupRoutes() {
 
 func (s *Server) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
+		"status":  "healthy",
 		"service": "semantic-cache",
 	})
 }
@@ -115,7 +115,7 @@ func (s *Server) handleCacheGet(c *gin.Context) {
 
 	// Normalize prompt
 	prompt := strings.TrimSpace(req.Prompt)
-	
+
 	// Get from cache
 	answer, found := s.cache.Get(prompt)
 	if !found {
@@ -188,7 +188,7 @@ func (s *Server) handleCacheSimilar(c *gin.Context) {
 		// For now, return an error
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "embedding required for similarity search",
-			"hint": "provide 'embedding' array in request or use a cache with embedding generation configured",
+			"hint":  "provide 'embedding' array in request or use a cache with embedding generation configured",
 		})
 		return
 	}
@@ -201,7 +201,7 @@ func (s *Server) handleCacheSimilar(c *gin.Context) {
 
 func (s *Server) handleCacheStats(c *gin.Context) {
 	hits, misses, hitRate := s.cache.Stats()
-	
+
 	c.JSON(http.StatusOK, StatsResponse{
 		Hits:    hits,
 		Misses:  misses,
@@ -212,7 +212,7 @@ func (s *Server) handleCacheStats(c *gin.Context) {
 func (s *Server) handleCacheFlush(c *gin.Context) {
 	s.cache.Flush()
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
+		"status":  "success",
 		"message": "cache flushed",
 	})
 }
