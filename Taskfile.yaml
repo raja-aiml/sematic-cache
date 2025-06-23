@@ -1,14 +1,25 @@
 version: '3'
 
 includes:
-  # Include common build tasks
-  build:
-    taskfile: ./devops/Taskfile.build.common.yaml
+  # Modern modular task structure
+  go:
+    taskfile: ./devops/tasks/build/go.yaml
     dir: '{{.USER_WORKING_DIR}}'
   
-  # Include common deploy tasks
-  deploy:
-    taskfile: ./devops/Taskfile.deploy.common.yaml
+  docker:
+    taskfile: ./devops/tasks/build/docker.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+  
+  k3d:
+    taskfile: ./devops/tasks/deploy/k3d.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+  
+  k8s:
+    taskfile: ./devops/tasks/deploy/k8s.yaml
+    dir: '{{.USER_WORKING_DIR}}'
+  
+  helm:
+    taskfile: ./devops/tasks/deploy/helm.yaml
     dir: '{{.USER_WORKING_DIR}}'
     
   # Include IaaC orchestration
@@ -57,7 +68,7 @@ tasks:
   build:
     desc: Build the semantic cache server
     cmds:
-      - task: build:build
+      - task: go:build
         vars:
           BINARY_NAME: semantic-cache
           MAIN: ./cmd/server
@@ -65,7 +76,7 @@ tasks:
   build:all:
     desc: Build for all platforms
     cmds:
-      - task: build:build:all
+      - task: go:build:all
         vars:
           BINARY_NAME: semantic-cache
           MAIN: ./cmd/server
@@ -79,69 +90,69 @@ tasks:
   test:
     desc: Run all tests in the project
     cmds:
-      - task: build:test
+      - task: go:test
 
   test:coverage:
     desc: Run tests with coverage report
     cmds:
-      - task: build:test:coverage
+      - task: go:test:coverage
 
   test:bench:
     desc: Run benchmarks
     cmds:
-      - task: build:test:bench
+      - task: go:test:bench
 
   # === CODE QUALITY TASKS ===
   fmt:
     desc: Format all Go code
     cmds:
-      - task: build:fmt
+      - task: go:fmt
 
   lint:
     desc: Run linting
     cmds:
-      - task: build:lint
+      - task: go:lint
 
   check:
     desc: Run all checks (fmt, vet, lint, test)
     cmds:
-      - task: build:check
+      - task: go:check
 
   # === CLEAN TASKS ===
   clean:
     desc: Clean all build artifacts
     cmds:
-      - task: build:clean
+      - task: go:clean
       - cd ./iaac/infra && task clean
 
   # === CORE WORKFLOWS ===
   full:
     desc: Complete production workflow (setup → build → deploy → test)
     cmds:
-      - task: deploy:full
+      - task: k8s:full
 
   quick:
     desc: Quick development workflow with essential tests
     cmds:
-      - task: deploy:quick
+      - task: k8s:quick
 
   reset:
     desc: Complete reset (cleanup → setup → build → deploy)
     cmds:
-      - task: deploy:reset
+      - task: k8s:reset
 
   # === DOCKER TASKS ===
-  docker:build:
+  image:build:
     desc: Build Docker image
     cmds:
-      - task: build:docker:build
+      - task: docker:build
         vars:
           IMAGE_NAME: semantic-cache
 
-  docker:push:
+  image:push:
     desc: Push Docker image
     cmds:
-      - task: build:docker:push
+      - task: docker:push
         vars:
           IMAGE_NAME: semantic-cache
 
@@ -149,51 +160,51 @@ tasks:
   setup:
     desc: Create k3d cluster and deploy infrastructure
     cmds:
-      - task: deploy:setup
+      - task: k8s:setup
 
   deploy:
     desc: Deploy application to cluster
     cmds:
-      - task: deploy:deploy
+      - task: k8s:deploy
 
   # === MONITORING TASKS ===
   status:
     desc: Show current deployment status
     cmds:
-      - task: deploy:status
+      - task: k8s:status
 
   logs:
     desc: Show application logs
     cmds:
-      - task: deploy:logs
+      - task: k8s:logs
 
   health:
     desc: Quick health check of all services
     cmds:
-      - task: deploy:health
+      - task: k8s:health
 
   metrics:
     desc: Show API metrics
     cmds:
-      - task: deploy:metrics
+      - task: k8s:metrics
 
   # === DEVELOPMENT TASKS ===
   dev:
     desc: Development cycle (build → deploy → quick-test)
     cmds:
       - task: build
-      - task: deploy:dev
+      - task: k8s:dev
 
   # === CI/CD TASKS ===
   ci:
     desc: Run CI pipeline
     cmds:
-      - task: build:ci
+      - task: go:ci
 
   release:
     desc: Create release artifacts
     cmds:
-      - task: build:release
+      - task: go:release
         vars:
           BINARY_NAME: semantic-cache
           MAIN: ./cmd/server
@@ -202,56 +213,56 @@ tasks:
   test:api:
     desc: Test API endpoints
     cmds:
-      - task: deploy:test:api
+      - task: k8s:test:api
 
   test:benchmark:
     desc: Run API performance benchmark
     cmds:
-      - task: deploy:test:benchmark
+      - task: k8s:test:benchmark
 
   # === DEBUGGING TASKS ===
   debug:
     desc: Debug deployment issues
     cmds:
-      - task: deploy:debug
+      - task: k8s:debug
 
   debug:pods:
     desc: Debug pod issues
     cmds:
-      - task: deploy:debug:pods
+      - task: k8s:debug:pods
 
   debug:network:
     desc: Debug network connectivity
     cmds:
-      - task: deploy:debug:network
+      - task: k8s:debug:network
 
   # === SCALING TASKS ===
   scale:up:
     desc: Scale application to 2 replicas
     cmds:
-      - task: deploy:scale:up
+      - task: k8s:scale:up
 
   scale:down:
     desc: Scale application to 1 replica
     cmds:
-      - task: deploy:scale:down
+      - task: k8s:scale:down
 
   # === VERIFICATION TASKS ===
   verify:
     desc: Verify deployment is working correctly
     cmds:
-      - task: deploy:verify
+      - task: k8s:verify
 
   validate:
     desc: Validate configuration files
     cmds:
-      - task: deploy:validate
+      - task: k8s:validate
 
   # === CLEANUP TASKS ===
   cleanup:
     desc: Destroy cluster and cleanup all resources
     cmds:
-      - task: deploy:cleanup
+      - task: k8s:cleanup
 
   cleanup:all:
     desc: Clean everything including build artifacts
@@ -263,29 +274,29 @@ tasks:
   port-forward:api:
     desc: Port forward to API service (localhost:8080)
     cmds:
-      - task: deploy:port-forward:api
+      - task: k8s:port-forward:api
 
   port-forward:postgres:
     desc: Port forward to PostgreSQL (localhost:5432)
     cmds:
-      - task: deploy:port-forward:postgres
+      - task: k8s:port-forward:postgres
 
   port-forward:redis:
     desc: Port forward to Redis (localhost:6379)
     cmds:
-      - task: deploy:port-forward:redis
+      - task: k8s:port-forward:redis
 
   # === UTILITY TASKS ===
   deps:
     desc: Download and tidy dependencies
     cmds:
-      - task: build:deps
-      - task: build:deps:tidy
+      - task: go:deps
+      - task: go:deps:tidy
 
   info:
     desc: Show project and build information
     cmds:
-      - task: build:info
+      - task: go:info
       - |
         echo ""
         echo "📦 Semantic Cache Project Info:"
@@ -329,7 +340,7 @@ tasks:
       GIT_COMMIT:
         sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
       BUILD_TIME:
-        sh: date -u '+%Y-%m-%d_%H:%M:%S'
+        sh: date -u +%Y-%m-%d_%H:%M:%S
     cmds:
       - mkdir -p bin
       - |

@@ -179,7 +179,7 @@ tasks:
   exec:
     desc: Execute command in cluster node
     vars:
-      NODE: '{{.NODE | default "k3d-" + .CLUSTER_NAME + "-server-0"}}'
+      NODE: '{{.NODE | default (print "k3d-" .CLUSTER_NAME "-server-0")}}'
       CMD: '{{.CMD | default "sh"}}'
     cmds:
       - docker exec -it {{.NODE}} {{.CMD}}
@@ -187,6 +187,6 @@ tasks:
   logs:
     desc: Show k3d cluster logs
     vars:
-      NODE: '{{.NODE | default "k3d-" + .CLUSTER_NAME + "-server-0"}}'
+      NODE: '{{.NODE | default (print "k3d-" .CLUSTER_NAME "-server-0")}}'
     cmds:
       - docker logs {{.LOG_ARGS}} {{.NODE}}

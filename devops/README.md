@@ -53,9 +53,8 @@ devops/
 ├── tools/                   # Development tools (separate Go module)
 │   ├── cmd/devops/         # DevOps CLI tool
 │   └── internal/           # Tool implementations
-├── Taskfile.yaml           # DevOps meta tasks
-├── Taskfile.build.common.compat.yaml  # Build compatibility wrapper
-└── Taskfile.deploy.common.compat.yaml # Deploy compatibility wrapper
+├── Taskfile.yaml                      # DevOps meta tasks
+└── Taskfile.example.yaml             # Example template
 ```
 
 ## 📦 Available Modules
@@ -180,21 +179,17 @@ task devops:migrate:check
 task devops:migrate:guide
 ```
 
-### Compatibility Mode
+### Migration Complete ✅
 
-During transition, compatibility wrappers are available:
+The migration to modular task structure is complete. Use the new structure:
 
 ```yaml
-# Old way (deprecated but still works)
-includes:
-  build: ./devops/Taskfile.build.common.compat.yaml
-  deploy: ./devops/Taskfile.deploy.common.compat.yaml
-
-# New way (recommended)
+# Modern modular approach
 includes:
   go: ./devops/tasks/build/go.yaml
   docker: ./devops/tasks/build/docker.yaml
   k8s: ./devops/tasks/deploy/k8s.yaml
+  helm: ./devops/tasks/deploy/helm.yaml
 ```
 
 See [migration guide](docs/migration.md) for detailed instructions.

@@ -79,7 +79,7 @@ func runPrecheck(cmd *cobra.Command, args []string) error {
 		{
 			name:        "kubectl",
 			command:     "kubectl",
-			versionCmd:  "version --client --short",
+			versionCmd:  "version --client",
 			required:    false,
 			installHint: "Run: devops install kubectl",
 		},
@@ -189,9 +189,13 @@ func checkTool(t tool, log *logger.Logger) error {
 	var versionOutput string
 	if t.versionCmd != "" {
 		cmd := exec.Command("sh", "-c", fmt.Sprintf("%s %s", t.command, t.versionCmd))
-		output, err := cmd.Output()
+		output, err := cmd.CombinedOutput()
 		if err != nil {
 			log.Warn("⚠️  %s: Found at %s but couldn't get version", t.name, path)
+			if precheckVerbose {
+				fmt.Printf("     Error: %v\n", err)
+				fmt.Printf("     Output: %s\n", string(output))
+			}
 			return nil
 		}
 		versionOutput = string(output)

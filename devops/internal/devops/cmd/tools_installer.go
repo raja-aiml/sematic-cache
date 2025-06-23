@@ -14,7 +14,7 @@ var (
 	toolsInstallerDebug       bool
 )
 
-// toolsInstallerCmd represents the tools-installer command  
+// toolsInstallerCmd represents the tools-installer command
 var toolsInstallerCmd = &cobra.Command{
 	Use:   "tools-installer",
 	Short: "Install development tools using the comprehensive tool installer",
@@ -39,7 +39,7 @@ Supported tools:
 
 func runToolsInstaller(cmd *cobra.Command, args []string) error {
 	log := logger.New()
-	
+
 	if toolsInstallerDebug {
 		log.SetLevel(logger.DebugLevel)
 	}
@@ -58,7 +58,7 @@ func runToolsInstaller(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Register standard tools
 	if err := registerStandardTools(registry, f); err != nil {
 		return err

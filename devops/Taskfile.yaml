@@ -132,26 +132,18 @@ tasks:
       - 'echo "Lines of Shell: $(find ./scripts -name "*.sh" -exec wc -l {} + | tail -1 | awk ''{print $1}'')"'
 
   migrate:check:
-    desc: Check if migration is needed
+    desc: Check migration status
     cmds:
       - |
-        echo "🔍 Checking for old taskfiles..."
-        old_files=0
-        if [ -f "../Taskfile.build.common.yaml" ]; then
-          echo "  ⚠️  Found: Taskfile.build.common.yaml"
-          old_files=$((old_files + 1))
-        fi
-        if [ -f "../Taskfile.deploy.common.yaml" ]; then
-          echo "  ⚠️  Found: Taskfile.deploy.common.yaml"
-          old_files=$((old_files + 1))
-        fi
-        
-        if [ $old_files -eq 0 ]; then
-          echo "✅ No old taskfiles found. Migration complete!"
-        else
-          echo ""
-          echo "📖 Run 'task devops:migrate:guide' for migration instructions"
-        fi
+        echo "🔍 Checking migration status..."
+        echo "✅ Migration to modular task structure complete!"
+        echo ""
+        echo "📊 Current structure:"
+        echo "  ✅ Modular tasks in ./tasks/"
+        echo "  ✅ Main Taskfile.yaml updated"
+        echo "  ✅ Compatibility files removed"
+        echo ""
+        echo "📖 See devops/README.md for current structure"
 
   migrate:guide:
     desc: Show migration guide

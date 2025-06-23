@@ -138,6 +138,23 @@ type CommandRunner interface {
 	RunWithEnv(ctx context.Context, env []string, name string, args ...string) error
 }
 
+// TaskExecutor interface for executing Taskfile tasks
+type TaskExecutor interface {
+	ExecuteTask(ctx context.Context, taskName string, vars map[string]string) error
+	LoadTaskfile(taskfilePath string) error
+	ValidateDirectory(dir string) error
+	ListTasks() ([]TaskInfo, error)
+}
+
+// TaskInfo holds information about a task
+type TaskInfo struct {
+	Name        string
+	Description string
+	Summary     string
+	Vars        map[string]string
+	Deps        []string
+}
+
 // Data structures used by interfaces
 
 // ContainerInfo holds container information

@@ -14,7 +14,7 @@ vars:
   VERSION:
     sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
   BUILD_TIME:
-    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+    sh: date -u +%Y-%m-%dT%H:%M:%SZ
   GIT_COMMIT:
     sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
   
@@ -27,19 +27,20 @@ vars:
   
   # Build flags
   DEFAULT_LDFLAGS: -s -w -X main.version={{.VERSION}} -X main.buildTime={{.BUILD_TIME}} -X main.gitCommit={{.GIT_COMMIT}}
-  LDFLAGS: '{{.LDFLAGS}}'
+  GO_LDFLAGS: '{{.GO_LDFLAGS | default ""}}'
+  FULL_LDFLAGS: '"{{.DEFAULT_LDFLAGS}}{{if .GO_LDFLAGS}} {{.GO_LDFLAGS}}{{end}}"'
 
 tasks:
   build:
     desc: Build Go binary for current platform
     cmds:
       - mkdir -p {{.BINARY_DIR}}
-      - |
-        echo "🔨 Building {{.BINARY_NAME}}..."
-        go build -ldflags "{{.DEFAULT_LDFLAGS}} {{.LDFLAGS}}" -o {{.BINARY_DIR}}/{{.BINARY_NAME}} {{.MAIN}}
-        echo "✅ Built: {{.BINARY_DIR}}/{{.BINARY_NAME}}"
+      - echo Building {{.BINARY_NAME}}...
+      - go build -ldflags {{.FULL_LDFLAGS}} -o {{.BINARY_DIR}}/{{.BINARY_NAME}} {{.MAIN}}
+      - echo Built {{.BINARY_DIR}}/{{.BINARY_NAME}}
     env:
       CGO_ENABLED: '{{.CGO_ENABLED}}'
+      LDFLAGS: ''
 
   build:linux:
     desc: Build for Linux (amd64)

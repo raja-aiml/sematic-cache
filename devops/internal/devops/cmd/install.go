@@ -78,20 +78,20 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 || (len(args) == 1 && args[0] == "all") {
 		// Install all tools using factory approach
 		log.Info("Installing all development tools...")
-		
+
 		// Create factory with default config
 		factoryConfig := factory.DefaultConfig()
 		f, err := factory.NewFactory(factoryConfig)
 		if err != nil {
 			return err
 		}
-		
+
 		// Create registry and register tools
 		registry, err := f.CreateToolRegistry()
 		if err != nil {
 			return err
 		}
-		
+
 		ctx := context.Background()
 		return registry.InstallAll(ctx)
 	}
@@ -109,22 +109,22 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Install specific tools using factory approach
 	log.Info("Installing selected tools: %v", toolsToInstall)
-	
+
 	// Create factory with default config
 	factoryConfig := factory.DefaultConfig()
 	f, err := factory.NewFactory(factoryConfig)
 	if err != nil {
 		return err
 	}
-	
+
 	// Create registry and register tools
 	registry, err := f.CreateToolRegistry()
 	if err != nil {
 		return err
 	}
-	
+
 	ctx := context.Background()
-	
+
 	// Install specific tools
 	for _, toolName := range toolsToInstall {
 		if err := registry.Install(ctx, toolName); err != nil {
@@ -132,7 +132,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	
+
 	log.Success("Selected tools installed successfully!")
 	return nil
 }

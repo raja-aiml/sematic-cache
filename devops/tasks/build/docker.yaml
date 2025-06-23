@@ -23,7 +23,7 @@ vars:
   VERSION:
     sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
   BUILD_TIME:
-    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+    sh: date -u +%Y-%m-%d_%H:%M:%S
   GIT_COMMIT:
     sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
 
@@ -44,7 +44,7 @@ tasks:
           -f {{.DOCKERFILE}} \
           {{.BUILD_ARGS}} \
           {{.BUILD_CONTEXT}}
-        echo "✅ Docker image built: {{.FULL_IMAGE}}:{{.IMAGE_TAG}}"
+        echo '✅ Docker image built: {{.FULL_IMAGE}}:{{.IMAGE_TAG}}'
 
   build:multi:
     desc: Build multi-architecture image
@@ -74,7 +74,7 @@ tasks:
     cmds:
       - docker push {{.FULL_IMAGE}}:{{.IMAGE_TAG}}
       - docker push {{.FULL_IMAGE}}:latest
-      - echo "✅ Docker image pushed: {{.FULL_IMAGE}}:{{.IMAGE_TAG}}"
+      - 'echo "✅ Docker image pushed: {{.FULL_IMAGE}}:{{.IMAGE_TAG}}"'
 
   tag:
     desc: Tag Docker image
@@ -83,7 +83,7 @@ tasks:
       NEW_TAG: '{{.NEW_TAG}}'
     cmds:
       - docker tag {{.FULL_IMAGE}}:{{.IMAGE_TAG}} {{.FULL_IMAGE}}:{{.NEW_TAG}}
-      - echo "✅ Tagged {{.FULL_IMAGE}}:{{.IMAGE_TAG}} as {{.FULL_IMAGE}}:{{.NEW_TAG}}"
+      - 'echo "✅ Tagged {{.FULL_IMAGE}}:{{.IMAGE_TAG}} as {{.FULL_IMAGE}}:{{.NEW_TAG}}"'
 
   scan:
     desc: Scan Docker image for vulnerabilities
@@ -153,7 +153,7 @@ tasks:
       CONTAINER_NAME: '{{.CONTAINER_NAME | default .IMAGE_NAME}}'
     cmds:
       - docker stop {{.CONTAINER_NAME}}
-      - echo "✅ Container {{.CONTAINER_NAME}} stopped"
+      - 'echo "✅ Container {{.CONTAINER_NAME}} stopped"'
 
   remove:
     desc: Remove container
@@ -162,7 +162,7 @@ tasks:
     deps: [stop]
     cmds:
       - docker rm {{.CONTAINER_NAME}}
-      - echo "✅ Container {{.CONTAINER_NAME}} removed"
+      - 'echo "✅ Container {{.CONTAINER_NAME}} removed"'
 
   clean:
     desc: Clean Docker images
@@ -172,7 +172,7 @@ tasks:
       - |
         echo "🧹 Cleaning Docker images..."
         docker rmi {{.FULL_IMAGE}}:{{.IMAGE_TAG}} {{.FULL_IMAGE}}:latest || true
-        echo "✅ Docker images cleaned"
+        echo '✅ Docker images cleaned'
 
   prune:
     desc: Prune unused Docker resources
@@ -180,4 +180,4 @@ tasks:
       - |
         echo "🧹 Pruning Docker resources..."
         docker system prune -f
-        echo "✅ Docker resources pruned"
+        echo '✅ Docker resources pruned'
