@@ -1,245 +1,253 @@
-# DevOps Directory - Reusable Task Definitions
+# DevOps Modular Task System
 
-This directory contains modular DevOps task definitions that can be included in any Taskfile across the project.
+A modular, maintainable task automation system for Go projects using [Task](https://taskfile.dev).
 
-## Structure
+## 🚀 Quick Start
+
+### 1. Include modules in your Taskfile.yaml
+
+```yaml
+version: '3'
+
+includes:
+  go: ./devops/tasks/build/go.yaml
+  docker: ./devops/tasks/build/docker.yaml
+  k8s: ./devops/tasks/deploy/k8s.yaml
+```
+
+### 2. Use namespaced tasks
+
+```bash
+# Build
+task go:build
+task docker:build
+
+# Deploy
+task k8s:deploy
+
+# Quality
+task sec:scan
+```
+
+## 📁 Structure
 
 ```
 devops/
-├── tools/                       # Development tools (separate Go module)
-│   ├── cmd/devops/             # DevOps CLI tool
-│   ├── internal/               # Tool implementations
-│   └── README.md               # Tools documentation
-├── Taskfile.build.common.yaml   # Go build, test, and CI tasks
-├── Taskfile.deploy.common.yaml  # Kubernetes deployment and cluster tasks
-├── Taskfile.example.yaml        # Usage examples
-├── README.md                    # This file
-├── STRUCTURE.md                 # Architecture documentation
-└── ARCHITECTURE.md              # Architecture guide
+├── tasks/                    # Modular task files
+│   ├── build/               # Build domain
+│   │   ├── go.yaml         # Go compilation, testing
+│   │   └── docker.yaml     # Container builds
+│   ├── deploy/              # Deployment domain
+│   │   ├── k3d.yaml        # Local k8s clusters
+│   │   ├── k8s.yaml        # Kubernetes operations
+│   │   └── helm.yaml       # Helm charts
+│   └── quality/             # Code quality
+│       └── security.yaml    # Security scanning
+├── scripts/                  # Shell scripts
+│   ├── lib/                # Shared libraries
+│   └── install-tools.sh    # Tool installation
+├── templates/               # Project templates
+│   └── taskfile/           # Taskfile templates
+├── docs/                    # Documentation
+│   └── migration.md        # Migration guide
+├── tools/                   # Development tools (separate Go module)
+│   ├── cmd/devops/         # DevOps CLI tool
+│   └── internal/           # Tool implementations
+├── Taskfile.yaml           # DevOps meta tasks
+├── Taskfile.build.common.compat.yaml  # Build compatibility wrapper
+└── Taskfile.deploy.common.compat.yaml # Deploy compatibility wrapper
 ```
 
-## Task Categories
+## 📦 Available Modules
 
-### Build Tasks (`Taskfile.build.common.yaml`)
+### Build Domain
 
-**Purpose**: Common Go build, test, and code quality operations
+**go.yaml** - Go build and test tasks
+- `go:build` - Build binary
+- `go:test` - Run tests
+- `go:lint` - Run linters
+- `go:fmt` - Format code
 
-**Include as**: `build:`
+**docker.yaml** - Container management
+- `docker:build` - Build image
+- `docker:push` - Push to registry
+- `docker:run` - Run container
+
+### Deploy Domain
+
+**k3d.yaml** - Local Kubernetes
+- `k3d:create` - Create cluster
+- `k3d:delete` - Delete cluster
+- `k3d:kubeconfig` - Get kubeconfig
+
+**k8s.yaml** - Kubernetes operations
+- `k8s:deploy` - Deploy application
+- `k8s:scale` - Scale deployment
+- `k8s:logs` - View logs
+- `k8s:exec` - Execute commands
+
+**helm.yaml** - Helm charts
+- `helm:install` - Install chart
+- `helm:upgrade` - Upgrade release
+- `helm:rollback` - Rollback release
+
+### Quality Domain
+
+**security.yaml** - Security scanning
+- `sec:scan` - Run all scans
+- `sec:scan:go` - Scan Go code
+- `sec:scan:deps` - Scan dependencies
+- `sec:scan:docker` - Scan containers
+
+## 🔧 Configuration
+
+### Variables
+
+Each module accepts variables:
+
 ```yaml
-includes:
-  build:
-    taskfile: ./devops/Taskfile.build.common.yaml
-    dir: '{{.USER_WORKING_DIR}}'
+vars:
+  # Go module
+  BINARY_NAME: myapp
+  
+  # Docker module
+  IMAGE_NAME: myapp
+  REGISTRY: docker.io/myorg
+  
+  # K8s module
+  NAMESPACE: production
+  APP_NAME: myapp
 ```
 
-**Available Tasks**:
-- `build:build` - Build binary for current platform
-- `build:build:all` - Build for all major platforms  
-- `build:build:multi` - Build for specific platforms
-- `build:test` - Run tests
-- `build:test:coverage` - Run tests with coverage
-- `build:test:bench` - Run benchmarks
-- `build:fmt` - Format code
-- `build:lint` - Run linting
-- `build:clean` - Clean build artifacts
-- `build:deps` - Manage dependencies
-- `build:docker:build` - Build Docker images
-- `build:ci` - Run CI pipeline
-- `build:release` - Create release artifacts
+### Composition
 
-### Deploy Tasks (`Taskfile.deploy.common.yaml`)
+Combine modules for complete workflows:
 
-**Purpose**: Kubernetes deployment and cluster management operations
-
-**Include as**: `deploy:`
 ```yaml
-includes:
+tasks:
   deploy:
-    taskfile: ./devops/Taskfile.deploy.common.yaml
-    dir: '{{.USER_WORKING_DIR}}'
+    desc: Build and deploy
+    cmds:
+      - task: go:build
+      - task: docker:build
+      - task: k8s:deploy
 ```
 
-**Available Tasks**:
-- `deploy:full` - Complete production workflow
-- `deploy:quick` - Quick development workflow
-- `deploy:setup` - Setup cluster and infrastructure
-- `deploy:deploy` - Deploy application
-- `deploy:test:*` - Various test suites
-- `deploy:status` - Check deployment status
-- `deploy:logs` - View application logs
-- `deploy:health` - Health checks
-- `deploy:scale:*` - Scaling operations
-- `deploy:debug:*` - Debugging tools
-- `deploy:cleanup` - Resource cleanup
+## 📚 Templates
 
-### DevOps Tools (`tools/`)
+Use templates to bootstrap new projects:
 
-**Purpose**: Development and operations CLI tools
+```bash
+# Create from template
+task devops:template:create TYPE=microservice OUTPUT=Taskfile.yaml
+```
 
-**Location**: `devops/tools/` (separate Go module)
+Available templates:
+- `basic` - Simple Go project
+- `microservice` - Full microservice with K8s
 
-**Available Tools**:
-- **devops CLI** - Swiss-army knife for development operations
-  - `taskdoc` - Generate documentation for all Taskfiles
-  - `validate` - Validate Taskfile syntax
-  - `version` - Display version information
+## 🔄 Migration from Old Structure
 
-**Usage**:
+The old monolithic structure has been reorganized into modular, focused task files.
+
+### Old Structure (Deprecated)
+```
+devops/
+├── Taskfile.build.common.yaml   # 500+ lines
+└── Taskfile.deploy.common.yaml  # 400+ lines
+```
+
+### New Modular Structure
+```
+devops/
+├── tasks/
+│   ├── build/
+│   │   ├── go.yaml      # ~200 lines
+│   │   └── docker.yaml  # ~150 lines
+│   └── deploy/
+│       ├── k3d.yaml     # ~100 lines
+│       ├── k8s.yaml     # ~200 lines
+│       └── helm.yaml    # ~150 lines
+```
+
+### Migration Steps
+
+```bash
+# Check migration status
+task devops:migrate:check
+
+# Show migration guide
+task devops:migrate:guide
+```
+
+### Compatibility Mode
+
+During transition, compatibility wrappers are available:
+
+```yaml
+# Old way (deprecated but still works)
+includes:
+  build: ./devops/Taskfile.build.common.compat.yaml
+  deploy: ./devops/Taskfile.deploy.common.compat.yaml
+
+# New way (recommended)
+includes:
+  go: ./devops/tasks/build/go.yaml
+  docker: ./devops/tasks/build/docker.yaml
+  k8s: ./devops/tasks/deploy/k8s.yaml
+```
+
+See [migration guide](docs/migration.md) for detailed instructions.
+
+## 🛠️ DevOps Management
+
+```bash
+# Show structure info
+task devops:info
+
+# List all modules
+task devops:list:modules
+
+# List all tasks
+task devops:list:tasks
+
+# Validate taskfiles
+task devops:validate
+
+# Install tools
+task devops:install:tools
+```
+
+## 📖 Documentation
+
+- [Migration Guide](docs/migration.md) - Migrate from old structure
+- [Build Tasks](tasks/build/README.md) - Build domain documentation
+- [Deploy Tasks](tasks/deploy/README.md) - Deploy domain documentation
+- [Quality Tasks](tasks/quality/README.md) - Quality domain documentation
+
+## 🔧 DevOps Tools
+
+The `tools/` directory contains the DevOps CLI tool:
+
 ```bash
 # Build the devops tool
-task build:devops
+task go:build MAIN=./devops/tools/cmd/devops BINARY_NAME=devops
 
 # Generate Taskfile documentation
 ./bin/devops taskdoc
 
 # Validate Taskfiles
 ./bin/devops validate
-
-# Show version
-./bin/devops version
 ```
 
-## Usage Examples
+## 🤝 Contributing
 
-### In Your Project Taskfile
+1. Keep modules focused and single-purpose
+2. Use consistent naming conventions
+3. Document all tasks with descriptions
+4. Provide sensible defaults for variables
+5. Test modules independently
 
-```yaml
-version: '3'
+## 📝 License
 
-includes:
-  # Include build tasks
-  build:
-    taskfile: ./devops/Taskfile.build.common.yaml
-    dir: '{{.USER_WORKING_DIR}}'
-  
-  # Include deploy tasks  
-  deploy:
-    taskfile: ./devops/Taskfile.deploy.common.yaml
-    dir: '{{.USER_WORKING_DIR}}'
-
-vars:
-  BINARY_NAME: my-app
-  CLUSTER_NAME: my-cluster
-
-tasks:
-  # Use build tasks
-  build:
-    desc: Build my application
-    cmds:
-      - task: build:build
-        vars:
-          BINARY_NAME: '{{.BINARY_NAME}}'
-
-  # Use deploy tasks
-  deploy:
-    desc: Deploy my application
-    cmds:
-      - task: deploy:deploy
-        vars:
-          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
-```
-
-### Command Line Usage
-
-```bash
-# Build operations
-task build:build          # Build binary
-task build:test           # Run tests
-task build:fmt            # Format code
-task build:ci             # Run CI pipeline
-
-# Deploy operations  
-task deploy:setup         # Setup cluster
-task deploy:deploy        # Deploy application
-task deploy:status        # Check status
-task deploy:logs          # View logs
-task deploy:cleanup       # Clean up
-```
-
-## Configuration Variables
-
-### Build Variables
-```yaml
-vars:
-  BINARY_NAME: my-app              # Binary name
-  BINARY_DIR: ./bin               # Output directory
-  MAIN: ./cmd/server              # Main package
-  PACKAGES: ./...                 # Packages to test
-  CGO_ENABLED: "0"               # CGO setting
-  LDFLAGS: -X main.foo=bar       # Additional build flags
-```
-
-### Deploy Variables
-```yaml
-vars:
-  CLUSTER_NAME: my-cluster        # Cluster name
-  API_URL: http://localhost:8080  # API endpoint
-  APP_NAMESPACE: app              # App namespace
-  INFRA_NAMESPACE: infra          # Infrastructure namespace
-  WORKFLOW_SCRIPT: ./deploy.sh   # Deployment script
-```
-
-## Key Benefits
-
-1. **Separation of Concerns**: Build vs Deploy responsibilities clearly separated
-2. **Reusability**: Same tasks work across all projects
-3. **Consistency**: Standardized commands and behavior
-4. **Modularity**: Include only what you need
-5. **Maintainability**: Update tasks in one place
-6. **Flexibility**: Override variables for customization
-
-## Migration from Old Structure
-
-### Before (Old approach)
-```yaml
-includes:
-  common: ./build/Taskfile.common.yaml
-
-tasks:
-  build:
-    cmds:
-      - task: common:build
-```
-
-### After (Current approach)
-```yaml
-includes:
-  build: ./devops/Taskfile.build.common.yaml
-  deploy: ./devops/Taskfile.deploy.common.yaml
-
-tasks:
-  build:
-    cmds:
-      - task: build:build
-  
-  deploy:
-    cmds:
-      - task: deploy:deploy
-```
-
-## Best Practices
-
-1. **Use Specific Includes**: Include `build:` and `deploy:` separately
-2. **Override Variables**: Customize behavior through variables
-3. **Compose Tasks**: Combine simple tasks into complex workflows
-4. **Keep Wrappers Simple**: Local Taskfiles should be thin wrappers
-5. **Document Variables**: Clearly document required variables
-
-## Adding New Tasks
-
-### For Build Tasks
-1. Add to `Taskfile.build.common.yaml`
-2. Use `build:` prefix
-3. Focus on Go build/test/quality operations
-
-### For Deploy Tasks
-1. Add to `Taskfile.deploy.common.yaml`  
-2. Use `deploy:` prefix
-3. Focus on Kubernetes/Docker operations
-
-### For Project-Specific Tasks
-1. Add to local project Taskfile
-2. Use tasks without prefix
-3. Delegate to common tasks when possible
-
-This modular approach provides clean separation, better organization, and maximum reusability across all projects.
+Same as parent project.

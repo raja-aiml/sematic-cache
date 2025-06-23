@@ -1,0 +1,188 @@
+# Go Build Tasks
+# Focused on Go compilation, testing, and code quality
+#
+# Usage:
+#   includes:
+#     go: ./devops/tasks/build/go.yaml
+#
+# Then use: task go:build, task go:test, etc.
+
+version: '3'
+
+vars:
+  # Version info
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  BUILD_TIME:
+    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+  GIT_COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+  
+  # Go settings
+  BINARY_NAME: '{{.BINARY_NAME | default (base .USER_WORKING_DIR)}}'
+  BINARY_DIR: '{{.BINARY_DIR | default "bin"}}'
+  MAIN: '{{.MAIN | default "."}}'
+  PACKAGES: '{{.PACKAGES | default "./..."}}'
+  CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
+  
+  # Build flags
+  DEFAULT_LDFLAGS: -s -w -X main.version={{.VERSION}} -X main.buildTime={{.BUILD_TIME}} -X main.gitCommit={{.GIT_COMMIT}}
+  LDFLAGS: '{{.LDFLAGS}}'
+
+tasks:
+  build:
+    desc: Build Go binary for current platform
+    cmds:
+      - mkdir -p {{.BINARY_DIR}}
+      - |
+        echo "🔨 Building {{.BINARY_NAME}}..."
+        go build -ldflags "{{.DEFAULT_LDFLAGS}} {{.LDFLAGS}}" -o {{.BINARY_DIR}}/{{.BINARY_NAME}} {{.MAIN}}
+        echo "✅ Built: {{.BINARY_DIR}}/{{.BINARY_NAME}}"
+    env:
+      CGO_ENABLED: '{{.CGO_ENABLED}}'
+
+  build:linux:
+    desc: Build for Linux (amd64)
+    cmds:
+      - task: build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}-linux-amd64'
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: '{{.CGO_ENABLED}}'
+
+  build:darwin:
+    desc: Build for macOS (amd64 and arm64)
+    cmds:
+      - task: build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}-darwin-amd64'
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+      - task: build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}-darwin-arm64'
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+
+  build:windows:
+    desc: Build for Windows (amd64)
+    cmds:
+      - task: build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}-windows-amd64.exe'
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: '{{.CGO_ENABLED}}'
+
+  build:all:
+    desc: Build for all platforms
+    deps: [build:linux, build:darwin, build:windows]
+
+  test:
+    desc: Run Go tests
+    cmds:
+      - go test -race -v {{.TEST_ARGS}} {{.PACKAGES}}
+
+  test:short:
+    desc: Run short tests
+    cmds:
+      - task: test
+        vars:
+          TEST_ARGS: "-short {{.TEST_ARGS}}"
+
+  test:coverage:
+    desc: Run tests with coverage report
+    vars:
+      COVERAGE_DIR: '{{.COVERAGE_DIR | default "coverage"}}'
+    cmds:
+      - mkdir -p {{.COVERAGE_DIR}}
+      - |
+        go test -race -coverprofile={{.COVERAGE_DIR}}/coverage.out -covermode=atomic {{.PACKAGES}}
+        go tool cover -html={{.COVERAGE_DIR}}/coverage.out -o {{.COVERAGE_DIR}}/coverage.html
+        echo "📊 Coverage report: {{.COVERAGE_DIR}}/coverage.html"
+        go tool cover -func={{.COVERAGE_DIR}}/coverage.out | tail -1
+
+  test:bench:
+    desc: Run benchmarks
+    cmds:
+      - go test -bench=. -benchmem {{.BENCH_ARGS}} {{.PACKAGES}}
+
+  fmt:
+    desc: Format Go code
+    cmds:
+      - gofmt -w {{.FMT_ARGS}} .
+      - echo "✨ Code formatted"
+
+  fmt:check:
+    desc: Check code formatting
+    cmds:
+      - |
+        if [ -n "$(gofmt -l .)" ]; then
+          echo "❌ Code is not formatted. Run 'task go:fmt'"
+          gofmt -d .
+          exit 1
+        fi
+        echo "✅ Code is properly formatted"
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet {{.VET_ARGS}} {{.PACKAGES}}
+      - echo "✅ No vet issues found"
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - |
+        if command -v golangci-lint >/dev/null 2>&1; then
+          golangci-lint run {{.LINT_ARGS}} {{.PACKAGES}}
+          echo "✅ No lint issues found"
+        else
+          echo "⚠️  golangci-lint not installed, skipping..."
+          echo "    Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+        fi
+
+  mod:download:
+    desc: Download Go modules
+    cmds:
+      - go mod download
+      - echo "📦 Dependencies downloaded"
+
+  mod:tidy:
+    desc: Tidy Go modules
+    cmds:
+      - go mod tidy
+      - echo "📦 Dependencies tidied"
+
+  mod:update:
+    desc: Update Go modules
+    cmds:
+      - go get -u {{.UPDATE_ARGS}} {{.PACKAGES}}
+      - go mod tidy
+      - echo "📦 Dependencies updated"
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BINARY_DIR}}
+      - rm -rf {{.COVERAGE_DIR | default "coverage"}}
+      - rm -f coverage.out coverage.html
+      - go clean -cache -testcache
+      - echo "🧹 Cleaned build artifacts"
+
+  info:
+    desc: Show Go environment info
+    cmds:
+      - |
+        echo "📋 Go Build Information"
+        echo "====================="
+        echo "Go Version: $(go version)"
+        echo "GOPATH: ${GOPATH:-not set}"
+        echo "GOROOT: $(go env GOROOT)"
+        echo "CGO_ENABLED: {{.CGO_ENABLED}}"
+        echo "Build Tags: {{.BUILD_TAGS | default "none"}}"

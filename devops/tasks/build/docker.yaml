@@ -1,0 +1,183 @@
+# Docker Build Tasks
+# Focused on container image building and management
+#
+# Usage:
+#   includes:
+#     docker: ./devops/tasks/build/docker.yaml
+#
+# Then use: task docker:build, task docker:push, etc.
+
+version: '3'
+
+vars:
+  # Image naming
+  IMAGE_NAME: '{{.IMAGE_NAME | default (base .USER_WORKING_DIR)}}'
+  IMAGE_TAG: '{{.IMAGE_TAG | default "latest"}}'
+  REGISTRY: '{{.REGISTRY | default ""}}'
+  
+  # Build settings
+  DOCKERFILE: '{{.DOCKERFILE | default "Dockerfile"}}'
+  BUILD_CONTEXT: '{{.BUILD_CONTEXT | default "."}}'
+  
+  # Version info for labels
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  BUILD_TIME:
+    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+  GIT_COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+
+tasks:
+  build:
+    desc: Build Docker image
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+    cmds:
+      - |
+        echo "🐳 Building Docker image {{.FULL_IMAGE}}:{{.IMAGE_TAG}}..."
+        docker build \
+          --label "version={{.VERSION}}" \
+          --label "build.time={{.BUILD_TIME}}" \
+          --label "git.commit={{.GIT_COMMIT}}" \
+          -t {{.FULL_IMAGE}}:{{.IMAGE_TAG}} \
+          -t {{.FULL_IMAGE}}:latest \
+          -f {{.DOCKERFILE}} \
+          {{.BUILD_ARGS}} \
+          {{.BUILD_CONTEXT}}
+        echo "✅ Docker image built: {{.FULL_IMAGE}}:{{.IMAGE_TAG}}"
+
+  build:multi:
+    desc: Build multi-architecture image
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+      PLATFORMS: '{{.PLATFORMS | default "linux/amd64,linux/arm64"}}'
+    cmds:
+      - |
+        echo "🐳 Building multi-arch Docker image {{.FULL_IMAGE}}:{{.IMAGE_TAG}}..."
+        docker buildx build \
+          --platform {{.PLATFORMS}} \
+          --label "version={{.VERSION}}" \
+          --label "build.time={{.BUILD_TIME}}" \
+          --label "git.commit={{.GIT_COMMIT}}" \
+          -t {{.FULL_IMAGE}}:{{.IMAGE_TAG}} \
+          -t {{.FULL_IMAGE}}:latest \
+          -f {{.DOCKERFILE}} \
+          {{.BUILD_ARGS}} \
+          {{if .PUSH}}--push{{end}} \
+          {{.BUILD_CONTEXT}}
+
+  push:
+    desc: Push Docker image to registry
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+    deps: [build]
+    cmds:
+      - docker push {{.FULL_IMAGE}}:{{.IMAGE_TAG}}
+      - docker push {{.FULL_IMAGE}}:latest
+      - echo "✅ Docker image pushed: {{.FULL_IMAGE}}:{{.IMAGE_TAG}}"
+
+  tag:
+    desc: Tag Docker image
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+      NEW_TAG: '{{.NEW_TAG}}'
+    cmds:
+      - docker tag {{.FULL_IMAGE}}:{{.IMAGE_TAG}} {{.FULL_IMAGE}}:{{.NEW_TAG}}
+      - echo "✅ Tagged {{.FULL_IMAGE}}:{{.IMAGE_TAG}} as {{.FULL_IMAGE}}:{{.NEW_TAG}}"
+
+  scan:
+    desc: Scan Docker image for vulnerabilities
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+    cmds:
+      - |
+        if command -v trivy >/dev/null 2>&1; then
+          echo "🔍 Scanning {{.FULL_IMAGE}}:{{.IMAGE_TAG}} for vulnerabilities..."
+          trivy image {{.FULL_IMAGE}}:{{.IMAGE_TAG}}
+        elif command -v grype >/dev/null 2>&1; then
+          echo "🔍 Scanning {{.FULL_IMAGE}}:{{.IMAGE_TAG}} with grype..."
+          grype {{.FULL_IMAGE}}:{{.IMAGE_TAG}}
+        else
+          echo "⚠️  No vulnerability scanner found (install trivy or grype)"
+        fi
+
+  size:
+    desc: Show Docker image size
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+    cmds:
+      - |
+        echo "📏 Image sizes:"
+        docker images {{.FULL_IMAGE}} --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+
+  history:
+    desc: Show Docker image history
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+    cmds:
+      - docker history {{.FULL_IMAGE}}:{{.IMAGE_TAG}}
+
+  run:
+    desc: Run Docker container
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+      CONTAINER_NAME: '{{.CONTAINER_NAME | default .IMAGE_NAME}}'
+      PORTS: '{{.PORTS | default ""}}'
+    cmds:
+      - |
+        echo "🚀 Running container {{.CONTAINER_NAME}}..."
+        docker run -d \
+          --name {{.CONTAINER_NAME}} \
+          {{if .PORTS}}-p {{.PORTS}}{{end}} \
+          {{.RUN_ARGS}} \
+          {{.FULL_IMAGE}}:{{.IMAGE_TAG}}
+
+  logs:
+    desc: Show container logs
+    vars:
+      CONTAINER_NAME: '{{.CONTAINER_NAME | default .IMAGE_NAME}}'
+    cmds:
+      - docker logs {{.LOG_ARGS}} {{.CONTAINER_NAME}}
+
+  exec:
+    desc: Execute command in container
+    vars:
+      CONTAINER_NAME: '{{.CONTAINER_NAME | default .IMAGE_NAME}}'
+      CMD: '{{.CMD | default "/bin/sh"}}'
+    cmds:
+      - docker exec -it {{.CONTAINER_NAME}} {{.CMD}}
+
+  stop:
+    desc: Stop container
+    vars:
+      CONTAINER_NAME: '{{.CONTAINER_NAME | default .IMAGE_NAME}}'
+    cmds:
+      - docker stop {{.CONTAINER_NAME}}
+      - echo "✅ Container {{.CONTAINER_NAME}} stopped"
+
+  remove:
+    desc: Remove container
+    vars:
+      CONTAINER_NAME: '{{.CONTAINER_NAME | default .IMAGE_NAME}}'
+    deps: [stop]
+    cmds:
+      - docker rm {{.CONTAINER_NAME}}
+      - echo "✅ Container {{.CONTAINER_NAME}} removed"
+
+  clean:
+    desc: Clean Docker images
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}'
+    cmds:
+      - |
+        echo "🧹 Cleaning Docker images..."
+        docker rmi {{.FULL_IMAGE}}:{{.IMAGE_TAG}} {{.FULL_IMAGE}}:latest || true
+        echo "✅ Docker images cleaned"
+
+  prune:
+    desc: Prune unused Docker resources
+    cmds:
+      - |
+        echo "🧹 Pruning Docker resources..."
+        docker system prune -f
+        echo "✅ Docker resources pruned"

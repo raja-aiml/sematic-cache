@@ -55,7 +55,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("failed to walk directory: %w", err)
+			return fmt.Errorf("failed to walk directory %s: %w", ".", err)
 		}
 	}
 
@@ -68,36 +68,36 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	for _, file := range files {
 		if validateVerbose {
-			fmt.Printf("Checking %s... ", file)
+			fmt.Fprintf(cmd.OutOrStdout(), "Checking %s... ", file)
 		}
 
 		data, err := os.ReadFile(file)
 		if err != nil {
-			fmt.Printf("❌ %s: %v\n", file, err)
+			fmt.Fprintf(cmd.OutOrStdout(), "❌ %s: %v\n", file, err)
 			hasErrors = true
 			continue
 		}
 
 		var content map[string]interface{}
 		if err := yaml.Unmarshal(data, &content); err != nil {
-			fmt.Printf("❌ %s: %v\n", file, err)
+			fmt.Fprintf(cmd.OutOrStdout(), "❌ %s: %v\n", file, err)
 			hasErrors = true
 			continue
 		}
 
 		// Basic validation
 		if _, ok := content["version"]; !ok {
-			fmt.Printf("⚠️  %s: missing 'version' field\n", file)
+			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  %s: missing 'version' field\n", file)
 		}
 
 		if validateVerbose {
-			fmt.Printf("✅\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "✅\n")
 		}
 		validCount++
 	}
 
 	if !validateVerbose && !hasErrors {
-		fmt.Printf("✅ All %d Taskfiles are valid\n", validCount)
+		fmt.Fprintf(cmd.OutOrStdout(), "✅ All %d Taskfiles are valid\n", validCount)
 	} else if hasErrors {
 		return fmt.Errorf("validation failed")
 	}
@@ -105,3 +105,22 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// validateTaskfile validates a single Taskfile - exposed for testing
+func validateTaskfile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var taskfile map[string]interface{}
+	if err := yaml.Unmarshal(data, &taskfile); err != nil {
+		return fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	// Check required fields
+	if _, ok := taskfile["version"]; !ok {
+		return fmt.Errorf("Missing required field: version")
+	}
+
+	return nil
+}

@@ -77,15 +77,14 @@ func runTaskdoc(cmd *cobra.Command, args []string) error {
 	}
 
 	// Write output
-	if output == "-" {
-		fmt.Print(content)
+	if output == "-" || output == "" {
+		fmt.Fprint(cmd.OutOrStdout(), content)
 	} else {
 		if err := os.WriteFile(output, []byte(content), 0644); err != nil {
 			return fmt.Errorf("failed to write output file: %w", err)
 		}
-		fmt.Printf("📄 Documentation generated: %s\n", output)
+		fmt.Fprintf(cmd.OutOrStdout(), "📄 Documentation generated: %s\n", output)
 	}
 
 	return nil
 }
-

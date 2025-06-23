@@ -1,0 +1,272 @@
+# Compatibility wrapper for old deploy tasks
+# This file maps old task names to new modular tasks
+# DEPRECATED: Please migrate to new structure
+
+version: '3'
+
+includes:
+  k3d_internal: ./tasks/deploy/k3d.yaml
+  k8s_internal: ./tasks/deploy/k8s.yaml
+  helm_internal: ./tasks/deploy/helm.yaml
+
+tasks:
+  _deprecation_notice:
+    cmds:
+      - 'echo "⚠️  WARNING: Using deprecated task structure. Please migrate to new modular tasks."'
+      - 'echo "📖 See devops/docs/migration.md for migration guide"'
+    silent: true
+
+  # === CLUSTER TASKS ===
+  cluster:create:
+    desc: "[DEPRECATED] Use k3d:create"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k3d_internal:create
+
+  cluster:delete:
+    desc: "[DEPRECATED] Use k3d:delete"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k3d_internal:delete
+
+  cluster:start:
+    desc: "[DEPRECATED] Use k3d:start"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k3d_internal:start
+
+  cluster:stop:
+    desc: "[DEPRECATED] Use k3d:stop"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k3d_internal:stop
+
+  cluster:info:
+    desc: "[DEPRECATED] Use k3d:info"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k3d_internal:info
+
+  cluster:kubeconfig:
+    desc: "[DEPRECATED] Use k3d:kubeconfig"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k3d_internal:kubeconfig
+
+  # === SETUP TASKS ===
+  setup:
+    desc: "[DEPRECATED] Use k8s:namespace:create"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:namespace:create
+
+  setup:namespace:
+    desc: "[DEPRECATED] Use k8s:namespace:create"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:namespace:create
+
+  # === DEPLOYMENT TASKS ===
+  deploy:
+    desc: "[DEPRECATED] Use k8s:deploy"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:deploy
+
+  deploy:apply:
+    desc: "[DEPRECATED] Use k8s:apply"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:apply
+
+  deploy:rollout:
+    desc: "[DEPRECATED] Use k8s:rollout:status"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:rollout:status
+
+  deploy:restart:
+    desc: "[DEPRECATED] Use k8s:rollout:restart"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:rollout:restart
+
+  deploy:rollback:
+    desc: "[DEPRECATED] Use k8s:rollback"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:rollback
+
+  deploy:delete:
+    desc: "[DEPRECATED] Use k8s:delete"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:delete
+
+  # === SCALE TASKS ===
+  scale:up:
+    desc: "[DEPRECATED] Use k8s:scale with REPLICAS var"
+    deps: [_deprecation_notice]
+    vars:
+      REPLICAS: '{{.REPLICAS | default 3}}'
+    cmds:
+      - task: k8s_internal:scale
+
+  scale:down:
+    desc: "[DEPRECATED] Use k8s:scale with REPLICAS var"
+    deps: [_deprecation_notice]
+    vars:
+      REPLICAS: '{{.REPLICAS | default 1}}'
+    cmds:
+      - task: k8s_internal:scale
+
+  scale:zero:
+    desc: "[DEPRECATED] Use k8s:scale with REPLICAS=0"
+    deps: [_deprecation_notice]
+    vars:
+      REPLICAS: 0
+    cmds:
+      - task: k8s_internal:scale
+
+  # === STATUS TASKS ===
+  status:
+    desc: "[DEPRECATED] Use k8s:status"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:status
+
+  status:pods:
+    desc: "[DEPRECATED] Use k8s:pods"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:pods
+
+  status:services:
+    desc: "[DEPRECATED] Use k8s:get with TYPE=service"
+    deps: [_deprecation_notice]
+    vars:
+      TYPE: service
+    cmds:
+      - task: k8s_internal:get
+
+  # === LOG TASKS ===
+  logs:
+    desc: "[DEPRECATED] Use k8s:logs"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:logs
+
+  logs:follow:
+    desc: "[DEPRECATED] Use k8s:logs:follow"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:logs:follow
+
+  logs:previous:
+    desc: "[DEPRECATED] Use k8s:logs:previous"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:logs:previous
+
+  # === EXEC TASKS ===
+  exec:
+    desc: "[DEPRECATED] Use k8s:exec"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:exec
+
+  exec:shell:
+    desc: "[DEPRECATED] Use k8s:shell"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:shell
+
+  # === PORT FORWARD TASKS ===
+  forward:
+    desc: "[DEPRECATED] Use k8s:port-forward"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:port-forward
+
+  port-forward:
+    desc: "[DEPRECATED] Use k8s:port-forward"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:port-forward
+
+  # === HELM TASKS ===
+  helm:install:
+    desc: "[DEPRECATED] Use helm:install"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: helm_internal:install
+
+  helm:upgrade:
+    desc: "[DEPRECATED] Use helm:upgrade"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: helm_internal:upgrade
+
+  helm:uninstall:
+    desc: "[DEPRECATED] Use helm:uninstall"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: helm_internal:uninstall
+
+  helm:list:
+    desc: "[DEPRECATED] Use helm:list"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: helm_internal:list
+
+  helm:status:
+    desc: "[DEPRECATED] Use helm:status"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: helm_internal:status
+
+  helm:rollback:
+    desc: "[DEPRECATED] Use helm:rollback"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: helm_internal:rollback
+
+  # === CONFIG TASKS ===
+  config:view:
+    desc: "[DEPRECATED] Use k8s:config:view"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:config:view
+
+  config:edit:
+    desc: "[DEPRECATED] Use k8s:config:edit"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:config:edit
+
+  # === DEBUG TASKS ===
+  debug:
+    desc: "[DEPRECATED] Use k8s:describe"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:describe
+
+  debug:events:
+    desc: "[DEPRECATED] Use k8s:events"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:events
+
+  # === CLEAN TASKS ===
+  clean:
+    desc: "[DEPRECATED] Use k8s:clean"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:clean
+
+  clean:all:
+    desc: "[DEPRECATED] Use k8s:clean and k3d:delete"
+    deps: [_deprecation_notice]
+    cmds:
+      - task: k8s_internal:clean
+      - task: k3d_internal:delete

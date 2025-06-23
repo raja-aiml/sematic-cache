@@ -277,4 +277,3 @@ func TestMinFunction(t *testing.T) {
 	assert.Equal(t, 1, min(2, 1))
 	assert.Equal(t, 5, min(5, 5))
 }
-

@@ -1,0 +1,282 @@
+# Microservice Taskfile Template
+# Complete template for microservice with K8s deployment
+
+version: '3'
+
+includes:
+  go: ./devops/tasks/build/go.yaml
+  docker: ./devops/tasks/build/docker.yaml
+  k3d: ./devops/tasks/deploy/k3d.yaml
+  k8s: ./devops/tasks/deploy/k8s.yaml
+
+vars:
+  # Application
+  APP_NAME: '{{.APP_NAME | default (base .USER_WORKING_DIR)}}'
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  
+  # Build
+  BINARY_NAME: '{{.APP_NAME}}'
+  MAIN_PACKAGE: './cmd/{{.APP_NAME}}'
+  
+  # Docker
+  IMAGE_NAME: '{{.APP_NAME}}'
+  REGISTRY: '{{.REGISTRY | default ""}}'
+  
+  # Kubernetes
+  NAMESPACE: '{{.NAMESPACE | default .APP_NAME}}'
+  CLUSTER_NAME: '{{.CLUSTER_NAME | default "dev-cluster"}}'
+  
+  # Ports
+  APP_PORT: '{{.APP_PORT | default "8080"}}'
+  METRICS_PORT: '{{.METRICS_PORT | default "9090"}}'
+
+tasks:
+  # === DEFAULT ===
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # === DEVELOPMENT ===
+  dev:
+    desc: Development workflow
+    cmds:
+      - task: build
+      - task: docker:build
+      - task: deploy:dev
+
+  run:
+    desc: Run locally
+    deps: [build]
+    cmds:
+      - ./bin/{{.BINARY_NAME}}
+    env:
+      PORT: '{{.APP_PORT}}'
+
+  watch:
+    desc: Run with auto-reload
+    cmds:
+      - air -c .air.toml
+
+  # === BUILD ===
+  build:
+    desc: Build service
+    cmds:
+      - task: go:build
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          MAIN: '{{.MAIN_PACKAGE}}'
+
+  build:all:
+    desc: Build for all platforms
+    cmds:
+      - task: go:build:all
+        vars:
+          BINARY_NAME: '{{.BINARY_NAME}}'
+          MAIN: '{{.MAIN_PACKAGE}}'
+
+  # === TEST ===
+  test:
+    desc: Run all tests
+    cmds:
+      - task: test:unit
+      - task: test:integration
+
+  test:unit:
+    desc: Run unit tests
+    cmds:
+      - task: go:test
+        vars:
+          PACKAGES: './...'
+          TEST_ARGS: '-short'
+
+  test:integration:
+    desc: Run integration tests
+    cmds:
+      - task: go:test
+        vars:
+          PACKAGES: './tests/integration/...'
+          TEST_ARGS: '-tags=integration'
+
+  test:coverage:
+    desc: Generate test coverage
+    cmds:
+      - task: go:test:coverage
+
+  # === QUALITY ===
+  fmt:
+    desc: Format code
+    cmds:
+      - task: go:fmt
+
+  lint:
+    desc: Run linters
+    cmds:
+      - task: go:lint
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - task: go:vet
+
+  check:
+    desc: Run all checks
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: test:unit
+
+  # === DOCKER ===
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - task: docker:build
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
+          IMAGE_TAG: '{{.VERSION}}'
+          REGISTRY: '{{.REGISTRY}}'
+
+  docker:push:
+    desc: Push Docker image
+    cmds:
+      - task: docker:push
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
+          IMAGE_TAG: '{{.VERSION}}'
+          REGISTRY: '{{.REGISTRY}}'
+
+  docker:run:
+    desc: Run Docker container
+    deps: [docker:build]
+    cmds:
+      - task: docker:run
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
+          IMAGE_TAG: '{{.VERSION}}'
+          PORTS: '{{.APP_PORT}}:{{.APP_PORT}}'
+
+  # === KUBERNETES ===
+  cluster:create:
+    desc: Create local cluster
+    cmds:
+      - task: k3d:create
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  cluster:delete:
+    desc: Delete local cluster
+    cmds:
+      - task: k3d:delete
+        vars:
+          CLUSTER_NAME: '{{.CLUSTER_NAME}}'
+
+  deploy:
+    desc: Deploy to Kubernetes
+    deps: [docker:build]
+    cmds:
+      - task: k8s:namespace:create
+        vars:
+          NAMESPACE: '{{.NAMESPACE}}'
+      - task: k8s:deploy
+        vars:
+          APP_NAME: '{{.APP_NAME}}'
+          NAMESPACE: '{{.NAMESPACE}}'
+
+  deploy:dev:
+    desc: Deploy to development
+    cmds:
+      - task: deploy
+        vars:
+          NAMESPACE: '{{.APP_NAME}}-dev'
+
+  deploy:staging:
+    desc: Deploy to staging
+    cmds:
+      - task: docker:push
+      - task: deploy
+        vars:
+          NAMESPACE: '{{.APP_NAME}}-staging'
+
+  undeploy:
+    desc: Remove from Kubernetes
+    cmds:
+      - task: k8s:delete
+        vars:
+          APP_NAME: '{{.APP_NAME}}'
+          NAMESPACE: '{{.NAMESPACE}}'
+
+  # === OPERATIONS ===
+  logs:
+    desc: Show application logs
+    cmds:
+      - task: k8s:logs:follow
+        vars:
+          APP_NAME: '{{.APP_NAME}}'
+          NAMESPACE: '{{.NAMESPACE}}'
+
+  status:
+    desc: Show deployment status
+    cmds:
+      - task: k8s:status
+        vars:
+          APP_NAME: '{{.APP_NAME}}'
+          NAMESPACE: '{{.NAMESPACE}}'
+
+  port-forward:
+    desc: Port forward to application
+    cmds:
+      - task: k8s:port-forward
+        vars:
+          APP_NAME: '{{.APP_NAME}}'
+          NAMESPACE: '{{.NAMESPACE}}'
+          LOCAL_PORT: '{{.APP_PORT}}'
+          REMOTE_PORT: '{{.APP_PORT}}'
+
+  scale:
+    desc: Scale deployment
+    cmds:
+      - task: k8s:scale
+        vars:
+          APP_NAME: '{{.APP_NAME}}'
+          NAMESPACE: '{{.NAMESPACE}}'
+          REPLICAS: '{{.REPLICAS}}'
+
+  # === MAINTENANCE ===
+  clean:
+    desc: Clean all artifacts
+    cmds:
+      - task: go:clean
+      - task: docker:clean
+        vars:
+          IMAGE_NAME: '{{.IMAGE_NAME}}'
+
+  deps:
+    desc: Update dependencies
+    cmds:
+      - task: go:mod:tidy
+      - task: go:mod:download
+
+  # === CI/CD ===
+  ci:
+    desc: Run CI pipeline
+    cmds:
+      - task: deps
+      - task: check
+      - task: build
+      - task: test:coverage
+      - task: docker:build
+
+  release:
+    desc: Create release
+    cmds:
+      - task: test
+      - task: build:all
+      - task: docker:build
+      - task: docker:push
+        vars:
+          IMAGE_TAG: '{{.VERSION}}'
+      - task: docker:push
+        vars:
+          IMAGE_TAG: 'latest'

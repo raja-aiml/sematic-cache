@@ -1,0 +1,178 @@
+# DevOps Meta Taskfile
+# Tasks for managing the devops directory itself
+
+version: '3'
+
+tasks:
+  info:
+    desc: Show devops structure information
+    cmds:
+      - echo "📁 DevOps Modular Structure"
+      - echo ""
+      - echo "Task Modules:"
+      - echo "  - build/go.yaml      : Go build and test tasks"
+      - echo "  - build/docker.yaml  : Docker image tasks"
+      - echo "  - deploy/k3d.yaml    : k3d cluster management"
+      - echo "  - deploy/k8s.yaml    : Kubernetes operations"
+      - echo "  - deploy/helm.yaml   : Helm chart management"
+      - echo "  - quality/security.yaml : Security scanning"
+      - echo ""
+      - echo "📖 See devops/docs/ for documentation"
+      - echo "🔄 See devops/docs/migration.md for migration guide"
+
+  validate:
+    desc: Validate all taskfiles
+    cmds:
+      - echo "🔍 Validating taskfiles..."
+      - |
+        for file in $(find ./tasks -name "*.yaml"); do
+          echo -n "Checking $file... "
+          if task --taskfile "$file" --list >/dev/null 2>&1; then
+            echo "✅"
+          else
+            echo "❌"
+            exit 1
+          fi
+        done
+      - echo "✅ All taskfiles are valid"
+
+  list:modules:
+    desc: List all available task modules
+    cmds:
+      - echo "📦 Available Task Modules:"
+      - echo ""
+      - find ./tasks -name "*.yaml" -type f | sed 's|./tasks/||' | sort
+
+  list:tasks:
+    desc: List all available tasks from all modules
+    cmds:
+      - echo "📋 All Available Tasks:"
+      - echo ""
+      - |
+        for file in $(find ./tasks -name "*.yaml"); do
+          module=$(echo "$file" | sed 's|./tasks/||' | sed 's|.yaml||' | tr '/' ':')
+          echo "=== $module ==="
+          task --taskfile "$file" --list-all 2>/dev/null | grep -E "^\*" | sed 's/^/* /'
+          echo ""
+        done
+
+  install:tools:
+    desc: Install all recommended tools
+    cmds:
+      - task: install:go-tools
+      - task: install:security-tools
+      - echo ""
+      - echo "⚠️  Some tools require manual installation:"
+      - echo "  - Docker"
+      - echo "  - k3d"
+      - echo "  - kubectl"
+      - echo "  - helm"
+      - echo "  - trivy or grype"
+      - echo "  - kubesec"
+
+  install:go-tools:
+    desc: Install Go development tools
+    cmds:
+      - echo "📦 Installing Go tools..."
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - go install github.com/sonatype-nexus-community/nancy@latest
+      - go install github.com/google/go-licenses@latest
+      - echo "✅ Go tools installed"
+
+  install:security-tools:
+    desc: Install security scanning tools
+    cmds:
+      - task: install:go-tools
+      - echo ""
+      - echo "📦 Install these security tools manually:"
+      - echo "  brew install trivy     # Container scanner"
+      - echo "  brew install grype     # Alternative scanner"
+      - echo "  brew install kubesec   # K8s manifest scanner"
+      - echo "  brew install gitleaks  # Secret scanner"
+
+  template:create:
+    desc: Create a new Taskfile from template
+    vars:
+      TYPE: '{{.TYPE | default "basic"}}'
+      OUTPUT: '{{.OUTPUT | default "Taskfile.yaml"}}'
+    cmds:
+      - |
+        if [ -f "./templates/taskfile/{{.TYPE}}.yaml" ]; then
+          cp "./templates/taskfile/{{.TYPE}}.yaml" "{{.OUTPUT}}"
+          echo "✅ Created {{.OUTPUT}} from {{.TYPE}} template"
+          echo "📝 Edit {{.OUTPUT}} to customize for your project"
+        else
+          echo "❌ Template '{{.TYPE}}' not found"
+          echo "Available templates:"
+          ls ./templates/taskfile/ | sed 's/.yaml//' | sed 's/^/  - /'
+          exit 1
+        fi
+
+  clean:reports:
+    desc: Clean all generated reports
+    cmds:
+      - echo "🧹 Cleaning reports..."
+      - find . -name "security-reports" -type d -exec rm -rf {} + 2>/dev/null || true
+      - find . -name "coverage.out" -type f -delete 2>/dev/null || true
+      - find . -name "*.test" -type f -delete 2>/dev/null || true
+      - echo "✅ Reports cleaned"
+
+  stats:
+    desc: Show devops statistics
+    cmds:
+      - echo "📊 DevOps Statistics"
+      - echo ""
+      - echo "Task files: $(find ./tasks -name "*.yaml" | wc -l | tr -d ' ')"
+      - echo "Total tasks: $(grep -h "^  [a-zA-Z].*:$" ./tasks/**/*.yaml | wc -l | tr -d ' ')"
+      - echo "Script files: $(find ./scripts -name "*.sh" | wc -l | tr -d ' ')"
+      - echo "Templates: $(find ./templates -name "*.yaml" | wc -l | tr -d ' ')"
+      - echo ""
+      - echo "Lines of YAML: $(find ./tasks -name "*.yaml" -exec wc -l {} + | tail -1 | awk '{print $1}')"
+      - echo "Lines of Shell: $(find ./scripts -name "*.sh" -exec wc -l {} + | tail -1 | awk '{print $1}')"
+
+  migrate:check:
+    desc: Check if migration is needed
+    cmds:
+      - |
+        echo "🔍 Checking for old taskfiles..."
+        old_files=0
+        if [ -f "../Taskfile.build.common.yaml" ]; then
+          echo "  ⚠️  Found: Taskfile.build.common.yaml"
+          old_files=$((old_files + 1))
+        fi
+        if [ -f "../Taskfile.deploy.common.yaml" ]; then
+          echo "  ⚠️  Found: Taskfile.deploy.common.yaml"
+          old_files=$((old_files + 1))
+        fi
+        
+        if [ $old_files -eq 0 ]; then
+          echo "✅ No old taskfiles found. Migration complete!"
+        else
+          echo ""
+          echo "📖 Run 'task devops:migrate:guide' for migration instructions"
+        fi
+
+  migrate:guide:
+    desc: Show migration guide
+    cmds:
+      - cat ./docs/migration.md
+
+  help:
+    desc: Show help and usage
+    cmds:
+      - echo "🚀 DevOps Task System"
+      - echo ""
+      - echo "Quick Start:"
+      - echo "  1. Include the modules you need in your Taskfile.yaml"
+      - echo "  2. Run 'task --list' to see available tasks"
+      - echo "  3. Use namespaced tasks (e.g., go:build, k8s:deploy)"
+      - echo ""
+      - echo "Common Commands:"
+      - echo "  task devops:info         # Show structure info"
+      - echo "  task devops:list:modules # List all modules"
+      - echo "  task devops:list:tasks   # List all tasks"
+      - echo "  task devops:validate     # Validate taskfiles"
+      - echo "  task devops:migrate:check # Check migration status"
+      - echo ""
+      - echo "📖 See devops/docs/ for full documentation"

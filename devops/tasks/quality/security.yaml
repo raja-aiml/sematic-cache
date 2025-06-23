@@ -1,0 +1,186 @@
+# Security Scanning Tasks
+# Focused on security vulnerability detection
+#
+# Usage:
+#   includes:
+#     sec: ./devops/tasks/quality/security.yaml
+#
+# Then use: task sec:scan, sec:audit, etc.
+
+version: '3'
+
+vars:
+  # Scan targets
+  SCAN_DIR: '{{.SCAN_DIR | default "."}}'
+  IMAGE_NAME: '{{.IMAGE_NAME | default (base .USER_WORKING_DIR)}}'
+  IMAGE_TAG: '{{.IMAGE_TAG | default "latest"}}'
+  
+  # Report settings
+  REPORT_DIR: '{{.REPORT_DIR | default "security-reports"}}'
+  REPORT_FORMAT: '{{.REPORT_FORMAT | default "json"}}'
+
+tasks:
+  scan:
+    desc: Run all security scans
+    cmds:
+      - task: scan:go
+      - task: scan:deps
+      - task: scan:docker
+      - task: scan:secrets
+
+  scan:go:
+    desc: Scan Go code for security issues
+    cmds:
+      - |
+        echo "🔍 Scanning Go code for security vulnerabilities..."
+        if command -v gosec >/dev/null 2>&1; then
+          mkdir -p {{.REPORT_DIR}}
+          gosec -fmt {{.REPORT_FORMAT}} -out {{.REPORT_DIR}}/gosec-report.{{.REPORT_FORMAT}} {{.SCAN_DIR}}/...
+          echo "✅ Go security scan complete: {{.REPORT_DIR}}/gosec-report.{{.REPORT_FORMAT}}"
+        else
+          echo "⚠️  gosec not installed. Install with: go install github.com/securego/gosec/v2/cmd/gosec@latest"
+        fi
+
+  scan:deps:
+    desc: Scan dependencies for vulnerabilities
+    cmds:
+      - |
+        echo "🔍 Scanning dependencies for vulnerabilities..."
+        if command -v nancy >/dev/null 2>&1; then
+          mkdir -p {{.REPORT_DIR}}
+          go list -json -deps ./... | nancy sleuth -o {{.REPORT_FORMAT}} > {{.REPORT_DIR}}/nancy-report.{{.REPORT_FORMAT}}
+          echo "✅ Dependency scan complete: {{.REPORT_DIR}}/nancy-report.{{.REPORT_FORMAT}}"
+        else
+          echo "⚠️  nancy not installed. Install with: go install github.com/sonatype-nexus-community/nancy@latest"
+        fi
+
+  scan:docker:
+    desc: Scan Docker image for vulnerabilities
+    vars:
+      FULL_IMAGE: '{{if .REGISTRY}}{{.REGISTRY}}/{{end}}{{.IMAGE_NAME}}:{{.IMAGE_TAG}}'
+    cmds:
+      - |
+        echo "🔍 Scanning Docker image {{.FULL_IMAGE}} for vulnerabilities..."
+        if command -v trivy >/dev/null 2>&1; then
+          mkdir -p {{.REPORT_DIR}}
+          trivy image --format {{.REPORT_FORMAT}} --output {{.REPORT_DIR}}/trivy-report.{{.REPORT_FORMAT}} {{.FULL_IMAGE}}
+          echo "✅ Docker scan complete: {{.REPORT_DIR}}/trivy-report.{{.REPORT_FORMAT}}"
+        elif command -v grype >/dev/null 2>&1; then
+          mkdir -p {{.REPORT_DIR}}
+          grype {{.FULL_IMAGE}} -o {{.REPORT_FORMAT}} > {{.REPORT_DIR}}/grype-report.{{.REPORT_FORMAT}}
+          echo "✅ Docker scan complete: {{.REPORT_DIR}}/grype-report.{{.REPORT_FORMAT}}"
+        else
+          echo "⚠️  No Docker scanner found. Install trivy or grype"
+        fi
+
+  scan:k8s:
+    desc: Scan Kubernetes manifests for security issues
+    vars:
+      MANIFEST_DIR: '{{.MANIFEST_DIR | default "./k8s"}}'
+    cmds:
+      - |
+        echo "🔍 Scanning Kubernetes manifests for security issues..."
+        if command -v kubesec >/dev/null 2>&1; then
+          mkdir -p {{.REPORT_DIR}}
+          for file in {{.MANIFEST_DIR}}/*.yaml; do
+            if [ -f "$file" ]; then
+              echo "Scanning: $file"
+              kubesec scan "$file" >> {{.REPORT_DIR}}/kubesec-report.json
+            fi
+          done
+          echo "✅ Kubernetes scan complete: {{.REPORT_DIR}}/kubesec-report.json"
+        else
+          echo "⚠️  kubesec not installed. Install from: https://github.com/controlplaneio/kubesec"
+        fi
+
+  scan:secrets:
+    desc: Scan for exposed secrets
+    cmds:
+      - |
+        echo "🔍 Scanning for exposed secrets..."
+        if command -v gitleaks >/dev/null 2>&1; then
+          mkdir -p {{.REPORT_DIR}}
+          gitleaks detect --report-format {{.REPORT_FORMAT}} --report-path {{.REPORT_DIR}}/gitleaks-report.{{.REPORT_FORMAT}}
+          echo "✅ Secret scan complete: {{.REPORT_DIR}}/gitleaks-report.{{.REPORT_FORMAT}}"
+        else
+          echo "⚠️  gitleaks not installed. Install from: https://github.com/gitleaks/gitleaks"
+        fi
+
+  scan:licenses:
+    desc: Scan for license compliance
+    cmds:
+      - |
+        echo "🔍 Scanning licenses..."
+        if command -v go-licenses >/dev/null 2>&1; then
+          mkdir -p {{.REPORT_DIR}}
+          go-licenses report ./... > {{.REPORT_DIR}}/licenses-report.txt
+          echo "✅ License scan complete: {{.REPORT_DIR}}/licenses-report.txt"
+        else
+          echo "⚠️  go-licenses not installed. Install with: go install github.com/google/go-licenses@latest"
+        fi
+
+  audit:
+    desc: Run security audit (interactive)
+    cmds:
+      - echo "🔍 Running security audit..."
+      - task: scan:go
+      - task: scan:deps
+      - echo ""
+      - echo "📊 Audit Summary:"
+      - |
+        if [ -f {{.REPORT_DIR}}/gosec-report.json ]; then
+          echo "Go vulnerabilities: $(jq '.Issues | length' {{.REPORT_DIR}}/gosec-report.json 2>/dev/null || echo "unknown")"
+        fi
+      - |
+        if [ -f {{.REPORT_DIR}}/nancy-report.json ]; then
+          echo "Dependency vulnerabilities: $(jq '.vulnerable | length' {{.REPORT_DIR}}/nancy-report.json 2>/dev/null || echo "unknown")"
+        fi
+
+  fix:
+    desc: Attempt to fix security issues
+    cmds:
+      - echo "🔧 Attempting to fix security issues..."
+      - echo "Updating dependencies..."
+      - go get -u ./...
+      - go mod tidy
+      - echo "✅ Dependencies updated. Re-run security scans to verify fixes."
+
+  report:
+    desc: Generate consolidated security report
+    cmds:
+      - |
+        echo "📊 Generating security report..."
+        mkdir -p {{.REPORT_DIR}}
+        echo "# Security Report" > {{.REPORT_DIR}}/SECURITY_REPORT.md
+        echo "Generated: $(date)" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+        echo "" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+        
+        if [ -f {{.REPORT_DIR}}/gosec-report.json ]; then
+          echo "## Go Security" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+          echo "Issues found: $(jq '.Issues | length' {{.REPORT_DIR}}/gosec-report.json)" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+          echo "" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+        fi
+        
+        if [ -f {{.REPORT_DIR}}/trivy-report.json ]; then
+          echo "## Container Security" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+          echo "Vulnerabilities found: $(jq '.Results[0].Vulnerabilities | length' {{.REPORT_DIR}}/trivy-report.json 2>/dev/null || echo "0")" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+          echo "" >> {{.REPORT_DIR}}/SECURITY_REPORT.md
+        fi
+        
+        echo "✅ Security report generated: {{.REPORT_DIR}}/SECURITY_REPORT.md"
+
+  install:tools:
+    desc: Install security scanning tools
+    cmds:
+      - echo "📦 Installing security tools..."
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - go install github.com/sonatype-nexus-community/nancy@latest
+      - go install github.com/google/go-licenses@latest
+      - echo "✅ Go security tools installed"
+      - echo "⚠️  Please install trivy/grype and kubesec manually"
+
+  clean:
+    desc: Clean security reports
+    cmds:
+      - rm -rf {{.REPORT_DIR}}
+      - echo "🧹 Security reports cleaned"

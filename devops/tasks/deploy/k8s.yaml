@@ -1,0 +1,222 @@
+# Kubernetes Deployment Tasks
+# Focused on Kubernetes application deployment and management
+#
+# Usage:
+#   includes:
+#     k8s: ./devops/tasks/deploy/k8s.yaml
+#
+# Then use: task k8s:deploy, task k8s:rollback, etc.
+
+version: '3'
+
+vars:
+  NAMESPACE: '{{.NAMESPACE | default "default"}}'
+  APP_NAME: '{{.APP_NAME | default "app"}}'
+  MANIFEST_DIR: '{{.MANIFEST_DIR | default "./k8s"}}'
+  KUSTOMIZE_DIR: '{{.KUSTOMIZE_DIR | default "."}}'
+  DEPLOY_TIMEOUT: '{{.DEPLOY_TIMEOUT | default "5m"}}'
+  
+  # Labels for selecting resources
+  APP_LABEL: '{{.APP_LABEL | default "app=" + .APP_NAME}}'
+
+tasks:
+  deploy:
+    desc: Deploy application to Kubernetes
+    deps: [validate]
+    cmds:
+      - |
+        echo "🚀 Deploying {{.APP_NAME}} to namespace {{.NAMESPACE}}..."
+        kubectl apply -k {{.KUSTOMIZE_DIR}} -n {{.NAMESPACE}}
+        echo "⏳ Waiting for deployment to complete..."
+        kubectl rollout status deployment/{{.APP_NAME}} -n {{.NAMESPACE}} --timeout={{.DEPLOY_TIMEOUT}}
+        echo "✅ Deployment completed"
+
+  deploy:dry-run:
+    desc: Dry run deployment
+    cmds:
+      - |
+        echo "🔍 Dry run deployment for {{.APP_NAME}}..."
+        kubectl apply -k {{.KUSTOMIZE_DIR}} -n {{.NAMESPACE}} --dry-run=client
+
+  delete:
+    desc: Delete application from Kubernetes
+    cmds:
+      - |
+        echo "🗑️  Deleting {{.APP_NAME}} from namespace {{.NAMESPACE}}..."
+        kubectl delete -k {{.KUSTOMIZE_DIR}} -n {{.NAMESPACE}} --ignore-not-found
+        echo "✅ Application deleted"
+
+  rollback:
+    desc: Rollback to previous deployment
+    cmds:
+      - |
+        echo "↩️  Rolling back {{.APP_NAME}}..."
+        kubectl rollout undo deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+        kubectl rollout status deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+        echo "✅ Rollback completed"
+
+  rollback:to:
+    desc: Rollback to specific revision
+    vars:
+      REVISION: '{{.REVISION}}'
+    cmds:
+      - |
+        echo "↩️  Rolling back {{.APP_NAME}} to revision {{.REVISION}}..."
+        kubectl rollout undo deployment/{{.APP_NAME}} -n {{.NAMESPACE}} --to-revision={{.REVISION}}
+        kubectl rollout status deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+        echo "✅ Rollback to revision {{.REVISION}} completed"
+
+  restart:
+    desc: Restart application pods
+    cmds:
+      - |
+        echo "🔄 Restarting {{.APP_NAME}}..."
+        kubectl rollout restart deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+        kubectl rollout status deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+        echo "✅ Restart completed"
+
+  status:
+    desc: Show deployment status
+    cmds:
+      - echo "📊 Status of {{.APP_NAME}} in namespace {{.NAMESPACE}}:"
+      - kubectl get all -l {{.APP_LABEL}} -n {{.NAMESPACE}}
+      - echo ""
+      - kubectl rollout status deployment/{{.APP_NAME}} -n {{.NAMESPACE}} || true
+
+  history:
+    desc: Show deployment history
+    cmds:
+      - echo "📜 Deployment history for {{.APP_NAME}}:"
+      - kubectl rollout history deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+
+  scale:
+    desc: Scale deployment
+    vars:
+      REPLICAS: '{{.REPLICAS | default "2"}}'
+    cmds:
+      - |
+        echo "📊 Scaling {{.APP_NAME}} to {{.REPLICAS}} replicas..."
+        kubectl scale deployment/{{.APP_NAME}} --replicas={{.REPLICAS}} -n {{.NAMESPACE}}
+        kubectl rollout status deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+        echo "✅ Scaled to {{.REPLICAS}} replicas"
+
+  autoscale:
+    desc: Enable autoscaling
+    vars:
+      MIN: '{{.MIN | default "1"}}'
+      MAX: '{{.MAX | default "5"}}'
+      CPU: '{{.CPU | default "80"}}'
+    cmds:
+      - |
+        echo "📈 Enabling autoscaling for {{.APP_NAME}}..."
+        kubectl autoscale deployment/{{.APP_NAME}} \
+          --min={{.MIN}} --max={{.MAX}} --cpu-percent={{.CPU}} \
+          -n {{.NAMESPACE}}
+        echo "✅ Autoscaling enabled ({{.MIN}}-{{.MAX}} replicas, {{.CPU}}% CPU)"
+
+  logs:
+    desc: Show application logs
+    cmds:
+      - kubectl logs -l {{.APP_LABEL}} -n {{.NAMESPACE}} {{.LOG_ARGS}}
+
+  logs:follow:
+    desc: Follow application logs
+    cmds:
+      - kubectl logs -l {{.APP_LABEL}} -n {{.NAMESPACE}} -f
+
+  logs:previous:
+    desc: Show previous container logs
+    cmds:
+      - kubectl logs -l {{.APP_LABEL}} -n {{.NAMESPACE}} -p
+
+  exec:
+    desc: Execute command in pod
+    vars:
+      CMD: '{{.CMD | default "/bin/sh"}}'
+    cmds:
+      - |
+        POD=$(kubectl get pod -l {{.APP_LABEL}} -n {{.NAMESPACE}} -o jsonpath='{.items[0].metadata.name}')
+        echo "🖥️  Executing in pod $POD..."
+        kubectl exec -it $POD -n {{.NAMESPACE}} -- {{.CMD}}
+
+  port-forward:
+    desc: Port forward to application
+    vars:
+      LOCAL_PORT: '{{.LOCAL_PORT | default "8080"}}'
+      REMOTE_PORT: '{{.REMOTE_PORT | default "8080"}}'
+    cmds:
+      - |
+        echo "🔗 Port forwarding localhost:{{.LOCAL_PORT}} → {{.APP_NAME}}:{{.REMOTE_PORT}}..."
+        kubectl port-forward -n {{.NAMESPACE}} svc/{{.APP_NAME}} {{.LOCAL_PORT}}:{{.REMOTE_PORT}}
+
+  describe:
+    desc: Describe application resources
+    cmds:
+      - echo "📋 Describing {{.APP_NAME}} resources:"
+      - kubectl describe deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+      - echo "---"
+      - kubectl describe svc/{{.APP_NAME}} -n {{.NAMESPACE}}
+
+  events:
+    desc: Show application events
+    cmds:
+      - echo "📅 Events for {{.APP_NAME}}:"
+      - kubectl get events -n {{.NAMESPACE}} --field-selector involvedObject.name={{.APP_NAME}} --sort-by='.lastTimestamp'
+
+  top:
+    desc: Show resource usage
+    cmds:
+      - echo "📊 Resource usage for {{.APP_NAME}}:"
+      - kubectl top pods -l {{.APP_LABEL}} -n {{.NAMESPACE}}
+
+  validate:
+    desc: Validate Kubernetes manifests
+    cmds:
+      - |
+        echo "✅ Validating manifests..."
+        if [ -d "{{.KUSTOMIZE_DIR}}" ]; then
+          kubectl kustomize {{.KUSTOMIZE_DIR}} >/dev/null && echo "✅ Kustomization valid" || exit 1
+        elif [ -d "{{.MANIFEST_DIR}}" ]; then
+          kubectl apply -f {{.MANIFEST_DIR}} -n {{.NAMESPACE}} --dry-run=client >/dev/null && echo "✅ Manifests valid" || exit 1
+        else
+          echo "❌ No manifests found"
+          exit 1
+        fi
+
+  wait:
+    desc: Wait for deployment to be ready
+    cmds:
+      - |
+        echo "⏳ Waiting for {{.APP_NAME}} to be ready..."
+        kubectl wait --for=condition=available --timeout={{.DEPLOY_TIMEOUT}} \
+          deployment/{{.APP_NAME}} -n {{.NAMESPACE}}
+        echo "✅ {{.APP_NAME}} is ready"
+
+  health:
+    desc: Check application health
+    cmds:
+      - |
+        echo "❤️  Checking health of {{.APP_NAME}}..."
+        kubectl get deployment/{{.APP_NAME}} -n {{.NAMESPACE}} -o json | \
+          jq -r '.status.conditions[] | select(.type=="Progressing") | 
+          "Deployment: \(.status) - \(.message)"'
+        echo ""
+        READY=$(kubectl get deployment/{{.APP_NAME}} -n {{.NAMESPACE}} -o jsonpath='{.status.readyReplicas}')
+        DESIRED=$(kubectl get deployment/{{.APP_NAME}} -n {{.NAMESPACE}} -o jsonpath='{.spec.replicas}')
+        echo "Replicas: $READY/$DESIRED ready"
+
+  namespace:create:
+    desc: Create namespace
+    cmds:
+      - |
+        echo "📁 Creating namespace {{.NAMESPACE}}..."
+        kubectl create namespace {{.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+        echo "✅ Namespace {{.NAMESPACE}} created"
+
+  namespace:delete:
+    desc: Delete namespace
+    cmds:
+      - |
+        echo "🗑️  Deleting namespace {{.NAMESPACE}}..."
+        kubectl delete namespace {{.NAMESPACE}} --ignore-not-found
+        echo "✅ Namespace {{.NAMESPACE}} deleted"
