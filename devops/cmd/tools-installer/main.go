@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raja-aiml/sematic-cache/devops/pkg/devops/logger"
-	"github.com/raja-aiml/sematic-cache/devops/pkg/devops/osutil"
+	"github.com/raja-aiml/sematic-cache/devops/internal/logger"
+	"github.com/raja-aiml/sematic-cache/devops/internal/osutil"
 )
 
 // Tool represents a development tool to install
@@ -138,12 +138,12 @@ func (ti *ToolInstaller) Run(ctx context.Context, skipConfirmation bool) error {
 	for _, tool := range toInstall {
 		start := time.Now()
 		ti.logger.Info("Installing %s...", tool.Description)
-		
+
 		if err := tool.Installer(ctx); err != nil {
 			ti.logger.Error("Failed to install %s: %v", tool.Name, err)
 			return err
 		}
-		
+
 		ti.logger.Success("%s installed successfully (took %v)", tool.Description, time.Since(start))
 	}
 
@@ -170,7 +170,7 @@ func (ti *ToolInstaller) getToolVersion(name string) string {
 	if err != nil {
 		return "unknown"
 	}
-	
+
 	lines := strings.Split(string(output), "\n")
 	if len(lines) > 0 {
 		return strings.TrimSpace(lines[0])
@@ -237,7 +237,7 @@ func (ti *ToolInstaller) downloadAndExtract(ctx context.Context, url string, des
 			if err != nil {
 				return fmt.Errorf("failed to create file: %w", err)
 			}
-			
+
 			if _, err := io.Copy(file, tarReader); err != nil {
 				file.Close()
 				return fmt.Errorf("failed to write file: %w", err)
@@ -252,7 +252,7 @@ func (ti *ToolInstaller) downloadAndExtract(ctx context.Context, url string, des
 // moveToPath moves a file to /usr/local/bin with sudo if needed
 func (ti *ToolInstaller) moveToPath(source, name string) error {
 	dest := filepath.Join("/usr/local/bin", name)
-	
+
 	// Try direct move first
 	if err := os.Rename(source, dest); err == nil {
 		return nil
@@ -272,12 +272,12 @@ func (ti *ToolInstaller) moveToPath(source, name string) error {
 // Tool-specific installers
 
 func (ti *ToolInstaller) installTask(ctx context.Context) error {
-	os := osutil.GetOS()
+	platformOS := osutil.GetOS()
 	arch := osutil.GetArch()
 	version := ti.getToolByName("task").Version
-	
+
 	url := fmt.Sprintf("https://github.com/go-task/task/releases/download/%s/task_%s_%s.tar.gz",
-		version, os, arch)
+		version, platformOS, arch)
 
 	tmpDir, err := os.MkdirTemp("", "task-install")
 	if err != nil {
@@ -294,10 +294,10 @@ func (ti *ToolInstaller) installTask(ctx context.Context) error {
 
 func (ti *ToolInstaller) installGolangciLint(ctx context.Context) error {
 	version := ti.getToolByName("golangci-lint").Version
-	
+
 	// Use the official install script
 	scriptURL := "https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh"
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", scriptURL, nil)
 	if err != nil {
 		return err
@@ -334,26 +334,26 @@ func (ti *ToolInstaller) installGolangciLint(ctx context.Context) error {
 
 func (ti *ToolInstaller) installK3d(ctx context.Context) error {
 	version := ti.getToolByName("k3d").Version
-	
+
 	// Use the official install script
 	scriptURL := "https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh"
-	
+
 	cmd := exec.Command("sh", "-c",
 		fmt.Sprintf("curl -s %s | TAG=%s bash", scriptURL, version))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), fmt.Sprintf("TAG=%s", version))
-	
+
 	return cmd.Run()
 }
 
 func (ti *ToolInstaller) installHelm(ctx context.Context) error {
-	os := osutil.GetOS()
+	platformOS := osutil.GetOS()
 	arch := osutil.GetArch()
 	version := ti.getToolByName("helm").Version
-	
+
 	url := fmt.Sprintf("https://get.helm.sh/helm-%s-%s-%s.tar.gz",
-		version, os, arch)
+		version, platformOS, arch)
 
 	tmpDir, err := os.MkdirTemp("", "helm-install")
 	if err != nil {
@@ -365,19 +365,19 @@ func (ti *ToolInstaller) installHelm(ctx context.Context) error {
 		return err
 	}
 
-	helmPath := filepath.Join(tmpDir, fmt.Sprintf("%s-%s", os, arch), "helm")
+	helmPath := filepath.Join(tmpDir, fmt.Sprintf("%s-%s", platformOS, arch), "helm")
 	return ti.moveToPath(helmPath, "helm")
 }
 
 func (ti *ToolInstaller) installKustomize(ctx context.Context) error {
-	os := osutil.GetOS()
+	platformOS := osutil.GetOS()
 	arch := osutil.GetArch()
 	version := ti.getToolByName("kustomize").Version
-	
+
 	// Kustomize URL encoding is special
 	versionEncoded := strings.ReplaceAll(version, "/", "%2F")
 	url := fmt.Sprintf("https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%s/kustomize_%s_%s_%s.tar.gz",
-		versionEncoded, version, os, arch)
+		versionEncoded, version, platformOS, arch)
 
 	tmpDir, err := os.MkdirTemp("", "kustomize-install")
 	if err != nil {
@@ -410,7 +410,7 @@ func main() {
 	flag.Parse()
 
 	installer := NewToolInstaller()
-	
+
 	if *debugMode {
 		installer.logger.SetLevel(logger.DebugLevel)
 	}
