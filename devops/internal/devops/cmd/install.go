@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/raja-aiml/sematic-cache/devops/internal/logger"
 	"github.com/raja-aiml/sematic-cache/devops/internal/tools"
+	"github.com/spf13/cobra"
 )
 
 // installCmd represents the install command
@@ -74,7 +74,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Determine which tools to install
 	var toolsToInstall []string
-	
+
 	if len(args) == 0 || (len(args) == 1 && args[0] == "all") {
 		// Install all tools
 		log.Info("Installing all development tools...")
@@ -96,10 +96,10 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Create custom installer for specific tools
 	log.Info("Installing selected tools: %v", toolsToInstall)
-	
+
 	installer := tools.NewInstaller(installSkipConfirm)
 	ctx := context.Background()
-	
+
 	// For now, use the InstallAll method
 	// TODO: Add InstallSpecific method to tools.Installer
 	return installer.InstallAll(ctx)

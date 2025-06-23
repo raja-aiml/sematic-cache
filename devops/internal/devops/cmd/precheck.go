@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/spf13/cobra"
 	"github.com/raja-aiml/sematic-cache/devops/internal/logger"
+	"github.com/spf13/cobra"
 )
 
 // precheckCmd represents the precheck command
@@ -52,7 +52,7 @@ type tool struct {
 
 func runPrecheck(cmd *cobra.Command, args []string) error {
 	log := logger.New()
-	
+
 	if !precheckQuiet {
 		log.Info("Running system prechecks...")
 		log.Info("========================")
