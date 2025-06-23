@@ -241,10 +241,10 @@ tasks:
     cmds:
       - task: build:info
       - echo ""
-      - echo "Project: {{.PROJECT_NAME}}"
-      - echo "Binary: {{.BINARY_NAME}}"
-      - echo "Cluster: {{.CLUSTER_NAME}}"
-      - echo "API URL: {{.API_URL}}"
+      - 'echo "Project: {{.PROJECT_NAME}}"'
+      - 'echo "Binary: {{.BINARY_NAME}}"'
+      - 'echo "Cluster: {{.CLUSTER_NAME}}"'
+      - 'echo "API URL: {{.API_URL}}"'
 
   # === CI/CD HELPERS ===
   ci:full:

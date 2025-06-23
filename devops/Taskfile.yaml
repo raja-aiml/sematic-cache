@@ -9,13 +9,13 @@ tasks:
     cmds:
       - echo "📁 DevOps Modular Structure"
       - echo ""
-      - echo "Task Modules:"
-      - echo "  - build/go.yaml      : Go build and test tasks"
-      - echo "  - build/docker.yaml  : Docker image tasks"
-      - echo "  - deploy/k3d.yaml    : k3d cluster management"
-      - echo "  - deploy/k8s.yaml    : Kubernetes operations"
-      - echo "  - deploy/helm.yaml   : Helm chart management"
-      - echo "  - quality/security.yaml : Security scanning"
+      - 'echo "Task Modules:"'
+      - 'echo "  - build/go.yaml      : Go build and test tasks"'
+      - 'echo "  - build/docker.yaml  : Docker image tasks"'
+      - 'echo "  - deploy/k3d.yaml    : k3d cluster management"'
+      - 'echo "  - deploy/k8s.yaml    : Kubernetes operations"'
+      - 'echo "  - deploy/helm.yaml   : Helm chart management"'
+      - 'echo "  - quality/security.yaml : Security scanning"'
       - echo ""
       - echo "📖 See devops/docs/ for documentation"
       - echo "🔄 See devops/docs/migration.md for migration guide"
@@ -123,13 +123,13 @@ tasks:
     cmds:
       - echo "📊 DevOps Statistics"
       - echo ""
-      - echo "Task files: $(find ./tasks -name "*.yaml" | wc -l | tr -d ' ')"
-      - echo "Total tasks: $(grep -h "^  [a-zA-Z].*:$" ./tasks/**/*.yaml | wc -l | tr -d ' ')"
-      - echo "Script files: $(find ./scripts -name "*.sh" | wc -l | tr -d ' ')"
-      - echo "Templates: $(find ./templates -name "*.yaml" | wc -l | tr -d ' ')"
+      - 'echo "Task files: $(find ./tasks -name "*.yaml" | wc -l | tr -d '' '')"'
+      - 'echo "Total tasks: $(grep -h "^  [a-zA-Z].*:$" ./tasks/**/*.yaml | wc -l | tr -d '' '')"'
+      - 'echo "Script files: $(find ./scripts -name "*.sh" | wc -l | tr -d '' '')"'
+      - 'echo "Templates: $(find ./templates -name "*.yaml" | wc -l | tr -d '' '')"'
       - echo ""
-      - echo "Lines of YAML: $(find ./tasks -name "*.yaml" -exec wc -l {} + | tail -1 | awk '{print $1}')"
-      - echo "Lines of Shell: $(find ./scripts -name "*.sh" -exec wc -l {} + | tail -1 | awk '{print $1}')"
+      - 'echo "Lines of YAML: $(find ./tasks -name "*.yaml" -exec wc -l {} + | tail -1 | awk ''{print $1}'')"'
+      - 'echo "Lines of Shell: $(find ./scripts -name "*.sh" -exec wc -l {} + | tail -1 | awk ''{print $1}'')"'
 
   migrate:check:
     desc: Check if migration is needed
