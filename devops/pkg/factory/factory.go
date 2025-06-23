@@ -52,6 +52,9 @@ func DefaultConfig() *Config {
 			"golangci-lint": "v1.55.2",
 			"gofumpt":       "v0.5.0",
 			"mockgen":       "v1.6.0",
+			"k3d":           "v5.6.0",
+			"helm":          "v3.13.2",
+			"kustomize":     "v5.3.0",
 		},
 	}
 }
@@ -151,6 +154,9 @@ func (f *Factory) CreateToolRegistry() (interfaces.ToolRegistry, error) {
 		f.createGolangCILintTool(),
 		f.createGofumptTool(),
 		f.createMockgenTool(),
+		f.createK3DTool(),
+		f.createHelmTool(),
+		f.createKustomizeTool(),
 	}
 
 	for _, tool := range toolsToRegister {
@@ -211,6 +217,21 @@ func (f *Factory) createGofumptTool() interfaces.ToolInstaller {
 func (f *Factory) createMockgenTool() interfaces.ToolInstaller {
 	version := f.config.ToolVersions["mockgen"]
 	return tools.NewMockgen(version, f.logger, f.osUtil, f.commandRunner)
+}
+
+func (f *Factory) createK3DTool() interfaces.ToolInstaller {
+	version := f.config.ToolVersions["k3d"]
+	return tools.NewK3D(version, f.logger, f.osUtil, f.commandRunner)
+}
+
+func (f *Factory) createHelmTool() interfaces.ToolInstaller {
+	version := f.config.ToolVersions["helm"]
+	return tools.NewHelm(version, f.logger, f.osUtil, f.downloader, f.extractor, f.httpClient)
+}
+
+func (f *Factory) createKustomizeTool() interfaces.ToolInstaller {
+	version := f.config.ToolVersions["kustomize"]
+	return tools.NewKustomize(version, f.logger, f.osUtil, f.downloader, f.extractor, f.httpClient)
 }
 
 func (f *Factory) createCustomTool(config ToolConfig) (interfaces.ToolInstaller, error) {

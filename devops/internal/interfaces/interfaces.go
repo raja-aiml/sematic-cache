@@ -56,6 +56,7 @@ type ToolRegistry interface {
 	Register(tool ToolInstaller) error
 	Get(name string) (ToolInstaller, error)
 	List() []ToolInstaller
+	Install(ctx context.Context, name string) error
 	InstallAll(ctx context.Context) error
 	InstallAllWithOptions(ctx context.Context, opts InstallOptions) error
 	ValidateAll() error

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/raja-aiml/sematic-cache/devops/internal/logger"
-	"github.com/raja-aiml/sematic-cache/devops/internal/tools"
+	"github.com/raja-aiml/sematic-cache/devops/pkg/factory"
 	"github.com/spf13/cobra"
 )
 
@@ -76,11 +76,24 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	var toolsToInstall []string
 
 	if len(args) == 0 || (len(args) == 1 && args[0] == "all") {
-		// Install all tools
+		// Install all tools using factory approach
 		log.Info("Installing all development tools...")
-		installer := tools.NewInstaller(installSkipConfirm)
+		
+		// Create factory with default config
+		factoryConfig := factory.DefaultConfig()
+		f, err := factory.NewFactory(factoryConfig)
+		if err != nil {
+			return err
+		}
+		
+		// Create registry and register tools
+		registry, err := f.CreateToolRegistry()
+		if err != nil {
+			return err
+		}
+		
 		ctx := context.Background()
-		return installer.InstallAll(ctx)
+		return registry.InstallAll(ctx)
 	}
 
 	// Install specific tools
@@ -94,13 +107,32 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		toolsToInstall = append(toolsToInstall, toolName)
 	}
 
-	// Create custom installer for specific tools
+	// Install specific tools using factory approach
 	log.Info("Installing selected tools: %v", toolsToInstall)
-
-	installer := tools.NewInstaller(installSkipConfirm)
+	
+	// Create factory with default config
+	factoryConfig := factory.DefaultConfig()
+	f, err := factory.NewFactory(factoryConfig)
+	if err != nil {
+		return err
+	}
+	
+	// Create registry and register tools
+	registry, err := f.CreateToolRegistry()
+	if err != nil {
+		return err
+	}
+	
 	ctx := context.Background()
-
-	// For now, use the InstallAll method
-	// TODO: Add InstallSpecific method to tools.Installer
-	return installer.InstallAll(ctx)
+	
+	// Install specific tools
+	for _, toolName := range toolsToInstall {
+		if err := registry.Install(ctx, toolName); err != nil {
+			log.Error("Failed to install %s: %v", toolName, err)
+			return err
+		}
+	}
+	
+	log.Success("Selected tools installed successfully!")
+	return nil
 }

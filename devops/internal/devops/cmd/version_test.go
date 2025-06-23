@@ -48,19 +48,19 @@ func TestVersionCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original values
 			origVersion := Version
-			origGitCommit := GitCommit
-			origBuildTime := BuildTime
+			origCommit := Commit
+			origDate := Date
 
 			// Set test values
 			Version = tt.version
-			GitCommit = tt.gitCommit
-			BuildTime = tt.buildTime
+			Commit = tt.gitCommit
+			Date = tt.buildTime
 
 			// Reset after test
 			defer func() {
 				Version = origVersion
-				GitCommit = origGitCommit
-				BuildTime = origBuildTime
+				Commit = origCommit
+				Date = origDate
 			}()
 
 			// Execute command through root

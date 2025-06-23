@@ -73,6 +73,29 @@ func (r *Registry) List() []interfaces.ToolInstaller {
 	return tools
 }
 
+// Install installs a specific tool by name
+func (r *Registry) Install(ctx context.Context, name string) error {
+	tool, err := r.Get(name)
+	if err != nil {
+		return err
+	}
+
+	if tool.IsInstalled() {
+		version, _ := tool.GetInstalledVersion()
+		r.logger.Success("%s is already installed: %s", name, version)
+		return nil
+	}
+
+	r.logger.Info("Installing %s (%s)...", tool.Name(), tool.Description())
+
+	if err := tool.Install(ctx); err != nil {
+		return fmt.Errorf("failed to install %s: %w", name, err)
+	}
+
+	r.logger.Success("%s installed successfully!", name)
+	return nil
+}
+
 // InstallAll installs all registered tools
 func (r *Registry) InstallAll(ctx context.Context) error {
 	tools := r.List()
