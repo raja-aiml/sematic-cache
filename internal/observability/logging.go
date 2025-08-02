@@ -1,31 +1,10 @@
 package observability
 
 import (
-	"log/slog"
-	"os"
+	"github.com/raja-aiml/sematic-cache/internal/logger"
 )
 
-// SetupLogging configures structured logging to stdout
+// SetupLogging configures structured logging with zap
 func SetupLogging() {
-	logLevel := slog.LevelInfo
-	switch os.Getenv("LOG_LEVEL") {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	}
-
-	var handler slog.Handler
-	opts := &slog.HandlerOptions{Level: logLevel}
-
-	if os.Getenv("LOG_FORMAT") == "json" {
-		handler = slog.NewJSONHandler(os.Stdout, opts)
-	} else {
-		handler = slog.NewTextHandler(os.Stdout, opts)
-	}
-
-	logger := slog.New(handler)
-	slog.SetDefault(logger)
+	logger.Initialize()
 }

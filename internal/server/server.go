@@ -2,10 +2,10 @@ package server
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/raja-aiml/sematic-cache/internal/config"
 	"github.com/raja-aiml/sematic-cache/internal/embedding"
+	"github.com/raja-aiml/sematic-cache/internal/logger"
 	"github.com/raja-aiml/sematic-cache/internal/storage"
 )
 
@@ -21,9 +21,9 @@ func CreateStorage(cfg *config.EnvConfig) (*storage.VectorStore, error) {
 		embedFunc = func(text string) ([]float32, error) {
 			return client.Embedding(context.Background(), text)
 		}
-		slog.Info("OpenAI embeddings enabled", "model", cfg.OpenAIModel)
+		logger.Info("OpenAI embeddings enabled", logger.Fields{"model": cfg.OpenAIModel})
 	} else {
-		slog.Warn("OpenAI API key not configured, embeddings disabled")
+		logger.Warn("OpenAI API key not configured, embeddings disabled")
 	}
 
 	storeCfg := &config.Config{
@@ -40,10 +40,10 @@ func CreateStorage(cfg *config.EnvConfig) (*storage.VectorStore, error) {
 
 // LogServerConfig logs the server configuration
 func LogServerConfig(cfg *config.EnvConfig) {
-	slog.Info("Starting semantic-cache server",
-		"port", cfg.Port,
-		"database_configured", cfg.DatabaseURL != "",
-		"openai_configured", cfg.OpenAIAPIKey != "",
-		"otel_configured", cfg.OTELEndpoint != "",
-	)
+	logger.Info("Starting semantic-cache server", logger.Fields{
+		"port":                cfg.Port,
+		"database_configured": cfg.DatabaseURL != "",
+		"openai_configured":   cfg.OpenAIAPIKey != "",
+		"otel_configured":     cfg.OTELEndpoint != "",
+	})
 }

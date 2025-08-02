@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/raja-aiml/sematic-cache/internal/config"
 	"github.com/raja-aiml/sematic-cache/internal/database"
+	"github.com/raja-aiml/sematic-cache/internal/logger"
 	"github.com/raja-aiml/sematic-cache/internal/observability"
 	"github.com/raja-aiml/sematic-cache/internal/server"
 	"github.com/raja-aiml/sematic-cache/internal/storage"
@@ -59,7 +59,7 @@ func runWithGracefulShutdown(srv *http.Server, shutdownTimeout int) error {
 
 	serverErrors := make(chan error, 1)
 	go func() {
-		slog.Info("Server starting", "address", srv.Addr)
+		logger.Info("Server starting", logger.Fields{"address": srv.Addr})
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErrors <- err
 		}
@@ -70,7 +70,7 @@ func runWithGracefulShutdown(srv *http.Server, shutdownTimeout int) error {
 		return fmt.Errorf("server failed to start: %w", err)
 
 	case sig := <-sigChan:
-		slog.Info("Shutdown signal received", "signal", sig)
+		logger.Info("Shutdown signal received", logger.Fields{"signal": sig.String()})
 
 		ctx, cancel := context.WithTimeout(
 			context.Background(),
@@ -82,7 +82,7 @@ func runWithGracefulShutdown(srv *http.Server, shutdownTimeout int) error {
 			return fmt.Errorf("server shutdown failed: %w", err)
 		}
 
-		slog.Info("Server shutdown complete")
+		logger.Info("Server shutdown complete")
 		return nil
 	}
 }

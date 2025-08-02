@@ -2,6 +2,8 @@ package reduction
 
 import (
 	"fmt"
+
+	"github.com/raja-aiml/sematic-cache/internal/logger"
 )
 
 // ReducerType represents the type of dimension reduction algorithm
@@ -26,6 +28,12 @@ func NewReducerFactory() *ReducerFactory {
 
 // CreateReducer creates a reducer based on the specified type and configuration
 func (f *ReducerFactory) CreateReducer(reducerType ReducerType, config ReducerConfig) (Reducer, error) {
+	logger.Debug("Creating reducer", logger.Fields{
+		"type":       string(reducerType),
+		"output_dim": config.OutputDimensions,
+		"variance":   config.VarianceRetained,
+	})
+
 	switch reducerType {
 	case PCAReducerType:
 		// Convert ReducerConfig to Config
@@ -33,6 +41,9 @@ func (f *ReducerFactory) CreateReducer(reducerType ReducerType, config ReducerCo
 			TargetDim:         config.OutputDimensions,
 			VarianceThreshold: config.VarianceRetained,
 		}
+		logger.Info("Created PCA reducer", logger.Fields{
+			"target_dim": config.OutputDimensions,
+		})
 		return NewPCAReducer(pcaConfig), nil
 	case PCAGonumReducerType:
 		// Convert ReducerConfig to Config
@@ -40,6 +51,9 @@ func (f *ReducerFactory) CreateReducer(reducerType ReducerType, config ReducerCo
 			TargetDim:         config.OutputDimensions,
 			VarianceThreshold: config.VarianceRetained,
 		}
+		logger.Info("Created PCA Gonum reducer", logger.Fields{
+			"target_dim": config.OutputDimensions,
+		})
 		return NewPCAGonumReducer(pcaConfig), nil
 	case IncrementalPCAReducerType:
 		// Convert ReducerConfig to Config for IncrementalPCA
@@ -47,9 +61,18 @@ func (f *ReducerFactory) CreateReducer(reducerType ReducerType, config ReducerCo
 			TargetDim:         config.OutputDimensions,
 			VarianceThreshold: config.VarianceRetained,
 		}
+		logger.Info("Created Incremental PCA reducer", logger.Fields{
+			"target_dim": config.OutputDimensions,
+			"batch_size": 100,
+		})
 		return NewIncrementalPCAReducer(pcaConfig, 100), nil
 	default:
-		return nil, fmt.Errorf("unknown reducer type: %s", reducerType)
+		err := fmt.Errorf("unknown reducer type: %s", reducerType)
+		logger.Error("Failed to create reducer", logger.Fields{
+			"type":  string(reducerType),
+			"error": err.Error(),
+		})
+		return nil, err
 	}
 }
 

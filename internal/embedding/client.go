@@ -7,10 +7,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/param"
+	"github.com/raja-aiml/sematic-cache/internal/logger"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Client wraps the OpenAI SDK client.
@@ -23,22 +28,65 @@ type Client struct {
 
 // Moderate uses the OpenAI moderation API to check if the input is flagged.
 func (c *Client) Moderate(ctx context.Context, text string) (bool, error) {
+	tracer := otel.Tracer("embedding")
+	ctx, span := tracer.Start(ctx, "Moderate",
+		trace.WithAttributes(
+			attribute.Int("text.length", len(text)),
+		),
+	)
+	defer span.End()
+
+	start := time.Now()
 	params := openai.ModerationNewParams{
 		Input: openai.ModerationNewParamsInputUnion{OfStringArray: []string{text}},
 	}
+
+	logger.Debug("Starting moderation check", logger.Fields{
+		"text_length": len(text),
+	}.Merge(logger.WithTrace(ctx)))
+
 	resp, err := c.client.Moderations.New(ctx, params)
 	if err != nil {
+		logger.LogSpanError(ctx, err, "Moderation API call failed")
 		return false, fmt.Errorf("moderation: %w", err)
 	}
+
 	if len(resp.Results) == 0 {
-		return false, fmt.Errorf("moderation: no results returned")
+		err := fmt.Errorf("moderation: no results returned")
+		logger.LogSpanError(ctx, err, "Moderation returned no results")
+		return false, err
 	}
-	return resp.Results[0].Flagged, nil
+
+	flagged := resp.Results[0].Flagged
+	logger.Info("Moderation check completed", logger.Fields{
+		"flagged":    flagged,
+		"latency_ms": time.Since(start).Milliseconds(),
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(attribute.Bool("result.flagged", flagged))
+	return flagged, nil
 }
 
 // CreateImage generates images from a text prompt using the OpenAI Images API.
 // Returns a slice of URLs (or base64 strings if configured).
 func (c *Client) CreateImage(ctx context.Context, prompt string, n int, size string) ([]string, error) {
+	tracer := otel.Tracer("embedding")
+	ctx, span := tracer.Start(ctx, "CreateImage",
+		trace.WithAttributes(
+			attribute.String("prompt", prompt),
+			attribute.Int("count", n),
+			attribute.String("size", size),
+		),
+	)
+	defer span.End()
+
+	start := time.Now()
+	logger.Debug("Creating images", logger.Fields{
+		"prompt": prompt,
+		"count":  n,
+		"size":   size,
+	}.Merge(logger.WithTrace(ctx)))
+
 	params := openai.ImageGenerateParams{
 		Prompt: prompt,
 		N:      param.NewOpt(int64(n)),
@@ -46,8 +94,10 @@ func (c *Client) CreateImage(ctx context.Context, prompt string, n int, size str
 	}
 	resp, err := c.client.Images.Generate(ctx, params)
 	if err != nil {
+		logger.LogSpanError(ctx, err, "Image generation failed")
 		return nil, fmt.Errorf("create image: %w", err)
 	}
+
 	urls := make([]string, len(resp.Data))
 	for i, img := range resp.Data {
 		if img.URL != "" {
@@ -56,6 +106,13 @@ func (c *Client) CreateImage(ctx context.Context, prompt string, n int, size str
 			urls[i] = img.B64JSON
 		}
 	}
+
+	logger.Info("Images created successfully", logger.Fields{
+		"count":      len(urls),
+		"latency_ms": time.Since(start).Milliseconds(),
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(attribute.Int("result.count", len(urls)))
 	return urls, nil
 }
 
@@ -109,14 +166,35 @@ func (c *Client) CreateImageVariation(ctx context.Context, image io.Reader, n in
 
 // TranscribeAudio transcribes the given audio via OpenAI's audio transcription API.
 func (c *Client) TranscribeAudio(ctx context.Context, audio io.Reader) (string, error) {
+	tracer := otel.Tracer("embedding")
+	ctx, span := tracer.Start(ctx, "TranscribeAudio",
+		trace.WithAttributes(
+			attribute.String("model", "whisper-1"),
+		),
+	)
+	defer span.End()
+
+	start := time.Now()
+	logger.Debug("Starting audio transcription", logger.Fields{
+		"model": "whisper-1",
+	}.Merge(logger.WithTrace(ctx)))
+
 	params := openai.AudioTranscriptionNewParams{
 		File:  audio,
 		Model: openai.AudioModelWhisper1,
 	}
 	resp, err := c.client.Audio.Transcriptions.New(ctx, params)
 	if err != nil {
+		logger.LogSpanError(ctx, err, "Audio transcription failed")
 		return "", fmt.Errorf("transcribe audio: %w", err)
 	}
+
+	logger.Info("Audio transcription successful", logger.Fields{
+		"text_length": len(resp.Text),
+		"latency_ms":  time.Since(start).Milliseconds(),
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(attribute.Int("result.length", len(resp.Text)))
 	return resp.Text, nil
 }
 
@@ -153,6 +231,21 @@ type ChatOptions struct {
 // Chat invokes OpenAI's chat completions API.
 // It returns the content of the first choice.
 func (c *Client) Chat(ctx context.Context, messages []ChatMessage, opts ChatOptions) (string, error) {
+	tracer := otel.Tracer("embedding")
+	ctx, span := tracer.Start(ctx, "Chat",
+		trace.WithAttributes(
+			attribute.String("model", opts.Model),
+			attribute.Int("message.count", len(messages)),
+		),
+	)
+	defer span.End()
+
+	start := time.Now()
+	logger.Debug("Starting chat completion", logger.Fields{
+		"model":         opts.Model,
+		"message_count": len(messages),
+	}.Merge(logger.WithTrace(ctx)))
+
 	// build request params
 	params := openai.ChatCompletionNewParams{
 		Model: openai.ChatModel(opts.Model),
@@ -197,12 +290,31 @@ func (c *Client) Chat(ctx context.Context, messages []ChatMessage, opts ChatOpti
 	// call API
 	resp, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
+		logger.LogSpanError(ctx, err, "Chat completion failed")
 		return "", fmt.Errorf("chat completion: %w", err)
 	}
 	if len(resp.Choices) == 0 {
-		return "", fmt.Errorf("chat completion: no choices returned")
+		err := fmt.Errorf("chat completion: no choices returned")
+		logger.LogSpanError(ctx, err, "No choices in chat response")
+		return "", err
 	}
-	return resp.Choices[0].Message.Content, nil
+
+	result := resp.Choices[0].Message.Content
+	logger.Info("Chat completion successful", logger.Fields{
+		"model":            opts.Model,
+		"response_len":     len(result),
+		"latency_ms":       time.Since(start).Milliseconds(),
+		"usage_prompt":     resp.Usage.PromptTokens,
+		"usage_completion": resp.Usage.CompletionTokens,
+		"usage_total":      resp.Usage.TotalTokens,
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(
+		attribute.Int("usage.prompt_tokens", int(resp.Usage.PromptTokens)),
+		attribute.Int("usage.completion_tokens", int(resp.Usage.CompletionTokens)),
+		attribute.Int("usage.total_tokens", int(resp.Usage.TotalTokens)),
+	)
+	return result, nil
 }
 
 // ChatStream invokes the chat completion API with streaming enabled.
@@ -277,6 +389,10 @@ func (c *Client) ChatStream(ctx context.Context, messages []ChatMessage, opts Ch
 func NewClient(apiKey string) *Client {
 	c := &Client{apiKey: apiKey}
 	c.configure()
+
+	logger.Info("OpenAI client created", logger.Fields{
+		"has_api_key": apiKey != "",
+	})
 	return c
 }
 
@@ -297,6 +413,10 @@ func (c *Client) configure() {
 func (c *Client) SetBaseURL(url string) {
 	c.BaseURL = url
 	c.configure()
+
+	logger.Debug("Base URL updated", logger.Fields{
+		"base_url": url,
+	})
 }
 
 // SetAPIKey updates the API key and reinitializes the SDK client.
@@ -311,10 +431,31 @@ func (c *Client) ConfigureAzure(key, baseURL, version string) {
 	c.BaseURL = baseURL
 	c.APIVersion = version
 	c.configure()
+
+	logger.Info("Azure OpenAI configured", logger.Fields{
+		"base_url":    baseURL,
+		"api_version": version,
+		"has_api_key": key != "",
+	})
 }
 
 // Complete calls OpenAI's completion API.
 func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
+	tracer := otel.Tracer("embedding")
+	ctx, span := tracer.Start(ctx, "Complete",
+		trace.WithAttributes(
+			attribute.Int("prompt.length", len(prompt)),
+			attribute.String("model", "text-davinci-003"),
+		),
+	)
+	defer span.End()
+
+	start := time.Now()
+	logger.Debug("Starting completion", logger.Fields{
+		"prompt_length": len(prompt),
+		"model":         "text-davinci-003",
+	}.Merge(logger.WithTrace(ctx)))
+
 	params := openai.CompletionNewParams{
 		Model: "text-davinci-003",
 		Prompt: openai.CompletionNewParamsPromptUnion{
@@ -323,16 +464,47 @@ func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
 	}
 	resp, err := c.client.Completions.New(ctx, params)
 	if err != nil {
+		logger.LogSpanError(ctx, err, "Completion failed")
 		return "", fmt.Errorf("complete: %w", err)
 	}
 	if len(resp.Choices) == 0 {
-		return "", fmt.Errorf("complete: no choices returned")
+		err := fmt.Errorf("complete: no choices returned")
+		logger.LogSpanError(ctx, err, "No choices in completion response")
+		return "", err
 	}
-	return resp.Choices[0].Text, nil
+
+	result := resp.Choices[0].Text
+	logger.Info("Completion successful", logger.Fields{
+		"response_len":     len(result),
+		"latency_ms":       time.Since(start).Milliseconds(),
+		"usage_prompt":     resp.Usage.PromptTokens,
+		"usage_completion": resp.Usage.CompletionTokens,
+		"usage_total":      resp.Usage.TotalTokens,
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(
+		attribute.Int("usage.total_tokens", int(resp.Usage.TotalTokens)),
+	)
+	return result, nil
 }
 
 // Embedding calls OpenAI's embedding API.
 func (c *Client) Embedding(ctx context.Context, text string) ([]float32, error) {
+	tracer := otel.Tracer("embedding")
+	ctx, span := tracer.Start(ctx, "Embedding",
+		trace.WithAttributes(
+			attribute.Int("text.length", len(text)),
+			attribute.String("model", "text-embedding-ada-002"),
+		),
+	)
+	defer span.End()
+
+	start := time.Now()
+	logger.Debug("Generating embedding", logger.Fields{
+		"text_length": len(text),
+		"model":       "text-embedding-ada-002",
+	}.Merge(logger.WithTrace(ctx)))
+
 	params := openai.EmbeddingNewParams{
 		Model: openai.EmbeddingModelTextEmbeddingAda002,
 		Input: openai.EmbeddingNewParamsInputUnion{
@@ -341,15 +513,31 @@ func (c *Client) Embedding(ctx context.Context, text string) ([]float32, error) 
 	}
 	resp, err := c.client.Embeddings.New(ctx, params)
 	if err != nil {
+		logger.LogSpanError(ctx, err, "Embedding generation failed")
 		return nil, fmt.Errorf("embedding: %w", err)
 	}
 	if len(resp.Data) == 0 {
-		return nil, fmt.Errorf("embedding: no embedding returned")
+		err := fmt.Errorf("embedding: no embedding returned")
+		logger.LogSpanError(ctx, err, "No embedding in response")
+		return nil, err
 	}
+
 	raw := resp.Data[0].Embedding
 	vec := make([]float32, len(raw))
 	for i, v := range raw {
 		vec[i] = float32(v)
 	}
+
+	logger.Info("Embedding generated successfully", logger.Fields{
+		"dimension":    len(vec),
+		"latency_ms":   time.Since(start).Milliseconds(),
+		"usage_prompt": resp.Usage.PromptTokens,
+		"usage_total":  resp.Usage.TotalTokens,
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(
+		attribute.Int("embedding.dimension", len(vec)),
+		attribute.Int("usage.tokens", int(resp.Usage.TotalTokens)),
+	)
 	return vec, nil
 }

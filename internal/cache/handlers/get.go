@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/raja-aiml/sematic-cache/internal/cache"
+	"github.com/raja-aiml/sematic-cache/internal/logger"
 	"github.com/raja-aiml/sematic-cache/internal/storage"
 )
 
@@ -18,6 +19,20 @@ func HandleGet(backend storage.CacheBackend) gin.HandlerFunc {
 		}
 
 		value, found := backend.Get(req.Prompt)
+
+		// Log cache hit/miss
+		logFields := logger.Fields{
+			"prompt":     req.Prompt,
+			"cache_hit":  found,
+			"request_id": c.GetString("request_id"),
+		}
+
+		if found {
+			logger.Debug("Cache hit", logFields)
+		} else {
+			logger.Debug("Cache miss", logFields)
+		}
+
 		c.JSON(http.StatusOK, cache.CacheResponse{
 			Prompt: req.Prompt,
 			Answer: value,

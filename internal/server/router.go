@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/raja-aiml/sematic-cache/internal/cache/handlers"
 	"github.com/raja-aiml/sematic-cache/internal/config"
+	"github.com/raja-aiml/sematic-cache/internal/logger"
 	"github.com/raja-aiml/sematic-cache/internal/storage"
 )
 
@@ -19,8 +20,8 @@ func SetupRouter(cache storage.CacheBackend, cfg *config.EnvConfig) *gin.Engine 
 	router := gin.New()
 
 	// Middleware
-	router.Use(gin.Recovery())
-	router.Use(StructuredLoggingMiddleware())
+	router.Use(logger.RecoveryMiddleware())
+	router.Use(logger.GinMiddleware())
 
 	// Health checks
 	router.GET(cfg.HealthCheckPath, HealthCheck)

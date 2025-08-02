@@ -7,6 +7,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/raja-aiml/sematic-cache/internal/logger"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // DimensionReducer manages dimension reduction with quality monitoring
@@ -98,11 +103,25 @@ func (dr *DimensionReducer) Learn(ctx context.Context, embeddings [][]float32) e
 		return fmt.Errorf("DimensionReducer is nil")
 	}
 
+	tracer := otel.Tracer("embedding.reduction")
+	ctx, span := tracer.Start(ctx, "Learn",
+		trace.WithAttributes(
+			attribute.Int("sample.count", len(embeddings)),
+		),
+	)
+	defer span.End()
+
 	dr.mu.Lock()
 	defer dr.mu.Unlock()
 
+	logger.Info("Starting dimension reduction learning", logger.Fields{
+		"sample_count": len(embeddings),
+		"target_dim":   dr.config.OutputDimensions,
+	}.Merge(logger.WithTrace(ctx)))
+
 	// Validate embeddings
 	if err := dr.validateEmbeddings(embeddings); err != nil {
+		logger.LogSpanError(ctx, err, "Invalid embeddings for learning")
 		return fmt.Errorf("Learn: %w", err)
 	}
 
@@ -110,6 +129,7 @@ func (dr *DimensionReducer) Learn(ctx context.Context, embeddings [][]float32) e
 
 	// Train reducer
 	if err := dr.reducer.Fit(ctx, embeddings); err != nil {
+		logger.LogSpanError(ctx, err, "Failed to fit reducer")
 		return fmt.Errorf("failed to fit reducer: %w", err)
 	}
 
@@ -121,6 +141,18 @@ func (dr *DimensionReducer) Learn(ctx context.Context, embeddings [][]float32) e
 	// Calculate quality metrics
 	dr.updateLearnMetrics(embeddings, time.Since(startTime))
 
+	logger.Info("Dimension reduction learning completed", logger.Fields{
+		"original_dim":       dr.originalDim,
+		"reduced_dim":        dr.reducedDim,
+		"variance_explained": dr.varianceRatio,
+		"latency_ms":         time.Since(startTime).Milliseconds(),
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(
+		attribute.Int("original.dim", dr.originalDim),
+		attribute.Int("reduced.dim", dr.reducedDim),
+	)
+
 	return nil
 }
 
@@ -130,34 +162,63 @@ func (dr *DimensionReducer) ReduceForSearch(ctx context.Context, embedding []flo
 		return nil, fmt.Errorf("DimensionReducer is nil")
 	}
 
+	tracer := otel.Tracer("embedding.reduction")
+	ctx, span := tracer.Start(ctx, "ReduceForSearch",
+		trace.WithAttributes(
+			attribute.Int("input.dim", len(embedding)),
+		),
+	)
+	defer span.End()
+
 	if embedding == nil {
-		return nil, fmt.Errorf("embedding cannot be nil")
+		err := fmt.Errorf("embedding cannot be nil")
+		logger.LogSpanError(ctx, err, "Nil embedding provided")
+		return nil, err
 	}
 
 	if len(embedding) == 0 {
-		return nil, fmt.Errorf("embedding cannot be empty")
+		err := fmt.Errorf("embedding cannot be empty")
+		logger.LogSpanError(ctx, err, "Empty embedding provided")
+		return nil, err
 	}
 
 	dr.mu.RLock()
 	if !dr.isLearned {
 		dr.mu.RUnlock()
-		return nil, fmt.Errorf("reducer not learned yet")
+		err := fmt.Errorf("reducer not learned yet")
+		logger.LogSpanError(ctx, err, "Reducer not trained")
+		return nil, err
 	}
 
 	// Validate embedding dimension
 	if len(embedding) != dr.originalDim {
 		dr.mu.RUnlock()
-		return nil, fmt.Errorf("embedding dimension mismatch: expected %d, got %d", dr.originalDim, len(embedding))
+		err := fmt.Errorf("embedding dimension mismatch: expected %d, got %d", dr.originalDim, len(embedding))
+		logger.LogSpanError(ctx, err, "Dimension mismatch")
+		return nil, err
 	}
 	dr.mu.RUnlock()
 
 	startTime := time.Now()
 	reduced, err := dr.reducer.Transform(ctx, [][]float32{embedding})
 	if err != nil {
+		logger.LogSpanError(ctx, err, "Transform failed")
 		return nil, err
 	}
 
 	dr.updateReductionMetrics(time.Since(startTime))
+
+	logger.Debug("Embedding reduced", logger.Fields{
+		"original_dim": len(embedding),
+		"reduced_dim":  len(reduced[0]),
+		"latency_ms":   time.Since(startTime).Milliseconds(),
+	}.Merge(logger.WithTrace(ctx)))
+
+	span.SetAttributes(
+		attribute.Int("output.dim", len(reduced[0])),
+		attribute.Int64("latency.ms", time.Since(startTime).Milliseconds()),
+	)
+
 	return reduced[0], nil
 }
 
@@ -173,13 +234,29 @@ func (dr *DimensionReducer) HybridSearch(
 		return nil, fmt.Errorf("DimensionReducer is nil")
 	}
 
+	tracer := otel.Tracer("embedding.reduction")
+	ctx, span := tracer.Start(ctx, "HybridSearch",
+		trace.WithAttributes(
+			attribute.Int("candidates.count", len(candidates)),
+			attribute.Int("top_k", topK),
+		),
+	)
+	defer span.End()
+
+	logger.Debug("Starting hybrid search", logger.Fields{
+		"candidates": len(candidates),
+		"top_k":      topK,
+	}.Merge(logger.WithTrace(ctx)))
+
 	// Validate inputs
 	if err := dr.validateSearchInputs(queryEmbedding, candidates, topK, similarityFunc); err != nil {
+		logger.LogSpanError(ctx, err, "Invalid search inputs")
 		return nil, fmt.Errorf("HybridSearch: %w", err)
 	}
 
 	if !dr.isLearned {
 		// Fallback to full dimension search
+		logger.Info("Falling back to full dimension search", logger.WithTrace(ctx))
 		return dr.fullDimensionSearch(queryEmbedding, candidates, topK, similarityFunc), nil
 	}
 

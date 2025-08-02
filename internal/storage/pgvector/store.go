@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pgvector/pgvector-go"
 	"github.com/raja-aiml/sematic-cache/internal/cache"
+	"github.com/raja-aiml/sematic-cache/internal/logger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -15,8 +16,7 @@ import (
 
 // Store implements vector storage using PostgreSQL with pgvector
 type Store struct {
-	db     *gorm.DB
-	logger *Logger
+	db *gorm.DB
 }
 
 // Embedding represents a stored vector embedding
@@ -73,8 +73,7 @@ func NewStore(dsn string) (*Store, error) {
 	}
 
 	return &Store{
-		db:     db,
-		logger: NewLogger("pgvector"),
+		db: db,
 	}, nil
 }
 
@@ -99,7 +98,11 @@ func (s *Store) Store(ctx context.Context, prompt string, embedding []float32, a
 		Create(&entry).Error
 
 	if err != nil {
-		s.logger.LogError("store", prompt, err)
+		logger.Error("Failed to store embedding", logger.Fields{
+			"backend": "pgvector",
+			"prompt":  prompt,
+			"error":   err.Error(),
+		})
 		return fmt.Errorf("failed to store embedding: %w", err)
 	}
 
@@ -118,7 +121,11 @@ func (s *Store) Get(ctx context.Context, prompt string) (string, bool) {
 		if err == gorm.ErrRecordNotFound {
 			return "", false
 		}
-		s.logger.LogError("get", prompt, err)
+		logger.Error("Failed to get from cache", logger.Fields{
+			"backend": "pgvector",
+			"prompt":  prompt,
+			"error":   err.Error(),
+		})
 		return "", false
 	}
 
@@ -160,7 +167,12 @@ func (s *Store) Search(ctx context.Context, embedding []float32, k int, threshol
 		Scan(&results).Error
 
 	if err != nil {
-		s.logger.LogError("search", fmt.Sprintf("k=%d, threshold=%f", k, threshold), err)
+		logger.Error("Failed to search embeddings", logger.Fields{
+			"backend":   "pgvector",
+			"k":         k,
+			"threshold": threshold,
+			"error":     err.Error(),
+		})
 		return nil, fmt.Errorf("failed to search embeddings: %w", err)
 	}
 
@@ -201,7 +213,11 @@ func (s *Store) Delete(ctx context.Context, prompt string) error {
 		Delete(&Embedding{})
 
 	if result.Error != nil {
-		s.logger.LogError("delete", prompt, result.Error)
+		logger.Error("Failed to delete entry", logger.Fields{
+			"backend": "pgvector",
+			"prompt":  prompt,
+			"error":   result.Error.Error(),
+		})
 		return fmt.Errorf("failed to delete entry: %w", result.Error)
 	}
 
@@ -219,7 +235,10 @@ func (s *Store) Flush(ctx context.Context) error {
 		Delete(&Embedding{}).Error
 
 	if err != nil {
-		s.logger.LogError("flush", "all", err)
+		logger.Error("Failed to flush all entries", logger.Fields{
+			"backend": "pgvector",
+			"error":   err.Error(),
+		})
 		return fmt.Errorf("failed to flush entries: %w", err)
 	}
 
