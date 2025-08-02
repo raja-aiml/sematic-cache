@@ -8,8 +8,7 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 - **MANDATORY**: Use official Go SDKs/libraries instead of CLI commands
 - **FORBIDDEN**: Running external commands via exec/shell unless absolutely necessary
 - **EXCEPTION**: Only when no SDK exists and must be documented
-- **K3D SDK AVAILABLE**: Use `github.com/k3d-io/k3d/v5` SDK instead of CLI commands
-- **Example**: Use Docker SDK instead of `docker` CLI, Kubernetes client-go instead of `kubectl`
+- **Example**: Use Docker SDK instead of `docker` CLI, OpenAI SDK instead of HTTP calls
 
 ### 2. APPROVED TECHNOLOGY STACK
 **Web Frameworks:**
@@ -17,10 +16,10 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 - ❌ Fiber, Echo, Chi - Not approved
 
 **Database/Storage:**
-- ✅ **PostgreSQL** with pgx driver
-- ✅ **Redis** with go-redis/redis/v8
-- ✅ **GORM** for ORM when needed
-- ❌ MongoDB, MySQL - Not approved without justification
+- ✅ **PostgreSQL** with pgvector extension - Vector similarity search
+- ✅ **GORM** for ORM with pgvector-go driver
+- ✅ **pgx** driver for direct PostgreSQL access
+- ❌ MongoDB, MySQL, Redis - Not implemented
 
 **Testing:**
 - ✅ **testify** (github.com/stretchr/testify) - Assertions and mocks
@@ -29,21 +28,25 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 - ❌ Ginkgo, Gomega - Not approved
 
 **Configuration:**
-- ✅ **Viper** (github.com/spf13/viper) - Configuration management
-- ✅ **Cobra** (github.com/spf13/cobra) - CLI framework
-- ❌ Other config libraries without approval
+- ✅ **YAML configuration** - Simple config file loading
+- ✅ **Environment variables** - Twelve-Factor App methodology
+- ✅ **Structured config types** - Type-safe configuration
+- ✅ **Viper** (github.com/spf13/viper) - Advanced configuration management
+- ✅ **Cobra** (github.com/spf13/cobra) - CLI framework for command-line tools
 
 **Observability:**
-- ✅ **OpenTelemetry** - Tracing and metrics
-- ✅ **Prometheus** client - Metrics
-- ❌ Custom telemetry solutions
+- ✅ **OpenTelemetry** - Complete observability with OTLP exporters
+- ✅ **Zap** (go.uber.org/zap) - Structured logging with OTel integration
+- ✅ **Prometheus** - Metrics collection
+- ✅ **Jaeger** - Distributed tracing
+- ✅ **OpenTelemetry Collector** - Telemetry pipeline
 
-**Container/Orchestration:**
-- ✅ **Docker SDK** (github.com/docker/docker)
-- ✅ **Kubernetes client-go** (k8s.io/client-go)
-- ✅ **K3D SDK** (github.com/k3d-io/k3d/v5) - For local Kubernetes clusters
-- ✅ **Kustomize** libraries for manifest generation
-- ❌ Docker CLI commands, kubectl exec, k3d CLI commands
+
+**Container/Development:**
+- ✅ **Docker** - Containerization with multi-stage builds
+- ✅ **Docker Compose** - Local development environment
+- ✅ **Air** - Hot reload for development
+
 
 ### 3. INTERFACE COMPLIANCE
 - **MANDATORY**: Always check existing interfaces before implementation
@@ -67,7 +70,7 @@ if err != nil {
 ### 5. DEPENDENCY MANAGEMENT
 - **MANDATORY**: Run `go mod tidy` after adding dependencies
 - **MANDATORY**: Check for duplicate functionality before adding new deps
-- **MANDATORY**: Verify compatibility with go.work workspace
+- **MANDATORY**: Verify compatibility with Go 1.23.x
 - **FORBIDDEN**: Adding dependencies that duplicate existing functionality
 
 ## Quick Start Summary
@@ -78,7 +81,10 @@ gofmt -w .              # Format all code (MANDATORY before commit)
 go test ./...           # Run all tests (MANDATORY before commit)
 go vet ./...            # Static analysis (MANDATORY before commit)
 go mod tidy             # Clean dependencies (MANDATORY after changes)
-go run cmd/server/main.go -config config.yml  # Run server
+go run main.go              # Run server
+make dev                    # Run with hot reload
+make test                   # Run all tests
+make lint                   # Run linter
 ```
 
 ### Git Commit Guidelines
@@ -88,7 +94,7 @@ When you need to quickly stage all changes and commit with an auto-generated mes
 ```
 This will:
 1. Check git status to understand changes
-2. Stage all modified and new files (limited to current directory when in iaac/iaac)
+2. Stage all modified and new files
 3. Generate a descriptive commit message following conventional commits format
 4. Create the commit without any AI attribution
 
@@ -99,7 +105,6 @@ This will:
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-Note: When working in iaac/iaac, only changes within that directory will be staged and committed.
 
 ### Key Principles to Follow
 1. **KISS**: Keep implementations simple and readable
@@ -113,15 +118,20 @@ Note: When working in iaac/iaac, only changes within that directory will be stag
 9. **SDK First**: ALWAYS prefer SDK/library over CLI commands
 
 ### Project Structure
-- `core/`: Core functionality (cache, agents, orchestrator)
-- `storage/`: Storage backend implementations
-- `server/`: HTTP API server (Gin framework)
-- `openai/`: OpenAI integration
-- `config/`: Configuration management
-- `cmd/`: Application entry points
-- `iaac/`: Infrastructure as Code
-  - `blueprint/`: Kubernetes manifests
-  - `infra/`: Go-based infrastructure tooling
+- `internal/`: Internal packages (following Go best practices)
+  - `cache/`: Cache handlers and API types
+  - `config/`: Configuration management (YAML and env-based)
+  - `database/`: Database connection management
+  - `embedding/`: OpenAI client and dimension reduction algorithms
+  - `logger/`: Zap-based structured logging with OTel integration
+  - `observability/`: OpenTelemetry setup for traces and metrics
+  - `server/`: Gin HTTP server and routing
+  - `storage/`: Storage backend implementations with adapter pattern
+- `cmd/`: Application orchestration and entry point
+- `deployments/`: Deployment configurations
+  - `docker/`: Dockerfile for containerization
+  - `local/`: Docker Compose for local development with full observability stack
+- `bin/`: Build output directory (gitignored)
 
 ## Architectural Principles
 
@@ -154,7 +164,7 @@ Note: When working in iaac/iaac, only changes within that directory will be stag
 **Liskov Substitution Principle (LSP)**
 - Subtypes must be substitutable for their base types
 - All storage backends must fully implement the Storage interface
-- Example: Switching between Redis and PostgreSQL should require no code changes
+- Example: Storage interface allows different backend implementations
 
 **Interface Segregation Principle (ISP)**
 - Clients should not depend on interfaces they don't use
@@ -204,8 +214,8 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/stretchr/testify/assert"
     
-    "github.com/raja-aiml/sematic-cache/core"
-    "github.com/raja-aiml/sematic-cache/storage"
+    "github.com/raja-aiml/sematic-cache/internal/cache"
+    "github.com/raja-aiml/sematic-cache/internal/storage"
 )
 ```
 
@@ -226,11 +236,19 @@ defer resp.Body.Close()
 
 ### Testing Requirements
 
-1. **Minimum 80% test coverage** for all packages
+1. **Target 80% test coverage** for new code
 2. **Table-driven tests** for multiple test cases
 3. **Mock external dependencies** using interfaces
 4. **Test file naming**: `*_test.go` in the same package
-5. **Benchmark tests** for performance-critical code
+5. **Benchmark tests** for performance-critical code (especially embedding reduction)
+6. **Extended tests** for mathematical algorithms (`*_extended_test.go`)
+7. **Production tests** for real-world scenarios
+
+**Current test coverage gaps to address:**
+- Cache handlers need unit tests
+- Storage implementations need integration tests
+- Server components need HTTP tests
+- Configuration packages need validation tests
 
 Example table-driven test:
 ```go
@@ -301,13 +319,16 @@ Before submitting code, ensure:
 - [ ] Code passes `gofmt -w .`
 - [ ] Code passes `go vet ./...`
 - [ ] All tests pass `go test ./...`
-- [ ] Test coverage >= 80%
+- [ ] Test coverage for new code >= 80%
 - [ ] No CLI commands used where SDK exists
 - [ ] Interfaces properly implemented
 - [ ] Errors wrapped with context
 - [ ] Dependencies cleaned with `go mod tidy`
 - [ ] Documentation updated if needed
 - [ ] No sensitive data in logs or commits
+- [ ] Observability added (traces/metrics/logs)
+- [ ] Docker image builds successfully
+- [ ] Integration with existing storage adapter verified
 
 ## Common Pitfalls to Avoid
 
@@ -318,6 +339,9 @@ Before submitting code, ensure:
 5. **Forgetting go mod tidy**: Always run after dependency changes
 6. **Using wrong web framework**: Use Gin, not others
 7. **Creating duplicate functionality**: Search codebase first
+8. **Ignoring existing patterns**: Follow the adapter pattern in storage layer
+9. **Skipping observability**: Always add tracing and metrics to new features
+10. **Direct OpenAI API calls**: Use the internal embedding client wrapper
 
 ## Examples of Good Practices
 
@@ -341,29 +365,24 @@ err = client.Build(ctx, docker.BuildOptions{
 })
 ```
 
-**K3D Example:**
+**OpenAI Example:**
 ```go
-// BAD - Using CLI
-args := []string{"cluster", "create", clusterName}
-if _, err := utils.RunCommand(ctx, "k3d", args, nil); err != nil {
-    return fmt.Errorf("failed to create cluster: %w", err)
-}
+// BAD - Using raw HTTP calls
+resp, err := http.Post("https://api.openai.com/v1/embeddings", ...)
 
-// GOOD - Using SDK
-import (
-    "github.com/k3d-io/k3d/v5/pkg/client"
-    "github.com/k3d-io/k3d/v5/pkg/runtimes"
-    k3dtypes "github.com/k3d-io/k3d/v5/pkg/types"
+// GOOD - Using official SDK
+import "github.com/openai/openai-go/v2"
+
+client := openai.NewClient(
+    option.WithAPIKey(apiKey),
 )
 
-runtime, err := runtimes.GetRuntime("docker")
+embedding, err := client.Embeddings.New(ctx, openai.EmbeddingNewParams{
+    Input: openai.F([]string{text}),
+    Model: openai.F(openai.EmbeddingModelTextEmbedding3Small),
+})
 if err != nil {
-    return fmt.Errorf("failed to get runtime: %w", err)
-}
-
-cluster, err := client.ClusterCreate(ctx, clusterConfig, runtime)
-if err != nil {
-    return fmt.Errorf("failed to create cluster: %w", err)
+    return fmt.Errorf("failed to generate embedding: %w", err)
 }
 ```
 
@@ -371,137 +390,168 @@ if err != nil {
 ```go
 // First, check the interface
 type CacheBackend interface {
-    Get(prompt string) (string, bool)
-    Set(prompt string, value string) error
+    Get(ctx context.Context, key string) (interface{}, error)
+    Set(ctx context.Context, key string, value interface{}) error
+    Delete(ctx context.Context, key string) error
+    Clear(ctx context.Context) error
+    GetSimilar(ctx context.Context, embedding []float32, threshold float64, limit int) ([]SimilarItem, error)
+    GetStats(ctx context.Context) (CacheStats, error)
 }
 
 // Then implement correctly
 type MyCache struct{}
 
-func (c *MyCache) Get(prompt string) (string, bool) {
-    // Implementation
+func (c *MyCache) Get(ctx context.Context, key string) (interface{}, error) {
+    // Implementation with context and error handling
+    return nil, nil
 }
 
-func (c *MyCache) Set(prompt string, value string) error {
-    // Implementation
+func (c *MyCache) Set(ctx context.Context, key string, value interface{}) error {
+    // Implementation with context
+    return nil
 }
 
 // Verify at compile time
 var _ CacheBackend = (*MyCache)(nil)
 ```
 
-## K3D SDK Integration Guidelines
+## Observability Stack
 
-### K3D SDK Usage
-The K3D SDK (`github.com/k3d-io/k3d/v5`) provides comprehensive Go APIs for managing k3d clusters programmatically. **All k3d operations MUST use the SDK instead of CLI commands.**
+### OpenTelemetry Integration
+The project uses a comprehensive observability stack with OpenTelemetry at its core:
 
-### Key K3D SDK Packages
 ```go
-import (
-    "github.com/k3d-io/k3d/v5/pkg/client"    // Core cluster operations
-    "github.com/k3d-io/k3d/v5/pkg/config"    // Configuration management
-    "github.com/k3d-io/k3d/v5/pkg/runtimes"  // Container runtime integration
-    k3dtypes "github.com/k3d-io/k3d/v5/pkg/types" // Type definitions
+// Initialize observability
+import "github.com/raja-aiml/sematic-cache/internal/observability"
+
+shutdown, err := observability.SetupOtelSDK(ctx, serviceName, serviceVersion)
+if err != nil {
+    return fmt.Errorf("failed to setup OpenTelemetry: %w", err)
+}
+defer shutdown(ctx)
+```
+
+### Structured Logging with Zap
+```go
+import "github.com/raja-aiml/sematic-cache/internal/logger"
+
+// Initialize logger
+log := logger.NewLogger("production") // or "development"
+
+// Use structured logging
+log.Info("cache hit",
+    zap.String("key", key),
+    zap.Duration("latency", latency),
+    zap.Float64("similarity", similarity),
 )
 ```
 
-### Required Interface Pattern
-```go
-// Define interface for testability and abstraction
-type ClusterOperations interface {
-    CreateCluster(ctx context.Context) error
-    DeleteCluster(ctx context.Context) error
-    GetCluster(ctx context.Context) (*k3dtypes.Cluster, error)
-    IsRunning(ctx context.Context) bool
-    GetKubeconfig(ctx context.Context) ([]byte, error)
-}
+### Local Development Stack
+The project includes a complete observability stack via Docker Compose:
+- **PostgreSQL with pgvector**: Vector database for embeddings
+- **OpenTelemetry Collector**: Telemetry pipeline
+- **Jaeger**: Distributed tracing UI
+- **Prometheus**: Metrics collection
+- **Caddy**: Reverse proxy for services
 
-// Implementation using SDK
-type SDKClusterManager struct {
-    runtime     runtimes.Runtime
-    config      *k3dtypes.ClusterConfig
-    clusterName string
-}
-
-// Compile-time interface compliance check
-var _ ClusterOperations = (*SDKClusterManager)(nil)
-```
-
-### Essential SDK Operations
-```go
-// Initialize runtime
-runtime, err := runtimes.GetRuntime("docker")
-if err != nil {
-    return fmt.Errorf("failed to initialize runtime: %w", err)
-}
-
-// Create cluster
-cluster, err := client.ClusterCreate(ctx, clusterConfig, runtime)
-if err != nil {
-    return fmt.Errorf("failed to create cluster: %w", err)
-}
-
-// Get cluster info
-cluster, err := client.ClusterGet(ctx, runtime, &k3dtypes.Cluster{Name: clusterName})
-if err != nil {
-    return fmt.Errorf("failed to get cluster: %w", err)
-}
-
-// Delete cluster
-err = client.ClusterDelete(ctx, cluster, runtime, k3dtypes.ClusterDeleteOpts{})
-if err != nil {
-    return fmt.Errorf("failed to delete cluster: %w", err)
-}
-
-// Get kubeconfig
-kubeconfig, err := client.KubeconfigGet(ctx, runtime, cluster, k3dtypes.ClusterGetKubeconfigOpts{})
-if err != nil {
-    return fmt.Errorf("failed to get kubeconfig: %w", err)
-}
-```
-
-### Testing Requirements for K3D
-1. **Unit Tests**: Mock runtime interface for fast unit tests
-2. **Integration Tests**: Use `// +build integration` tag for real k3d operations
-3. **Table-Driven Tests**: Test various cluster configurations
-4. **Benchmark Tests**: Performance testing for cluster operations
-5. **Error Handling**: Test all failure scenarios
-
-### K3D Configuration Management
-```go
-// Load configuration from file
-config, err := config.ReadConfig(configPath)
-if err != nil {
-    return fmt.Errorf("failed to read config: %w", err)
-}
-
-// Save configuration to file
-err = config.WriteConfig(clusterConfig, configPath)
-if err != nil {
-    return fmt.Errorf("failed to write config: %w", err)
-}
-```
-
-### K3D Integration Test Setup
 ```bash
-# Run only unit tests (default)
-go test ./pkg/k3d/...
+# Start the observability stack
+docker-compose -f deployments/local/docker-compose.yml up -d
 
-# Run integration tests (requires Docker)
-go test -tags=integration ./pkg/k3d/...
-
-# Skip integration tests in CI
-SKIP_INTEGRATION_TESTS=true go test -tags=integration ./pkg/k3d/...
+# Access services:
+# - Application: http://localhost:8080
+# - Jaeger UI: http://localhost:16686
+# - Prometheus: http://localhost:9090
 ```
 
-### Migration from CLI to SDK
-When migrating existing CLI-based k3d code:
+## Embedding and AI Integration
 
-1. **Replace `utils.RunCommand("k3d", args)`** with appropriate SDK calls
-2. **Add proper error handling** with context wrapping
-3. **Implement interfaces** for testability
-4. **Add comprehensive tests** (unit + integration)
-5. **Update imports** to use k3d SDK packages
-6. **Verify integration** with existing codebase
+### OpenAI Client
+The project uses the official OpenAI Go SDK v2:
+
+```go
+import "github.com/openai/openai-go/v2"
+
+// Client supports:
+// - Chat completions (streaming and non-streaming)
+// - Text embeddings generation
+// - Image generation and editing
+// - Audio transcription and translation
+// - Content moderation
+```
+
+### Dimension Reduction System
+Advanced embedding optimization in `internal/embedding/reduction/`:
+- **PCA**: Principal Component Analysis for dimension reduction
+- **Incremental PCA**: Memory-efficient for large datasets
+- **Adaptive algorithms**: Auto-tuning based on data characteristics
+- **Performance optimization**: SIMD operations using Gonum
+
+### Storage Backend with pgvector
+```go
+// Vector similarity search using cosine distance
+type Store struct {
+    db *gorm.DB
+}
+
+// Automatic indexing with IVFFlat for performance
+// Cosine similarity search for semantic matching
+```
+
+## Development Workflow
+
+### Hot Reload Development
+```bash
+# Install air for hot reload
+go install github.com/air-verse/air@latest
+
+# Run with hot reload
+make dev
+```
+
+### Testing Strategy
+```bash
+# Run all tests
+make test
+
+# Run with coverage
+go test -cover ./...
+
+# Run benchmarks
+go test -bench=. ./internal/embedding/reduction/...
+
+# Watch mode for TDD
+make test-watch
+```
+
+### API Endpoints
+The Gin server exposes the following endpoints:
+- `GET /health` - Health check
+- `GET /ready` - Readiness check
+- `POST /api/v1/get` - Retrieve cached response
+- `POST /api/v1/set` - Store new cache entry
+- `POST /api/v1/similar` - Find similar entries
+- `GET /api/v1/stats` - Cache statistics
+- `POST /api/v1/clear` - Clear cache entries
+
+## Current Implementation Status
+
+### Implemented Features
+- ✅ PostgreSQL with pgvector for vector similarity search
+- ✅ OpenAI integration for embeddings and chat
+- ✅ Dimension reduction algorithms for embedding optimization
+- ✅ Complete observability stack with OpenTelemetry
+- ✅ Gin-based REST API with health checks
+- ✅ Docker containerization with multi-stage builds
+- ✅ Structured logging with Zap
+- ✅ Configuration via YAML and environment variables
+
+
+### Key Dependencies
+- Go 1.24.x
+- PostgreSQL with pgvector extension
+- OpenAI API for embeddings
+- OpenTelemetry for observability
+- Docker for containerization
 
 This document is the source of truth for all development decisions in this repository.

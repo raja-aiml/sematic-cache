@@ -18,7 +18,7 @@ SEARCH_LIMIT=10
 
 # OpenAI Configuration (non-sensitive)
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=text-embedding-3-small
+OPENAI_MODEL=text-embedding-3-large
 
 # Observability
 LOG_LEVEL=info
@@ -37,8 +37,3 @@ SHUTDOWN_TIMEOUT=30
 # Gin Mode (production, debug, release)
 GIN_MODE=release
 
-# Database Connection (default for local development)
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/semantic_cache?sslmode=disable
-
-# Telemetry Endpoint (empty by default, can be overridden)
-OTEL_EXPORTER_OTLP_ENDPOINT=
