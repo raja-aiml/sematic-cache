@@ -20,7 +20,9 @@ func main() {
 	// Run server with context
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- cmd.Run(ctx)
+		// Always run instrumented version - it's production ready
+		// If OTEL_EXPORTER_OTLP_ENDPOINT is not set, tracing will be no-op
+		errCh <- cmd.RunInstrumented(ctx)
 	}()
 
 	select {

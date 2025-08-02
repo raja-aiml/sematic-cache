@@ -1,0 +1,73 @@
+# Simplified Observability Stack for Semantic Cache
+# Just the essentials: PostgreSQL with pgvector, Redis, and Jaeger for tracing
+
+services:
+  # PostgreSQL with pgvector for vector similarity search
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg17
+    container_name: cache-postgres
+    environment:
+      POSTGRES_USER: cache_user
+      POSTGRES_PASSWORD: cache_pass
+      POSTGRES_DB: semantic_cache
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-pgvector.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cache_user -d semantic_cache"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cache-net
+
+  # Redis for L2 cache tier
+  redis:
+    image: redis:7-alpine
+    container_name: cache-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cache-net
+
+  # Jaeger for distributed tracing (simpler than full SigNoz)
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.8.0
+    container_name: ${COMPOSE_PROJECT_NAME:-semantic}-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "5778:5778"    # Configs
+      - "9411:9411"    # Zipkin
+    volumes:
+      - ./jaeger-config.yaml:/jaeger/config.yaml
+    command: ["--config", "/jaeger/config.yaml"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "localhost:16686"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cache-net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  cache-net:
+    driver: bridge
