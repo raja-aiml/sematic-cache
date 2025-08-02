@@ -7,6 +7,8 @@ This directory contains the complete observability stack for the Semantic Cache 
 ```
 Application → OTel Collector → Jaeger (Traces)
                             → Prometheus (Metrics)
+                            
+Caddy (Port 80) → Unified Web Interface → All Services
 ```
 
 ## Components
@@ -16,6 +18,7 @@ Application → OTel Collector → Jaeger (Traces)
 - **OpenTelemetry Collector**: Central telemetry hub that receives, processes, and exports traces and metrics
 - **Jaeger**: Distributed tracing backend for visualizing request flows
 - **Prometheus**: Time-series database for metrics collection and alerting
+- **Caddy**: Web server providing unified access to all services via port 80
 
 ## Quick Start
 
@@ -36,13 +39,21 @@ go run cmd/server.go -config local/config.yaml
 ./bin/semantic-cache -config local/config.yaml
 ```
 
-3. Access the services:
+3. Access everything through Caddy (recommended):
+- **Dashboard**: http://localhost
+- **Jaeger UI**: http://localhost/jaeger
+- **Prometheus**: http://localhost/prometheus
+- **OTel Health**: http://localhost/otel/health
+- **OTel ZPages**: http://localhost/otel/zpages
+- **Service Status**: http://localhost/api/status
+
+Or access services directly:
 - Jaeger UI: http://localhost:16686
 - Prometheus UI: http://localhost:9090
 - OTel Collector Health: http://localhost:13133/health
 - OTel Collector ZPages: http://localhost:55679
 
-3. Configure your application to send telemetry to the OTel Collector:
+4. Configure your application to send telemetry to the OTel Collector:
 ```yaml
 observability:
   otel:
@@ -53,6 +64,8 @@ observability:
 
 | Service | Port | Description |
 |---------|------|-------------|
+| **Caddy** | 80 | Unified web interface (dashboard + reverse proxy) |
+| **Caddy** | 443 | HTTPS (auto-cert if domain configured) |
 | PostgreSQL | 5432 | Database |
 | Redis | 6379 | Cache |
 | OTel Collector | 4317 | OTLP gRPC receiver |

@@ -71,6 +71,7 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
       - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - QUERY_BASE_PATH=/jaeger
     ports:
       - "16686:16686"  # Jaeger UI
       - "14250:14250"  # gRPC for model.proto
@@ -97,6 +98,8 @@ services:
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
+      - '--web.external-url=http://localhost/prometheus/'
+      - '--web.route-prefix=/prometheus/'
     ports:
       - "9090:9090"
     healthcheck:
@@ -107,10 +110,36 @@ services:
     networks:
       - cache-net
 
+  # Caddy - Web server and reverse proxy
+  caddy:
+    image: caddy:2-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-semantic}-caddy
+    ports:
+      - "80:80"       # Main web interface
+      - "443:443"     # HTTPS (with auto-cert)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./dashboard.html:/srv/dashboard.html
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - jaeger
+      - prometheus
+      - otel-collector
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cache-net
+
 volumes:
   postgres_data:
   redis_data:
   prometheus_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   cache-net:

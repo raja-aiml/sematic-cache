@@ -1,0 +1,192 @@
+# Caddyfile for Semantic Cache Observability Stack
+# Provides a unified interface for all services
+
+# Main site on port 80
+:80 {
+    # Enable gzip compression
+    encode gzip
+
+    # CORS headers for API access
+    header {
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Access-Control-Allow-Headers "Origin, Content-Type, Accept"
+    }
+
+    # Main dashboard
+    handle / {
+        root * /srv
+        file_server
+        try_files {path} /dashboard.html
+    }
+
+    # Serve dashboard at root
+    handle /dashboard {
+        root * /srv
+        rewrite * /dashboard.html
+        file_server
+    }
+
+    # Health check endpoint for Caddy itself
+    handle /health {
+        respond "OK" 200
+    }
+
+    # Reverse proxy to Jaeger UI
+    handle /jaeger* {
+        reverse_proxy jaeger:16686
+    }
+
+    # Reverse proxy to Prometheus
+    handle /prometheus* {
+        reverse_proxy prometheus:9090
+    }
+
+    # OTel Collector landing page
+    handle /otel {
+        header Content-Type "text/html; charset=utf-8"
+        respond `<!DOCTYPE html>
+<html>
+<head>
+    <title>OpenTelemetry Collector</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+               max-width: 800px; margin: 50px auto; padding: 20px; }
+        h1 { color: #333; }
+        .links { list-style: none; padding: 0; }
+        .links li { margin: 15px 0; }
+        .links a { display: inline-block; padding: 10px 20px; background: #667eea; 
+                   color: white; text-decoration: none; border-radius: 5px; }
+        .links a:hover { background: #5a67d8; }
+        .status { margin: 20px 0; padding: 15px; background: #f0f0f0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔭 OpenTelemetry Collector</h1>
+    <div class="status">
+        <strong>Status:</strong> ✅ Running<br>
+        <strong>Version:</strong> 0.97.0<br>
+        <strong>Endpoints:</strong> OTLP (4317), HTTP (4318), Metrics (8888)
+    </div>
+    <h2>Available Endpoints:</h2>
+    <ul class="links">
+        <li><a href="/otel/health">Health Check</a> - Service health status</li>
+        <li><a href="/otel/metrics">Metrics</a> - Prometheus metrics</li>
+        <li><a href="/otel/tracez">Trace ZPages</a> - Debug trace information</li>
+        <li><a href="/otel/zpages">ZPages Index</a> - All debug pages</li>
+    </ul>
+    <h2>Direct Ports:</h2>
+    <ul>
+        <li>OTLP gRPC: localhost:4317</li>
+        <li>OTLP HTTP: localhost:4318</li>
+        <li>Metrics: localhost:8888</li>
+        <li>Health: localhost:13133</li>
+        <li>ZPages: localhost:55679</li>
+    </ul>
+</body>
+</html>` 200
+    }
+    
+    # Reverse proxy to OTel Collector health
+    handle /otel/health {
+        rewrite * /health
+        reverse_proxy otel-collector:13133
+    }
+
+    # Reverse proxy to OTel Collector ZPages
+    handle /otel/zpages {
+        header Content-Type "text/html; charset=utf-8"
+        respond `<!DOCTYPE html>
+<html>
+<head>
+    <title>OTel Collector ZPages</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+               max-width: 600px; margin: 50px auto; padding: 20px; }
+        h1 { color: #333; }
+        .links { list-style: none; padding: 0; }
+        .links li { margin: 15px 0; }
+        .links a { display: inline-block; padding: 10px 20px; background: #667eea; 
+                   color: white; text-decoration: none; border-radius: 5px; }
+        .links a:hover { background: #5a67d8; }
+    </style>
+</head>
+<body>
+    <h1>📊 OTel Collector Debug Pages</h1>
+    <ul class="links">
+        <li><a href="/otel/tracez">TracezZ</a> - Trace spans information</li>
+        <li><a href="/otel/rpcz">RPCz</a> - RPC stats (if available)</li>
+        <li><a href="/otel">← Back to OTel Collector</a></li>
+    </ul>
+</body>
+</html>` 200
+    }
+    
+    handle /otel/tracez {
+        rewrite * /debug/tracez
+        reverse_proxy otel-collector:55679
+    }
+    
+    handle /otel/rpcz {
+        rewrite * /debug/rpcz
+        reverse_proxy otel-collector:55679
+    }
+
+    # Reverse proxy to OTel Collector metrics
+    handle /otel/metrics {
+        rewrite * /metrics
+        reverse_proxy otel-collector:8888
+    }
+
+    # API endpoints info
+    handle /api/services {
+        header Content-Type "application/json"
+        respond `{
+            "services": {
+                "dashboard": "http://localhost/",
+                "jaeger": "http://localhost/jaeger",
+                "prometheus": "http://localhost/prometheus",
+                "otel_health": "http://localhost/otel/health",
+                "otel_zpages": "http://localhost/otel/zpages",
+                "otel_metrics": "http://localhost/otel/metrics",
+                "ports": {
+                    "postgresql": 5432,
+                    "redis": 6379,
+                    "otlp_grpc": 4317,
+                    "otlp_http": 4318,
+                    "cache_api": 8080
+                }
+            }
+        }` 200
+    }
+
+    # Service status endpoint
+    handle /api/status {
+        header Content-Type "application/json"
+        respond `{
+            "status": "healthy",
+            "timestamp": "{time.now.unix}",
+            "services": [
+                {"name": "PostgreSQL", "port": 5432, "internal": "postgres:5432"},
+                {"name": "Redis", "port": 6379, "internal": "redis:6379"},
+                {"name": "Jaeger", "port": 16686, "internal": "jaeger:16686"},
+                {"name": "Prometheus", "port": 9090, "internal": "prometheus:9090"},
+                {"name": "OTel Collector", "port": 4317, "internal": "otel-collector:4317"}
+            ]
+        }` 200
+    }
+
+    # Logs
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+}
+
+# HTTPS with automatic certificates (if you have a domain)
+# Replace 'your-domain.com' with your actual domain
+# your-domain.com {
+#     # Same configuration as above
+#     # Caddy will automatically obtain and renew Let's Encrypt certificates
+# }
