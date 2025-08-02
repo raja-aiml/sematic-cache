@@ -275,6 +275,7 @@ type CacheBackend interface {
 	SetWithModel(prompt string, embedding []float32, answer, modelName, modelID string)
 	SetPromptWithModel(prompt, answer, modelName, modelID string) error
 	GetTopKByEmbedding(embed []float32, k int) []QueryResult
+	GetTopKByText(ctx context.Context, text string, k int) ([]QueryResult, error)
 	Flush()
 	Stats() (hits, misses uint64, hitRate float64)
 }
@@ -695,6 +696,29 @@ func (c *Cache) GetByEmbedding(embed []float32) (string, bool) {
 	c.mu.Unlock()
 	atomic.AddUint64(&c.hitCount, 1)
 	return ent.answer, true
+}
+
+// GetTopKByText searches for the K most similar cached prompts to the given text query.
+// It generates an embedding for the text and then searches the cache.
+func (c *Cache) GetTopKByText(ctx context.Context, text string, k int) ([]QueryResult, error) {
+	// Check if embedding function is available
+	if c.embedFunc == nil {
+		return nil, fmt.Errorf("embedding function not configured")
+	}
+
+	// Apply preprocessing if configured
+	if c.preProcess != nil {
+		text = c.preProcess(text)
+	}
+
+	// Generate embedding for the text
+	embedding, err := c.embedFunc(text)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate embedding: %w", err)
+	}
+
+	// Search using the generated embedding
+	return c.GetTopKByEmbedding(embedding, k), nil
 }
 
 // GetTopKByEmbedding returns up to k answers whose embeddings are most similar to the query.

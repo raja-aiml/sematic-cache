@@ -29,9 +29,10 @@ type SetRequest struct {
 }
 
 type SimilarRequest struct {
-	Query     string    `json:"query" binding:"required"`
+	Prompt    string    `json:"prompt"`     // Required for text search, optional with embedding
 	Embedding []float32 `json:"embedding,omitempty"`
 	TopK      int       `json:"top_k"`
+	Threshold float64   `json:"threshold,omitempty"` // Optional similarity threshold
 }
 
 type CacheResponse struct {
@@ -43,7 +44,7 @@ type CacheResponse struct {
 }
 
 type SimilarResponse struct {
-	Query   string             `json:"query"`
+	Prompt  string             `json:"prompt"`
 	Results []core.QueryResult `json:"results"`
 }
 
@@ -172,29 +173,49 @@ func (s *Server) handleCacheSimilar(c *gin.Context) {
 		return
 	}
 
+	// Validate that either prompt or embedding is provided
+	if req.Prompt == "" && len(req.Embedding) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "either 'prompt' text or 'embedding' array must be provided",
+		})
+		return
+	}
+
 	// Default top-k
 	if req.TopK <= 0 {
 		req.TopK = 5
 	}
 
 	var results []core.QueryResult
+	var err error
 
 	if len(req.Embedding) > 0 {
-		// Use provided embedding
+		// Use provided embedding (prompt field is optional when embedding is provided)
 		results = s.cache.GetTopKByEmbedding(req.Embedding, req.TopK)
 	} else {
-		// For text query, we need to generate embedding first
-		// This requires the cache to have an embedding function configured
-		// For now, return an error
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "embedding required for similarity search",
-			"hint":  "provide 'embedding' array in request or use a cache with embedding generation configured",
-		})
-		return
+		// Use text prompt - generate embedding internally
+		results, err = s.cache.GetTopKByText(c.Request.Context(), req.Prompt, req.TopK)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("failed to search by text: %v", err),
+			})
+			return
+		}
+	}
+
+	// Filter results by threshold if provided
+	if req.Threshold > 0 {
+		var filteredResults []core.QueryResult
+		for _, r := range results {
+			if r.Similarity >= req.Threshold {
+				filteredResults = append(filteredResults, r)
+			}
+		}
+		results = filteredResults
 	}
 
 	c.JSON(http.StatusOK, SimilarResponse{
-		Query:   req.Query,
+		Prompt:  req.Prompt,
 		Results: results,
 	})
 }

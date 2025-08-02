@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -99,6 +100,11 @@ func (m *mockCache) Stats() (hits, misses uint64, hitRate float64) {
 		hitRate = float64(m.hits) / total
 	}
 	return m.hits, m.misses, hitRate
+}
+
+func (m *mockCache) GetTopKByText(ctx context.Context, text string, k int) ([]core.QueryResult, error) {
+	// Simple mock implementation - returns empty results
+	return []core.QueryResult{}, nil
 }
 
 func TestServer(t *testing.T) {
@@ -218,7 +224,7 @@ func TestServer(t *testing.T) {
 		srv := New(cache)
 
 		body := SimilarRequest{
-			Query:     "Tell me about AI",
+			Prompt:    "Tell me about AI",
 			Embedding: []float32{0.1, 0.2, 0.3},
 			TopK:      2,
 		}
@@ -233,7 +239,7 @@ func TestServer(t *testing.T) {
 
 		var resp SimilarResponse
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Equal(t, "Tell me about AI", resp.Query)
+		assert.Equal(t, "Tell me about AI", resp.Prompt)
 		assert.Len(t, resp.Results, 1)
 		assert.Equal(t, "What is AI?", resp.Results[0].Prompt)
 	})
@@ -243,8 +249,8 @@ func TestServer(t *testing.T) {
 		srv := New(cache)
 
 		body := SimilarRequest{
-			Query: "Tell me about AI",
-			TopK:  2,
+			Prompt: "Tell me about AI",
+			TopK:   2,
 		}
 		jsonBody, _ := json.Marshal(body)
 
@@ -253,11 +259,11 @@ func TestServer(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		srv.Router().ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp map[string]interface{}
+		var resp SimilarResponse
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		assert.Contains(t, resp["error"], "embedding required")
+		assert.Equal(t, "Tell me about AI", resp.Prompt)
 	})
 
 	t.Run("cache stats", func(t *testing.T) {

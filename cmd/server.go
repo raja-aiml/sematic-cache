@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/raja-aiml/sematic-cache/config"
 	"github.com/raja-aiml/sematic-cache/observability"
 	"github.com/raja-aiml/sematic-cache/openai"
@@ -20,6 +21,9 @@ import (
 // Run starts the cache server with the provided context.
 // It returns when the context is cancelled or an error occurs.
 func Run(ctx context.Context) error {
+	// Set Gin to release mode to avoid debug warnings
+	gin.SetMode(gin.ReleaseMode)
+
 	// Path to YAML configuration file; empty disables config loading
 	configPath := flag.String("config", "", "path to YAML configuration file (empty to skip)")
 	addr := flag.String("address", ":8080", "server address (overrides config)")

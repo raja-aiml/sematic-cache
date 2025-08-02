@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -91,6 +92,11 @@ func (m *MockBackend) Flush() {
 
 func (m *MockBackend) Stats() (uint64, uint64, float64) {
 	return 0, 0, 0
+}
+
+func (m *MockBackend) GetTopKByText(ctx context.Context, text string, k int) ([]core.QueryResult, error) {
+	// Mock implementation - return empty results
+	return []core.QueryResult{}, nil
 }
 
 func TestCompositeBackend_BasicOperations(t *testing.T) {

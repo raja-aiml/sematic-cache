@@ -2,7 +2,9 @@
 package storage
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	pgvector "github.com/pgvector/pgvector-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -125,6 +127,11 @@ func (g *GormStore) GetTopKByEmbedding(embed []float32, k int) []core.QueryResul
 		}
 	}
 	return out
+}
+
+// GetTopKByText is not supported for GORM backend without embedding function.
+func (g *GormStore) GetTopKByText(ctx context.Context, text string, k int) ([]core.QueryResult, error) {
+	return nil, fmt.Errorf("text-based similarity search not supported in GORM backend without embedding function")
 }
 
 // Flush removes all entries from the table.

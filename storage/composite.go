@@ -2,6 +2,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -242,6 +243,24 @@ func (c *CompositeBackend) Flush() {
 	}
 
 	c.logger.LogInfo("flush", "flushed all tiers")
+}
+
+// GetTopKByText searches for K most similar prompts by text using the first capable tier.
+func (c *CompositeBackend) GetTopKByText(ctx context.Context, text string, k int) ([]core.QueryResult, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// Try each tier in priority order
+	for _, tier := range c.tiers {
+		// Check if this tier supports text-based search
+		results, err := tier.Backend.GetTopKByText(ctx, text, k)
+		if err == nil && len(results) > 0 {
+			return results, nil
+		}
+		// Continue to next tier if this one doesn't support it or has no results
+	}
+
+	return nil, fmt.Errorf("no tier supports text-based similarity search")
 }
 
 // Stats returns aggregated statistics from all tiers

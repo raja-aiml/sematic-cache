@@ -4,6 +4,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -91,6 +92,11 @@ func (r *RedisStore) GetModelInfo(prompt string) (string, string, bool) {
 // GetTopKByEmbedding is not supported for Redis backend.
 func (r *RedisStore) GetTopKByEmbedding(embed []float32, k int) []core.QueryResult {
 	return nil
+}
+
+// GetTopKByText is not supported for Redis backend.
+func (r *RedisStore) GetTopKByText(ctx context.Context, text string, k int) ([]core.QueryResult, error) {
+	return nil, fmt.Errorf("text-based similarity search not supported in Redis backend")
 }
 
 // Flush removes all entries from Redis.
