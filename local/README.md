@@ -24,7 +24,19 @@ Application → OTel Collector → Jaeger (Traces)
 docker compose up -d
 ```
 
-2. Access the services:
+2. Set your OpenAI API key and run the application:
+```bash
+# Set OpenAI API key
+export OPENAI_API_KEY="your-api-key-here"
+
+# Run from project root
+go run cmd/server.go -config local/config.yaml
+
+# Or if you built the binary
+./bin/semantic-cache -config local/config.yaml
+```
+
+3. Access the services:
 - Jaeger UI: http://localhost:16686
 - Prometheus UI: http://localhost:9090
 - OTel Collector Health: http://localhost:13133/health
@@ -59,7 +71,7 @@ observability:
 - `otel-collector-config.yaml`: OpenTelemetry Collector configuration
 - `prometheus.yaml`: Prometheus scrape configuration
 - `init-pgvector.sql`: PostgreSQL initialization script
-- `config.example.yaml`: Example application configuration
+- `config.yaml`: Application configuration (ready to use)
 
 ## Monitoring
 
