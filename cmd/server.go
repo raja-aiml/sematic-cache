@@ -1,14 +1,13 @@
-// Binary server runs the cache server.
-package main
+// Package cmd contains the cache server implementation.
+package cmd
 
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/raja-aiml/sematic-cache/config"
@@ -18,7 +17,9 @@ import (
 	"github.com/raja-aiml/sematic-cache/storage"
 )
 
-func main() {
+// Run starts the cache server with the provided context.
+// It returns when the context is cancelled or an error occurs.
+func Run(ctx context.Context) error {
 	// Path to YAML configuration file; empty disables config loading
 	configPath := flag.String("config", "", "path to YAML configuration file (empty to skip)")
 	addr := flag.String("address", ":8080", "server address (overrides config)")
@@ -30,7 +31,7 @@ func main() {
 		var err error
 		cfg, err = config.LoadConfig(*configPath)
 		if err != nil {
-			log.Fatalf("failed to load config: %v", err)
+			return fmt.Errorf("failed to load config: %w", err)
 		}
 	}
 	// Override address from config
@@ -43,9 +44,9 @@ func main() {
 	jaegerEndpoint := os.Getenv("JAEGER_ENDPOINT")
 	if jaegerEndpoint != "" {
 		var err error
-		shutdown, err = observability.Init(context.Background(), "cache-server", jaegerEndpoint)
+		shutdown, err = observability.Init(ctx, "cache-server", jaegerEndpoint)
 		if err != nil {
-			log.Fatalf("otel init: %v", err)
+			return fmt.Errorf("otel init: %w", err)
 		}
 	} else {
 		shutdown = func(context.Context) error { return nil }
@@ -66,10 +67,10 @@ func main() {
 	}
 	// Create cache backend using factory
 	cache, err := storage.NewBackend(cfg, func(p string) ([]float32, error) {
-		return openaiClient.Embedding(context.Background(), p)
+		return openaiClient.Embedding(ctx, p)
 	})
 	if err != nil {
-		log.Fatalf("failed to create cache backend: %v", err)
+		return fmt.Errorf("failed to create cache backend: %w", err)
 	}
 	srv := server.New(cache)
 	httpSrv := &http.Server{
@@ -81,21 +82,26 @@ func main() {
 	}
 
 	// Start server in background
+	serverErr := make(chan error, 1)
 	go func() {
 		log.Printf("server listening on %s", *addr)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
+			serverErr <- fmt.Errorf("HTTP server error: %w", err)
 		}
+		close(serverErr)
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
-	log.Println("Shutting down server...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+	// Wait for context cancellation or server error
+	select {
+	case <-ctx.Done():
+		log.Println("Shutting down server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("server forced to shutdown: %w", err)
+		}
+		return nil
+	case err := <-serverErr:
+		return err
 	}
 }

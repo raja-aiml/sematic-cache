@@ -1,0 +1,63 @@
+# Complete Configuration Example
+# This file shows ALL available configuration options
+# Copy and modify as needed for your deployment
+
+server:
+  address: ":8080"  # Server listen address
+
+cache:
+  # Cache backend type
+  type: "memory"         # Options: memory | redis | gorm | composite
+  
+  # Common settings
+  capacity: 10000        # Max items in cache
+  eviction_policy: "LRU" # Options: LRU | LFU | FIFO
+  ttl: "24h"            # Time-to-live (e.g., "30m", "1h", "24h")
+  min_similarity: 0.85   # Minimum similarity threshold (0.0-1.0)
+  
+  # Redis configuration (when type: redis)
+  redis:
+    addrs:              # Redis cluster addresses
+      - "localhost:6379"
+    password: ""        # Redis password (if required)
+    db: 0              # Redis database number
+  
+  # Composite configuration (when type: composite)
+  # Multi-tier caching for optimal performance
+  composite:
+    promote_on_hit: true  # Promote items to faster tiers on access
+    
+    tiers:
+      # Tier 1: Ultra-fast memory cache
+      - name: "memory-l1"
+        type: "memory"
+        priority: 1       # Lower number = higher priority
+        capacity: 1000
+        eviction_policy: "LRU"
+      
+      # Tier 2: Distributed Redis cache
+      - name: "redis-l2"
+        type: "redis"
+        priority: 2
+        redis:
+          addrs: ["localhost:6379"]
+          password: ""
+      
+      # Tier 3: Persistent PostgreSQL storage
+      - name: "postgres-l3"
+        type: "gorm"
+        priority: 3
+        # Requires DATABASE_URL environment variable
+
+# OpenAI configuration
+openai:
+  api_key: ""            # Leave empty to use OPENAI_API_KEY env var
+  base_url: "https://api.openai.com/v1"
+  api_version: "v1"      # API version (optional)
+
+# Environment Variables Used:
+# - OPENAI_API_KEY: OpenAI API key (if not set in config)
+# - DATABASE_URL: PostgreSQL connection string for gorm backend
+#   Example: postgres://user:pass@localhost/dbname?sslmode=disable
+# - JAEGER_ENDPOINT: OpenTelemetry/Jaeger endpoint for tracing
+#   Example: http://localhost:14268/api/traces

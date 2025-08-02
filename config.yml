@@ -1,0 +1,18 @@
+# Semantic Cache - Default Configuration
+# ========================================
+# Simple memory cache for development & testing
+# For production configs, see: examples/configs/
+
+server:
+  address: ":8080"
+
+cache:
+  type: "memory"        # Simple in-memory cache
+  capacity: 10000
+  eviction_policy: "LRU"
+  min_similarity: 0.85
+  ttl: "1h"
+
+openai:
+  api_key: ""  # Uses OPENAI_API_KEY env var if empty
+  base_url: "https://api.openai.com/v1"
