@@ -1,124 +1,81 @@
-# Twelve-Factor App Makefile
-# Factor XII: Admin processes - One-off administrative tasks
+# Semantic Cache - Simple Makefile
+.PHONY: help build run test clean fmt lint docker-build docker-up docker-down
 
-.PHONY: help build run test migrate clean docker-build docker-run docker-stop
+# Variables
+BINARY_NAME=semantic-cache
+BINARY_PATH=bin/$(BINARY_NAME)
+DOCKER_IMAGE=semantic-cache:latest
 
 # Default target
 help:
-	@echo "Twelve-Factor App - Semantic Cache"
+	@echo "Semantic Cache - Available commands:"
 	@echo ""
-	@echo "Available targets:"
-	@echo "  make build          - Build the application binary"
-	@echo "  make run            - Run the application locally"
-	@echo "  make test           - Run all tests"
-	@echo "  make docker-build   - Build Docker image"
-	@echo "  make docker-run     - Run with docker-compose"
-	@echo "  make docker-stop    - Stop docker-compose services"
-	@echo "  make migrate        - Run database migrations"
-	@echo "  make seed           - Seed database with sample data"
-	@echo "  make clean          - Clean build artifacts"
-	@echo "  make lint           - Run linters"
-	@echo "  make fmt            - Format code"
+	@echo "  make build    - Build the binary"
+	@echo "  make run      - Run the application"
+	@echo "  make test     - Run tests"
+	@echo "  make fmt      - Format code"
+	@echo "  make lint     - Run linters"
+	@echo "  make clean    - Clean build artifacts"
+	@echo ""
+	@echo "Docker commands:"
+	@echo "  make docker-build  - Build Docker image"
+	@echo "  make docker-up     - Start with docker-compose"
+	@echo "  make docker-down   - Stop docker-compose"
 
-# Factor V: Build, release, run
+# Build the binary
 build:
-	@echo "Building semantic-cache..."
-	@go build -o bin/semantic-cache ./cmd/server/main.go
+	@echo "Building $(BINARY_NAME)..."
+	@go build -o $(BINARY_PATH) .
 
-# Run locally (Factor VI: Processes)
+# Run the application
 run: build
-	@echo "Running semantic-cache..."
-	@./bin/semantic-cache
+	@echo "Running $(BINARY_NAME)..."
+	@./$(BINARY_PATH)
 
-# Testing
+# Run tests
 test:
 	@echo "Running tests..."
 	@go test -v -cover ./...
 
-# Docker operations (Factor V: Build, release, run)
-docker-build:
-	@echo "Building Docker image..."
-	@docker build -t semantic-cache:latest .
-
-docker-run:
-	@echo "Starting services with docker-compose..."
-	@docker-compose up -d
-
-docker-stop:
-	@echo "Stopping services..."
-	@docker-compose down
-
-# Factor XII: Admin processes
-migrate:
-	@echo "Running database migrations..."
-	@go run ./cmd/migrate/main.go up
-
-migrate-down:
-	@echo "Rolling back database migrations..."
-	@go run ./cmd/migrate/main.go down
-
-seed:
-	@echo "Seeding database..."
-	@go run ./cmd/seed/main.go
-
-# Database operations
-db-console:
-	@echo "Connecting to database..."
-	@docker-compose exec postgres psql -U postgres -d semantic_cache
-
-db-backup:
-	@echo "Backing up database..."
-	@docker-compose exec postgres pg_dump -U postgres semantic_cache > backup_$$(date +%Y%m%d_%H%M%S).sql
-
-db-restore:
-	@echo "Restoring database from backup..."
-	@docker-compose exec -T postgres psql -U postgres semantic_cache < $(FILE)
-
-# Code quality
-lint:
-	@echo "Running linters..."
-	@golangci-lint run ./...
-	@go vet ./...
-
+# Format code
 fmt:
 	@echo "Formatting code..."
 	@gofmt -w .
 	@go mod tidy
 
-# Clean up
+# Run linters
+lint:
+	@echo "Running go vet..."
+	@go vet ./...
+
+# Clean build artifacts
 clean:
-	@echo "Cleaning build artifacts..."
+	@echo "Cleaning..."
 	@rm -rf bin/
 	@go clean -cache
 
-# Development helpers
-dev-setup:
-	@echo "Setting up development environment..."
-	@cp .env.example .env
-	@docker-compose up -d postgres
-	@sleep 5
-	@$(MAKE) migrate
-	@echo "Development environment ready!"
+# Docker commands
+docker-build:
+	@echo "Building Docker image..."
+	@docker build -t $(DOCKER_IMAGE) -f deployments/docker/Dockerfile .
 
-# Production deployment (Factor V: Build, release, run)
-deploy:
-	@echo "Deploying to production..."
-	@docker build -t semantic-cache:$(VERSION) .
-	@docker tag semantic-cache:$(VERSION) semantic-cache:latest
-	@echo "Tagged as semantic-cache:$(VERSION)"
+docker-up:
+	@echo "Starting services..."
+	@cd deployments/local && docker-compose up -d
 
-# Monitoring and debugging
-logs:
-	@docker-compose logs -f app
+docker-down:
+	@echo "Stopping services..."
+	@cd deployments/local && docker-compose down
 
-logs-db:
-	@docker-compose logs -f postgres
+# Quick commands for development
+.PHONY: dev test-watch
 
-stats:
-	@curl -s http://localhost:$${PORT:-8080}/api/v1/stats | jq .
+# Development mode - run with hot reload (requires air)
+dev:
+	@which air > /dev/null || go install github.com/cosmtrek/air@latest
+	@air
 
-health:
-	@curl -s http://localhost:$${PORT:-8080}/health | jq .
-
-ready:
-	@curl -s http://localhost:$${PORT:-8080}/ready | jq .
+# Watch tests (requires gotestsum)
+test-watch:
+	@which gotestsum > /dev/null || go install gotest.tools/gotestsum@latest
+	@gotestsum --watch
