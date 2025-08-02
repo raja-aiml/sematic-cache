@@ -1,0 +1,181 @@
+# OpenTelemetry Collector Configuration
+# This collector receives telemetry data and routes it to appropriate backends
+
+receivers:
+  # OTLP receiver for traces and metrics from applications
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+
+  # Prometheus receiver to scrape metrics from targets
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['localhost:8888']
+        
+        - job_name: 'semantic-cache'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['host.docker.internal:8080']  # Your app's metrics endpoint
+
+  # Host metrics for infrastructure monitoring
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      disk:
+      load:
+      filesystem:
+      memory:
+      network:
+      paging:
+      processes:
+
+processors:
+  # Batch processor to optimize data transmission
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 25
+
+  # Resource processor to add metadata
+  resource:
+    attributes:
+      - key: environment
+        value: development
+        action: insert
+      - key: service.namespace
+        value: semantic-cache
+        action: insert
+
+  # Span processor for trace processing
+  span:
+    name:
+      from_attributes: ["http.method", "http.route"]
+      separator: " "
+
+  # Attributes processor for data enrichment
+  attributes:
+    actions:
+      - key: http.user_agent
+        action: delete
+      - key: db.statement
+        action: hash
+
+  # Filter processor to reduce noise
+  filter/errors:
+    error_mode: ignore
+    traces:
+      span:
+        - 'status.code == STATUS_CODE_ERROR'
+
+  # Probabilistic sampling for cost control
+  probabilistic_sampler:
+    sampling_percentage: 100  # 100% for dev, reduce for production
+
+exporters:
+  # OTLP/gRPC exporter for traces to Jaeger
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+    headers:
+      "x-trace-source": "otel-collector"
+
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    const_labels:
+      environment: development
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # OTLP exporter for backup/debugging
+  otlphttp:
+    endpoint: http://localhost:4318
+    tls:
+      insecure: true
+
+  # Logging exporter for debugging
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # Debug exporter (verbose output)
+  debug:
+    verbosity: detailed
+    sampling_initial: 2
+    sampling_thereafter: 500
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: /health
+    check_collector_pipeline:
+      enabled: true
+      interval: 5s
+      exporter_failure_threshold: 5
+
+  # Performance profiler
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # ZPages for debugging
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+  # Memory ballast for performance
+  memory_ballast:
+    size_in_percentage: 20
+
+service:
+  # Enable extensions
+  extensions: [health_check, pprof, zpages, memory_ballast]
+  
+  # Configure telemetry for the collector itself
+  telemetry:
+    logs:
+      level: info
+      initial_fields:
+        service: otel-collector
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888
+
+  # Pipeline configurations
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource, span, attributes]
+      exporters: [otlp/jaeger, logging]
+
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics]
+      processors: [memory_limiter, batch, resource]
+      exporters: [prometheus, logging]
+
+    # Logs pipeline (if needed in future)
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging]

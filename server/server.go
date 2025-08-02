@@ -29,7 +29,7 @@ type SetRequest struct {
 }
 
 type SimilarRequest struct {
-	Prompt    string    `json:"prompt"`     // Required for text search, optional with embedding
+	Prompt    string    `json:"prompt"` // Required for text search, optional with embedding
 	Embedding []float32 `json:"embedding,omitempty"`
 	TopK      int       `json:"top_k"`
 	Threshold float64   `json:"threshold,omitempty"` // Optional similarity threshold

@@ -1,5 +1,5 @@
-# Simplified Observability Stack for Semantic Cache
-# Just the essentials: PostgreSQL with pgvector, Redis, and Jaeger for tracing
+# Full Observability Stack for Semantic Cache
+# PostgreSQL with pgvector, Redis, OTel Collector, Jaeger, and Prometheus
 
 services:
   # PostgreSQL with pgvector for vector similarity search
@@ -40,24 +40,67 @@ services:
     networks:
       - cache-net
 
-  # Jaeger for distributed tracing (simpler than full SigNoz)
+  # OpenTelemetry Collector - Central telemetry hub
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.97.0
+    container_name: ${COMPOSE_PROJECT_NAME:-semantic}-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+      - "8888:8888"    # Prometheus metrics exposed by the collector
+      - "8889:8889"    # Prometheus exporter metrics endpoint
+      - "13133:13133"  # Health check endpoint
+      - "55679:55679"  # ZPages endpoint
+    depends_on:
+      - jaeger
+      - prometheus
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cache-net
+
+  # Jaeger for distributed tracing
   jaeger:
-    image: cr.jaegertracing.io/jaegertracing/jaeger:2.8.0
+    image: jaegertracing/all-in-one:1.55
     container_name: ${COMPOSE_PROJECT_NAME:-semantic}-jaeger
     environment:
       - COLLECTOR_OTLP_ENABLED=true
       - COLLECTOR_ZIPKIN_HOST_PORT=:9411
     ports:
       - "16686:16686"  # Jaeger UI
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
-      - "5778:5778"    # Configs
-      - "9411:9411"    # Zipkin
-    volumes:
-      - ./jaeger-config.yaml:/jaeger/config.yaml
-    command: ["--config", "/jaeger/config.yaml"]
+      - "14250:14250"  # gRPC for model.proto
+      - "4317"        # OTLP gRPC (internal)
+      - "4318"        # OTLP HTTP (internal)
     healthcheck:
       test: ["CMD", "wget", "--spider", "localhost:16686"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cache-net
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: ${COMPOSE_PROJECT_NAME:-semantic}-prometheus
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "localhost:9090"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -67,6 +110,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
 
 networks:
   cache-net:

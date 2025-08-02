@@ -1,0 +1,106 @@
+# Prometheus Configuration for Semantic Cache Monitoring
+
+global:
+  scrape_interval: 15s          # Default scrape interval
+  evaluation_interval: 15s      # How frequently to evaluate rules
+  scrape_timeout: 10s          # Scrape timeout
+  
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager)
+  external_labels:
+    monitor: 'semantic-cache-monitor'
+    environment: 'development'
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - 'alertmanager:9093'
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'
+rule_files:
+  # - "alerts/*.yml"
+  # - "rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # OpenTelemetry Collector metrics
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8888']
+        labels:
+          service: 'otel-collector'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'otelcol_.*'
+        action: keep
+
+  # OTel Collector Prometheus exporter endpoint
+  - job_name: 'otel-collector-prometheus'
+    static_configs:
+      - targets: ['otel-collector:8889']
+        labels:
+          service: 'otel-metrics'
+
+  # Semantic Cache application metrics (if exposed directly)
+  - job_name: 'semantic-cache-app'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          service: 'semantic-cache'
+          component: 'api'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # PostgreSQL exporter (optional - add postgres-exporter to docker-compose if needed)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          database: 'semantic_cache'
+
+  # Redis exporter (optional - add redis-exporter to docker-compose if needed)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          cache_tier: 'L2'
+
+  # Jaeger metrics
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+        labels:
+          service: 'jaeger'
+    metrics_path: '/metrics'
+
+  # Docker daemon metrics (optional - requires Docker config)
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['host.docker.internal:9323']
+        labels:
+          service: 'docker'
+
+# Remote write configuration (optional - for long-term storage)
+# remote_write:
+#   - url: "http://remote-storage:9090/api/v1/write"
+#     remote_timeout: 30s
+#     queue_config:
+#       capacity: 10000
+#       max_shards: 5
+#       max_samples_per_send: 1000
+
+# Remote read configuration (optional)
+# remote_read:
+#   - url: "http://remote-storage:9090/api/v1/read"
+#     read_recent: true

@@ -15,15 +15,15 @@ var (
 	meter  metric.Meter
 
 	// Metrics
-	cacheHitCounter         metric.Int64Counter
-	cacheMissCounter        metric.Int64Counter
-	embeddingDuration       metric.Float64Histogram
+	cacheHitCounter          metric.Int64Counter
+	cacheMissCounter         metric.Int64Counter
+	embeddingDuration        metric.Float64Histogram
 	similaritySearchDuration metric.Float64Histogram
-	cacheOperationDuration  metric.Float64Histogram
+	cacheOperationDuration   metric.Float64Histogram
 	similarityScoreHistogram metric.Float64Histogram
-	tierHitCounter          metric.Int64Counter
-	evictionCounter         metric.Int64Counter
-	embeddingCacheSize      metric.Int64UpDownCounter
+	tierHitCounter           metric.Int64Counter
+	evictionCounter          metric.Int64Counter
+	embeddingCacheSize       metric.Int64UpDownCounter
 )
 
 // InitMetrics initializes custom metrics for semantic cache

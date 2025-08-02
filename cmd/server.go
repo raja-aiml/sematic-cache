@@ -16,13 +16,13 @@ import (
 	"github.com/raja-aiml/sematic-cache/openai"
 	"github.com/raja-aiml/sematic-cache/server"
 	"github.com/raja-aiml/sematic-cache/storage"
-	
+
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -85,7 +85,7 @@ func RunInstrumented(ctx context.Context) error {
 		duration := time.Since(start)
 
 		observability.RecordEmbeddingGeneration(ctx, duration, "text-embedding-3-small", len(embedding))
-		
+
 		if err != nil {
 			span.RecordError(err)
 		}
@@ -100,7 +100,7 @@ func RunInstrumented(ctx context.Context) error {
 
 	// Create instrumented server
 	srv := server.New(cache)
-	
+
 	// Add OpenTelemetry middleware to Gin
 	router := srv.Router()
 	router.Use(otelgin.Middleware("semantic-cache",
@@ -178,7 +178,7 @@ func initOTLP(ctx context.Context) (func(context.Context) error, error) {
 	} else if len(endpoint) > 8 && endpoint[:8] == "https://" {
 		endpoint = endpoint[8:]
 	}
-	
+
 	// Create trace exporter
 	traceExporter, err := otlptrace.New(ctx,
 		otlptracehttp.NewClient(
@@ -240,10 +240,10 @@ func initOTLP(ctx context.Context) (func(context.Context) error, error) {
 func cacheMetricsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		
+
 		// Process request
 		c.Next()
-		
+
 		// Record metrics
 		duration := time.Since(start)
 		observability.RecordCacheOperation(c.Request.Context(),
