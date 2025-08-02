@@ -3,43 +3,26 @@ package config
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"gopkg.in/yaml.v2"
 )
 
-// Config holds configuration for server, cache, and OpenAI client.
+// StorageConfig holds storage-specific configuration
+type StorageConfig struct {
+	DSN                 string  `yaml:"dsn"`                  // PostgreSQL connection string
+	SimilarityThreshold float64 `yaml:"similarity_threshold"` // Minimum similarity for search results
+	PoolSize            int     `yaml:"pool_size"`            // Database connection pool size
+	IndexLists          int     `yaml:"index_lists"`          // IVFFlat index parameter
+}
+
+// Config holds configuration for server and storage
 type Config struct {
 	Server struct {
 		Address string `yaml:"address"`
 	} `yaml:"server"`
-	Cache struct {
-		Type           string  `yaml:"type"`
-		Capacity       int     `yaml:"capacity"`
-		EvictionPolicy string  `yaml:"eviction_policy"`
-		TTL            string  `yaml:"ttl"`
-		MinSimilarity  float64 `yaml:"min_similarity"`
-		Redis          struct {
-			Addrs    []string `yaml:"addrs"`
-			Password string   `yaml:"password"`
-			DB       int      `yaml:"db"`
-		} `yaml:"redis"`
-		// Composite backend configuration
-		Composite struct {
-			PromoteOnHit bool `yaml:"promote_on_hit"`
-			Tiers        []struct {
-				Name           string `yaml:"name"`
-				Type           string `yaml:"type"`
-				Priority       int    `yaml:"priority"`
-				Capacity       int    `yaml:"capacity"`
-				EvictionPolicy string `yaml:"eviction_policy"`
-				Redis          struct {
-					Addrs    []string `yaml:"addrs"`
-					Password string   `yaml:"password"`
-				} `yaml:"redis"`
-			} `yaml:"tiers"`
-		} `yaml:"composite"`
-	} `yaml:"cache"`
+
+	Storage StorageConfig `yaml:"storage"`
+
 	OpenAI struct {
 		APIKey     string `yaml:"api_key"`
 		BaseURL    string `yaml:"base_url"`
@@ -47,33 +30,37 @@ type Config struct {
 	} `yaml:"openai"`
 }
 
-// LoadConfig reads a YAML config file from the given path and unmarshals it.
+// LoadConfig reads a YAML config file from the given path and unmarshals it
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
+
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-	// Validate TTL format if set
-	if cfg.Cache.TTL != "" {
-		if _, err := time.ParseDuration(cfg.Cache.TTL); err != nil {
-			return nil, fmt.Errorf("invalid ttl %q: %w", cfg.Cache.TTL, err)
-		}
+
+	// Set defaults
+	if cfg.Storage.SimilarityThreshold == 0 {
+		cfg.Storage.SimilarityThreshold = 0.8
 	}
+	if cfg.Storage.PoolSize == 0 {
+		cfg.Storage.PoolSize = 20
+	}
+	if cfg.Storage.IndexLists == 0 {
+		cfg.Storage.IndexLists = 100
+	}
+
 	return &cfg, nil
 }
 
-// TTLDuration parses the TTL string into a time.Duration. Returns 0 if parsing fails or TTL is empty.
-func (c *Config) TTLDuration() time.Duration {
-	if c.Cache.TTL == "" {
-		return 0
+// GetDSN returns the database connection string from environment or config
+func (c *Config) GetDSN() string {
+	// Environment variable takes precedence
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		return dsn
 	}
-	d, err := time.ParseDuration(c.Cache.TTL)
-	if err != nil {
-		return 0
-	}
-	return d
+	return c.Storage.DSN
 }

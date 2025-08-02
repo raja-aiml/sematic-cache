@@ -1,5 +1,5 @@
-// Package postgres provides logging utilities for PostgreSQL storage backends.
-package postgres
+// Package pgvector provides logging utilities for pgvector storage backend.
+package pgvector
 
 import (
 	"log"

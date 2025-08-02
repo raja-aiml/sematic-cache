@@ -1,102 +1,124 @@
-# Go project Makefile
-.PHONY: all build test test-coverage test-integration lint fmt clean run docker-build docker-run help
+# Twelve-Factor App Makefile
+# Factor XII: Admin processes - One-off administrative tasks
 
-# Variables
-BINARY_NAME=server
-BINARY_PATH=bin/$(BINARY_NAME)
-MAIN_PATH=cmd/server/main.go
-DOCKER_IMAGE=sematic-cache
-DOCKER_TAG=latest
+.PHONY: help build run test migrate clean docker-build docker-run docker-stop
 
 # Default target
-all: fmt lint test build
+help:
+	@echo "Twelve-Factor App - Semantic Cache"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  make build          - Build the application binary"
+	@echo "  make run            - Run the application locally"
+	@echo "  make test           - Run all tests"
+	@echo "  make docker-build   - Build Docker image"
+	@echo "  make docker-run     - Run with docker-compose"
+	@echo "  make docker-stop    - Stop docker-compose services"
+	@echo "  make migrate        - Run database migrations"
+	@echo "  make seed           - Seed database with sample data"
+	@echo "  make clean          - Clean build artifacts"
+	@echo "  make lint           - Run linters"
+	@echo "  make fmt            - Format code"
 
-# Build the binary
+# Factor V: Build, release, run
 build:
-	@echo "Building binary..."
-	@go build -o $(BINARY_PATH) $(MAIN_PATH)
-	@echo "Binary built at $(BINARY_PATH)"
+	@echo "Building semantic-cache..."
+	@go build -o bin/semantic-cache ./cmd/server/main.go
 
-# Run the application
+# Run locally (Factor VI: Processes)
 run: build
-	@echo "Running application..."
-	@./$(BINARY_PATH) -config config.yml
+	@echo "Running semantic-cache..."
+	@./bin/semantic-cache
 
-# Run tests
+# Testing
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	@go test -v -cover ./...
 
-# Run tests with coverage
-test-coverage:
-	@echo "Running tests with coverage..."
-	@go test -race -coverprofile=coverage.txt -covermode=atomic ./...
-	@go tool cover -html=coverage.txt -o coverage.html
-	@echo "Coverage report generated at coverage.html"
+# Docker operations (Factor V: Build, release, run)
+docker-build:
+	@echo "Building Docker image..."
+	@docker build -t semantic-cache:latest .
 
-# Run integration tests
-test-integration:
-	@echo "Running integration tests..."
-	@go test -tags=integration -v ./test/integration/...
+docker-run:
+	@echo "Starting services with docker-compose..."
+	@docker-compose up -d
 
-# Run linter
+docker-stop:
+	@echo "Stopping services..."
+	@docker-compose down
+
+# Factor XII: Admin processes
+migrate:
+	@echo "Running database migrations..."
+	@go run ./cmd/migrate/main.go up
+
+migrate-down:
+	@echo "Rolling back database migrations..."
+	@go run ./cmd/migrate/main.go down
+
+seed:
+	@echo "Seeding database..."
+	@go run ./cmd/seed/main.go
+
+# Database operations
+db-console:
+	@echo "Connecting to database..."
+	@docker-compose exec postgres psql -U postgres -d semantic_cache
+
+db-backup:
+	@echo "Backing up database..."
+	@docker-compose exec postgres pg_dump -U postgres semantic_cache > backup_$$(date +%Y%m%d_%H%M%S).sql
+
+db-restore:
+	@echo "Restoring database from backup..."
+	@docker-compose exec -T postgres psql -U postgres semantic_cache < $(FILE)
+
+# Code quality
 lint:
-	@echo "Running linter..."
-	@if command -v golangci-lint > /dev/null; then \
-		golangci-lint run ./...; \
-	else \
-		echo "golangci-lint not installed. Running go vet instead..."; \
-		go vet ./...; \
-	fi
+	@echo "Running linters..."
+	@golangci-lint run ./...
+	@go vet ./...
 
-# Format code
 fmt:
 	@echo "Formatting code..."
 	@gofmt -w .
 	@go mod tidy
-	@echo "Code formatted"
 
-# Clean build artifacts
+# Clean up
 clean:
-	@echo "Cleaning..."
-	@rm -rf bin/ coverage.txt coverage.html
-	@echo "Clean complete"
+	@echo "Cleaning build artifacts..."
+	@rm -rf bin/
+	@go clean -cache
 
-# Docker build
-docker-build:
-	@echo "Building Docker image..."
-	@docker build -f deployments/docker/Dockerfile -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
-	@echo "Docker image built: $(DOCKER_IMAGE):$(DOCKER_TAG)"
+# Development helpers
+dev-setup:
+	@echo "Setting up development environment..."
+	@cp .env.example .env
+	@docker-compose up -d postgres
+	@sleep 5
+	@$(MAKE) migrate
+	@echo "Development environment ready!"
 
-# Docker run
-docker-run:
-	@echo "Running Docker container..."
-	@docker run -p 8080:8080 -v $(PWD)/config.yml:/app/config.yml $(DOCKER_IMAGE):$(DOCKER_TAG)
+# Production deployment (Factor V: Build, release, run)
+deploy:
+	@echo "Deploying to production..."
+	@docker build -t semantic-cache:$(VERSION) .
+	@docker tag semantic-cache:$(VERSION) semantic-cache:latest
+	@echo "Tagged as semantic-cache:$(VERSION)"
 
-# Docker compose up
-compose-up:
-	@echo "Starting services with docker-compose..."
-	@cd deployments/local && docker-compose up -d
+# Monitoring and debugging
+logs:
+	@docker-compose logs -f app
 
-# Docker compose down
-compose-down:
-	@echo "Stopping services..."
-	@cd deployments/local && docker-compose down
+logs-db:
+	@docker-compose logs -f postgres
 
-# Help
-help:
-	@echo "Available targets:"
-	@echo "  make build         - Build the binary"
-	@echo "  make run           - Build and run the application"
-	@echo "  make test          - Run all tests"
-	@echo "  make test-coverage - Run tests with coverage report"
-	@echo "  make test-integration - Run integration tests"
-	@echo "  make lint          - Run linter"
-	@echo "  make fmt           - Format code and tidy dependencies"
-	@echo "  make clean         - Clean build artifacts"
-	@echo "  make docker-build  - Build Docker image"
-	@echo "  make docker-run    - Run Docker container"
-	@echo "  make compose-up    - Start services with docker-compose"
-	@echo "  make compose-down  - Stop docker-compose services"
-	@echo "  make all           - Format, lint, test, and build"
-	@echo "  make help          - Show this help message"
+stats:
+	@curl -s http://localhost:$${PORT:-8080}/api/v1/stats | jq .
+
+health:
+	@curl -s http://localhost:$${PORT:-8080}/health | jq .
+
+ready:
+	@curl -s http://localhost:$${PORT:-8080}/ready | jq .

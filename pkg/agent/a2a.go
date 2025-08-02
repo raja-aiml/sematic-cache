@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/raja-aiml/sematic-cache/internal/cache"
+	"github.com/raja-aiml/sematic-cache/internal/storage"
 )
 
 // MemoryType represents different types of agent memory
@@ -23,27 +24,27 @@ const (
 
 // A2AMessage represents a message in the Google A2A protocol
 type A2AMessage struct {
-	ID          string                 `json:"id"`
-	AgentID     string                 `json:"agent_id"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Type        string                 `json:"type"`
-	Content     string                 `json:"content"`
-	Context     map[string]interface{} `json:"context,omitempty"`
-	Embedding   []float32              `json:"embedding,omitempty"`
-	MemoryType  MemoryType             `json:"memory_type"`
-	TTL         time.Duration          `json:"ttl,omitempty"`
-	Importance  float64                `json:"importance"`
+	ID         string                 `json:"id"`
+	AgentID    string                 `json:"agent_id"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Type       string                 `json:"type"`
+	Content    string                 `json:"content"`
+	Context    map[string]interface{} `json:"context,omitempty"`
+	Embedding  []float32              `json:"embedding,omitempty"`
+	MemoryType MemoryType             `json:"memory_type"`
+	TTL        time.Duration          `json:"ttl,omitempty"`
+	Importance float64                `json:"importance"`
 }
 
 // A2AMemoryAdapter provides memory services for A2A protocol agents
 type A2AMemoryAdapter struct {
-	shortTermCache cache.CacheBackend  // In-memory with TTL
-	longTermCache  cache.CacheBackend  // Persistent storage
-	embedFunc      cache.EmbeddingFunc // For generating embeddings
+	shortTermCache storage.CacheBackend // In-memory with TTL
+	longTermCache  storage.CacheBackend // Persistent storage
+	embedFunc      cache.EmbeddingFunc  // For generating embeddings
 }
 
 // NewA2AMemoryAdapter creates a new A2A protocol memory adapter
-func NewA2AMemoryAdapter(shortTerm, longTerm cache.CacheBackend, embedFunc cache.EmbeddingFunc) *A2AMemoryAdapter {
+func NewA2AMemoryAdapter(shortTerm, longTerm storage.CacheBackend, embedFunc cache.EmbeddingFunc) *A2AMemoryAdapter {
 	return &A2AMemoryAdapter{
 		shortTermCache: shortTerm,
 		longTermCache:  longTerm,
@@ -69,7 +70,7 @@ func (a *A2AMemoryAdapter) Store(ctx context.Context, msg *A2AMessage) error {
 	}
 
 	key := a.generateKey(msg)
-	
+
 	// Store based on memory type
 	switch msg.MemoryType {
 	case ShortTermMemory, WorkingMemory:
@@ -77,18 +78,18 @@ func (a *A2AMemoryAdapter) Store(ctx context.Context, msg *A2AMessage) error {
 		if a.shortTermCache != nil {
 			a.shortTermCache.SetWithModel(key, msg.Embedding, string(data), msg.AgentID, msg.ID)
 		}
-	
+
 	case LongTermMemory, EpisodicMemory, SemanticMemory:
 		// Store in long-term persistent cache
 		if a.longTermCache != nil {
 			a.longTermCache.SetWithModel(key, msg.Embedding, string(data), msg.AgentID, msg.ID)
 		}
-		
+
 		// Also store in short-term for fast access
 		if a.shortTermCache != nil && msg.Importance > 0.7 {
 			a.shortTermCache.SetWithModel(key, msg.Embedding, string(data), msg.AgentID, msg.ID)
 		}
-	
+
 	default:
 		// Store in both for unknown types
 		if a.shortTermCache != nil {
@@ -98,21 +99,21 @@ func (a *A2AMemoryAdapter) Store(ctx context.Context, msg *A2AMessage) error {
 			a.longTermCache.SetWithModel(key, msg.Embedding, string(data), msg.AgentID, msg.ID)
 		}
 	}
-	
+
 	return nil
 }
 
 // Retrieve gets a specific message by key
 func (a *A2AMemoryAdapter) Retrieve(ctx context.Context, agentID, messageID string) (*A2AMessage, error) {
 	key := fmt.Sprintf("a2a:%s:%s", agentID, messageID)
-	
+
 	// Try short-term first (faster)
 	if a.shortTermCache != nil {
 		if data, found := a.shortTermCache.Get(key); found {
 			return a.deserializeMessage(data)
 		}
 	}
-	
+
 	// Fall back to long-term
 	if a.longTermCache != nil {
 		if data, found := a.longTermCache.Get(key); found {
@@ -124,7 +125,7 @@ func (a *A2AMemoryAdapter) Retrieve(ctx context.Context, agentID, messageID stri
 			return a.deserializeMessage(data)
 		}
 	}
-	
+
 	return nil, fmt.Errorf("message not found: %s", messageID)
 }
 
@@ -135,9 +136,9 @@ func (a *A2AMemoryAdapter) Search(ctx context.Context, query string, agentID str
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
-	
+
 	// Search in appropriate cache based on memory type
-	var searchCache cache.CacheBackend
+	var searchCache storage.CacheBackend
 	switch memoryType {
 	case ShortTermMemory, WorkingMemory:
 		searchCache = a.shortTermCache
@@ -147,14 +148,14 @@ func (a *A2AMemoryAdapter) Search(ctx context.Context, query string, agentID str
 		// Search both and merge results
 		return a.searchBothCaches(embedding, agentID, topK)
 	}
-	
+
 	if searchCache == nil {
 		return nil, fmt.Errorf("cache not available for memory type: %s", memoryType)
 	}
-	
+
 	// Perform semantic search
 	results := searchCache.GetTopKByEmbedding(embedding, topK)
-	
+
 	// Convert results to A2A messages
 	messages := make([]*A2AMessage, 0, len(results))
 	for _, result := range results {
@@ -166,7 +167,7 @@ func (a *A2AMemoryAdapter) Search(ctx context.Context, query string, agentID str
 			}
 		}
 	}
-	
+
 	return messages, nil
 }
 
@@ -189,25 +190,25 @@ func (a *A2AMemoryAdapter) GetRelevantContext(ctx context.Context, query string,
 	// Search across all memory types for relevant context
 	shortTermResults, _ := a.Search(ctx, query, agentID, ShortTermMemory, limit/2)
 	longTermResults, _ := a.Search(ctx, query, agentID, LongTermMemory, limit/2)
-	
+
 	// Merge and deduplicate results
 	seen := make(map[string]bool)
 	results := make([]*A2AMessage, 0, limit)
-	
+
 	for _, msg := range shortTermResults {
 		if !seen[msg.ID] {
 			seen[msg.ID] = true
 			results = append(results, msg)
 		}
 	}
-	
+
 	for _, msg := range longTermResults {
 		if !seen[msg.ID] && len(results) < limit {
 			seen[msg.ID] = true
 			results = append(results, msg)
 		}
 	}
-	
+
 	return results, nil
 }
 
@@ -227,7 +228,7 @@ func (a *A2AMemoryAdapter) deserializeMessage(data string) (*A2AMessage, error) 
 
 func (a *A2AMemoryAdapter) searchBothCaches(embedding []float32, agentID string, topK int) ([]*A2AMessage, error) {
 	messages := make([]*A2AMessage, 0, topK*2)
-	
+
 	// Search short-term
 	if a.shortTermCache != nil {
 		results := a.shortTermCache.GetTopKByEmbedding(embedding, topK)
@@ -240,7 +241,7 @@ func (a *A2AMemoryAdapter) searchBothCaches(embedding []float32, agentID string,
 			}
 		}
 	}
-	
+
 	// Search long-term
 	if a.longTermCache != nil {
 		results := a.longTermCache.GetTopKByEmbedding(embedding, topK)
@@ -253,12 +254,12 @@ func (a *A2AMemoryAdapter) searchBothCaches(embedding []float32, agentID string,
 			}
 		}
 	}
-	
+
 	// Sort by importance and return top K
 	// (In production, you'd want to properly sort and deduplicate)
 	if len(messages) > topK {
 		messages = messages[:topK]
 	}
-	
+
 	return messages, nil
 }

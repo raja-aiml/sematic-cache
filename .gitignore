@@ -57,18 +57,45 @@ $RECYCLE.BIN/
 
 # --- Custom ---
 .idea
-**/data_map**.txt
-**/faiss**.index
-**/sqlite**.db
-**/gpt_cache**.db
-**/example.py
-**/example.db
-**/.chroma/
-docs/references/*
-!docs/references/index.rst
+
+# Twelve-Factor App additions
+# Factor III: Config - Never commit environment files
+.env
+.env.local
+.env.*.local
+
+# Factor V: Build artifacts
+bin/
+dist/
+
+# Database files
+*.sql
+backup_*.sql
+*.db
+*.sqlite
+
+# Log files (Factor XI: Logs as event streams)
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker volumes (local development)
+postgres_data/
+
+# Build cache
+.cache/
+
+# Profiling
+*.prof
+*.pprof
+
+# Go workspace files
+go.work.sum
+
+# Secrets
 secrets.yaml
 *.secret
-!deploy/build/
-!/deploy/tests/lib/
-bin/
-.env
