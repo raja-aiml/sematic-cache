@@ -22,10 +22,26 @@ func TracingMiddleware(serviceName string) gin.HandlerFunc {
 		// Extract trace context from incoming request headers
 		ctx := propagator.Extract(c.Request.Context(), propagation.HeaderCarrier(c.Request.Header))
 
+		// Check if we have a valid parent context
+		parentSpanCtx := trace.SpanContextFromContext(ctx)
+		
 		// Start a new span for this request
 		spanName := fmt.Sprintf("%s %s", c.Request.Method, c.FullPath())
 		if spanName == " " {
 			spanName = fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)
+		}
+		
+		// If parent context is invalid, start a new root span
+		var span trace.Span
+		if !parentSpanCtx.IsValid() {
+			// Start a new root span if no valid parent
+			ctx, span = tracer.Start(c.Request.Context(), spanName,
+				trace.WithSpanKind(trace.SpanKindServer),
+				trace.WithNewRoot())
+		} else {
+			// Continue with the extracted context
+			ctx, span = tracer.Start(ctx, spanName,
+				trace.WithSpanKind(trace.SpanKindServer))
 		}
 
 		// Parse port
@@ -36,21 +52,19 @@ func TracingMiddleware(serviceName string) gin.HandlerFunc {
 			}
 		}
 
-		ctx, span := tracer.Start(ctx, spanName,
-			trace.WithSpanKind(trace.SpanKindServer),
-			trace.WithAttributes(
-				semconv.HTTPMethodKey.String(c.Request.Method),
-				semconv.HTTPTargetKey.String(c.Request.URL.Path),
-				semconv.HTTPRouteKey.String(c.FullPath()),
-				semconv.HTTPURLKey.String(c.Request.URL.String()),
-				attribute.String("http.host", c.Request.Host),
-				semconv.HTTPSchemeKey.String(c.Request.URL.Scheme),
-				semconv.HTTPRequestContentLengthKey.Int64(c.Request.ContentLength),
-				semconv.NetHostNameKey.String(c.Request.Host),
-				semconv.NetHostPortKey.Int(port),
-				semconv.HTTPUserAgentKey.String(c.Request.UserAgent()),
-				attribute.String("net.peer.ip", c.ClientIP()),
-			),
+		// Set span attributes
+		span.SetAttributes(
+			semconv.HTTPMethodKey.String(c.Request.Method),
+			semconv.HTTPTargetKey.String(c.Request.URL.Path),
+			semconv.HTTPRouteKey.String(c.FullPath()),
+			semconv.HTTPURLKey.String(c.Request.URL.String()),
+			attribute.String("http.host", c.Request.Host),
+			semconv.HTTPSchemeKey.String(c.Request.URL.Scheme),
+			semconv.HTTPRequestContentLengthKey.Int64(c.Request.ContentLength),
+			semconv.NetHostNameKey.String(c.Request.Host),
+			semconv.NetHostPortKey.Int(port),
+			semconv.HTTPUserAgentKey.String(c.Request.UserAgent()),
+			attribute.String("net.peer.ip", c.ClientIP()),
 		)
 		defer span.End()
 
