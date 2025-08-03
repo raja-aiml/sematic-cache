@@ -1,5 +1,5 @@
 # Full Observability Stack for Semantic Cache
-# PostgreSQL with pgvector, Redis, OTel Collector, Jaeger, and Prometheus
+# PostgreSQL with pgvector, OTel Collector, Jaeger, and Prometheus
 
 services:
   # PostgreSQL with pgvector for vector similarity search
@@ -23,17 +23,27 @@ services:
     networks:
       - cache-net
 
-  # Redis for L2 cache tier
-  redis:
-    image: redis:7-alpine
-    container_name: cache-redis
+  # Semantic Cache Application
+  semantic-cache:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile
+    container_name: semantic-cache-app
+    env_file:
+      - ../../.env.app
+      - ../../.env
+    environment:
+      - DATABASE_URL=postgresql://cache_user:cache_pass@postgres:5432/semantic_cache?sslmode=disable
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "wget", "--spider", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -136,7 +146,6 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
   prometheus_data:
   caddy_data:
   caddy_config:

@@ -18,14 +18,14 @@ RUN go mod download && go mod verify
 COPY . .
 
 # Verify source files exist
-RUN ls -la cmd/server/
+RUN ls -la main.go cmd/
 
 # Build with verbose output and static linking
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -a -installsuffix cgo \
     -ldflags '-extldflags "-static"' \
     -o sematic-cache \
-    ./cmd/server/main.go
+    .
 
 # Verify the binary was created
 RUN ls -la sematic-cache && echo "Binary created successfully"

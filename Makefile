@@ -63,6 +63,12 @@ help: ## Show this help
 	@echo "  $(CYAN)all$(RESET)                   Full build (clean → format → lint → test → build)"
 	@echo "  $(CYAN)ci$(RESET)                    CI pipeline (deps → checks → build)"
 	@echo "  $(CYAN)deploy$(RESET)                Deploy locally (docker → start services)"
+	@echo ""
+	@echo "$(GREEN)Stack Management$(RESET)"
+	@echo "  $(CYAN)start$(RESET)                 Start full stack (builds infra + app + tools)"
+	@echo "  $(CYAN)stop$(RESET)                  Stop full stack (removes containers + binaries)"
+	@echo "  $(CYAN)status$(RESET)                Check stack status"
+	@echo "  $(CYAN)logs$(RESET)                  View application logs"
 
 build: ## Build binary
 	@echo "Building..."
@@ -124,7 +130,10 @@ up: ## Start services
 down: ## Stop services
 	@cd $(DOCKER_COMPOSE_DIR) && docker-compose down
 
-logs: ## View logs
+logs: ## View application logs
+	@cd $(DOCKER_COMPOSE_DIR) && docker-compose logs -f semantic-cache
+
+logs-all: ## View all service logs
 	@cd $(DOCKER_COMPOSE_DIR) && docker-compose logs -f
 
 restart: down up ## Restart services
@@ -160,9 +169,65 @@ all: clean fmt lint test build ## Full build
 ci: deps check build ## CI pipeline
 deploy: docker up ## Deploy locally
 
+##@ Stack Management (Full Workflow)
+
+start: ## Start full stack (builds infra + app + tools)
+	@echo "$(GREEN)🚀 Starting full stack...$(RESET)"
+	@if [ ! -f .env ]; then \
+		echo "$(RED)⚠️  Missing .env file$(RESET)"; \
+		echo "$(YELLOW)Please copy .env.example to .env and add your OPENAI_API_KEY$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)1. Building and starting all services (including app)...$(RESET)"
+	@cd $(DOCKER_COMPOSE_DIR) && docker-compose up -d --build
+	@echo "$(CYAN)2. Waiting for services to be healthy...$(RESET)"
+	@sleep 10
+	@echo "$(CYAN)3. Building CLI tools...$(RESET)"
+	@cd tools && make build
+	@echo "$(GREEN)✅ Stack ready!$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Services:$(RESET)"
+	@echo "  • PostgreSQL:    localhost:5432"
+	@echo "  • Semantic Cache: http://localhost:8080"
+	@echo "  • Jaeger UI:     http://localhost:16686"
+	@echo "  • Prometheus:    http://localhost:9090"
+	@echo ""
+	@echo "$(YELLOW)CLI Tool:$(RESET)"
+	@echo "  • ./tools/bin/semantic-cache-tool"
+	@echo ""
+	@echo "$(CYAN)The application is running in Docker. Check status with 'make status'$(RESET)"
+
+stop: ## Stop full stack (removes containers + binaries)
+	@echo "$(RED)🛑 Stopping full stack...$(RESET)"
+	@cd $(DOCKER_COMPOSE_DIR) && docker-compose down
+	@echo "$(YELLOW)Cleaning CLI tools binaries...$(RESET)"
+	@rm -rf tools/bin/
+	@echo "$(GREEN)✅ Stack stopped and tools cleaned$(RESET)"
+
+status: ## Check stack status
+	@echo "$(CYAN)📊 Stack Status$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Docker Services:$(RESET)"
+	@cd $(DOCKER_COMPOSE_DIR) && docker-compose ps
+	@echo ""
+	@echo "$(YELLOW)Service Health:$(RESET)"
+	@cd $(DOCKER_COMPOSE_DIR) && docker-compose ps | grep -E "(healthy|unhealthy|starting)" || true
+	@echo ""
+	@echo "$(YELLOW)CLI Tool:$(RESET)"
+	@if [ -f tools/bin/semantic-cache-tool ]; then \
+		echo "  ✅ tools/bin/semantic-cache-tool ready"; \
+	else \
+		echo "  ❌ tools/bin/semantic-cache-tool not built"; \
+	fi
+	@echo ""
+	@echo "$(YELLOW)Application Logs (last 5 lines):$(RESET)"
+	@cd $(DOCKER_COMPOSE_DIR) && docker-compose logs --tail=5 semantic-cache 2>/dev/null || echo "  Application not running"
+
+
 .PHONY: help build run clean dev fmt lint check \
         test cover bench watch \
-        docker up down logs restart \
+        docker up down logs logs-all restart \
         migrate reset \
         deps update verify \
-        all ci deploy
+        all ci deploy \
+        start stop status
