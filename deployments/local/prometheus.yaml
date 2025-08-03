@@ -50,15 +50,16 @@ scrape_configs:
         labels:
           service: 'otel-metrics'
 
-  # Semantic Cache application metrics (if exposed directly)
-  - job_name: 'semantic-cache-app'
-    static_configs:
-      - targets: ['host.docker.internal:8080']
-        labels:
-          service: 'semantic-cache'
-          component: 'api'
-    metrics_path: '/metrics'
-    scrape_interval: 10s
+  # Semantic Cache application metrics (via OpenTelemetry Collector)
+  # App exports to OTel Collector, not scraped directly
+  # - job_name: 'semantic-cache-app'
+  #   static_configs:
+  #     - targets: ['host.docker.internal:8080']
+  #       labels:
+  #         service: 'semantic-cache'
+  #         component: 'api'
+  #   metrics_path: '/metrics'
+  #   scrape_interval: 10s
 
   # PostgreSQL exporter (optional - add postgres-exporter to docker-compose if needed)
   - job_name: 'postgres'
