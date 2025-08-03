@@ -13,16 +13,16 @@ import (
 // NewStatsCmd creates the stats command
 func NewStatsCmd() *cobra.Command {
 	var useAPI bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "stats",
 		Short: "Display cache statistics",
 		Long:  "Display statistics about the cache including entry count, hit rate, and storage usage",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			
+
 			globalLogger.Info("Fetching cache statistics")
-			
+
 			// Try to get stats from API first if server is running or explicitly requested
 			if useAPI || shouldUseAPI() {
 				if err := getStatsFromAPI(); err == nil {
@@ -35,14 +35,14 @@ func NewStatsCmd() *cobra.Command {
 					}
 				}
 			}
-			
+
 			// Fall back to direct database access
 			return getStatsFromDatabase(ctx)
 		},
 	}
-	
+
 	cmd.Flags().BoolVar(&useAPI, "api", false, "Force using API instead of direct database access")
-	
+
 	return cmd
 }
 
@@ -54,7 +54,7 @@ func shouldUseAPI() bool {
 		serverAddr = "localhost"
 	}
 	endpoint := fmt.Sprintf("http://%s:%s", serverAddr, globalCfg.ServerPort)
-	
+
 	// Quick check if server is reachable
 	return checkTCPConnection(endpoint)
 }
@@ -66,28 +66,28 @@ func getStatsFromAPI() error {
 		serverAddr = "localhost"
 	}
 	baseURL := fmt.Sprintf("http://%s:%s", serverAddr, globalCfg.ServerPort)
-	
+
 	// Create cache client
 	cacheClient := client.NewCacheClient(baseURL)
-	
+
 	// Get stats from API
 	stats, err := cacheClient.GetStats()
 	if err != nil {
 		return fmt.Errorf("failed to get stats from API: %w", err)
 	}
-	
+
 	// Display API statistics
 	fmt.Println("Cache Statistics (from API):")
 	fmt.Println("============================")
 	fmt.Printf("Cache Hits:        %d\n", stats.Hits)
 	fmt.Printf("Cache Misses:      %d\n", stats.Misses)
 	fmt.Printf("Hit Rate:          %.2f%%\n", stats.HitRate*100)
-	
+
 	// Try to get additional stats from database if available
 	if db, err := connectDatabase(context.Background(), globalCfg, globalLogger); err == nil {
 		displayDatabaseStats(db)
 	}
-	
+
 	return nil
 }
 
@@ -98,13 +98,13 @@ func getStatsFromDatabase(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
-	
+
 	// Get basic statistics from database
 	var stats struct {
 		TotalEntries int64
 		TotalSize    int64
 	}
-	
+
 	// Count total entries
 	err = db.Raw("SELECT COUNT(*) as total_entries FROM embeddings").Scan(&stats.TotalEntries).Error
 	if err != nil {
@@ -114,14 +114,14 @@ func getStatsFromDatabase(ctx context.Context) error {
 		fmt.Println("No cache table found (run 'database migrate' first)")
 		return nil
 	}
-	
+
 	// Display basic statistics
 	fmt.Println("Cache Statistics (from Database):")
 	fmt.Println("=================================")
 	fmt.Printf("Total Entries:     %d\n", stats.TotalEntries)
-	
+
 	displayDatabaseStats(db)
-	
+
 	return nil
 }
 
@@ -134,7 +134,7 @@ func displayDatabaseStats(db *gorm.DB) {
 		TotalSize   string
 		RowEstimate int64
 	}
-	
+
 	// Get table size
 	err := db.Raw(`
 		SELECT 
@@ -145,7 +145,7 @@ func displayDatabaseStats(db *gorm.DB) {
 		FROM pg_class 
 		WHERE relname = 'embeddings'
 	`).Scan(&dbStats).Error
-	
+
 	if err == nil {
 		fmt.Println("\nDatabase Statistics:")
 		fmt.Println("====================")
@@ -154,20 +154,20 @@ func displayDatabaseStats(db *gorm.DB) {
 		fmt.Printf("Total Size:        %s\n", dbStats.TotalSize)
 		fmt.Printf("Row Estimate:      %d\n", dbStats.RowEstimate)
 	}
-	
+
 	// Get top accessed entries
 	var topEntries []struct {
 		Prompt      string
 		AccessCount int
 	}
-	
+
 	err = db.Raw(`
 		SELECT prompt, access_count 
 		FROM embeddings 
 		ORDER BY access_count DESC 
 		LIMIT 5
 	`).Scan(&topEntries).Error
-	
+
 	if err == nil && len(topEntries) > 0 {
 		fmt.Println("\nTop Accessed Entries:")
 		fmt.Println("=====================")

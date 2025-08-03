@@ -19,14 +19,14 @@ type Telemetry struct {
 	Meter    metric.Meter
 	Logger   *zap.Logger
 	Shutdown func(context.Context) error
-	
+
 	// Metrics
-	commandCounter   metric.Int64Counter
-	commandDuration  metric.Float64Histogram
-	errorCounter     metric.Int64Counter
-	dbConnections    metric.Int64UpDownCounter
-	cacheHits        metric.Int64Counter
-	cacheMisses      metric.Int64Counter
+	commandCounter  metric.Int64Counter
+	commandDuration metric.Float64Histogram
+	errorCounter    metric.Int64Counter
+	dbConnections   metric.Int64UpDownCounter
+	cacheHits       metric.Int64Counter
+	cacheMisses     metric.Int64Counter
 }
 
 // InitTelemetry initializes OpenTelemetry
@@ -36,11 +36,11 @@ func InitTelemetry(ctx context.Context, serviceName, serviceVersion string, endp
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup OpenTelemetry: %w", err)
 	}
-	
+
 	// Get tracer and meter
 	tracer := otel.Tracer(serviceName)
 	meter := otel.Meter(serviceName)
-	
+
 	// Initialize metrics
 	t := &Telemetry{
 		Tracer:   tracer,
@@ -48,19 +48,19 @@ func InitTelemetry(ctx context.Context, serviceName, serviceVersion string, endp
 		Logger:   logger,
 		Shutdown: shutdown,
 	}
-	
+
 	// Create metrics
 	if err := t.createMetrics(); err != nil {
 		return nil, fmt.Errorf("failed to create metrics: %w", err)
 	}
-	
+
 	return t, nil
 }
 
 // createMetrics creates all the metrics
 func (t *Telemetry) createMetrics() error {
 	var err error
-	
+
 	// Command execution counter
 	t.commandCounter, err = t.Meter.Int64Counter(
 		"cli.command.executions",
@@ -70,7 +70,7 @@ func (t *Telemetry) createMetrics() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Command execution duration
 	t.commandDuration, err = t.Meter.Float64Histogram(
 		"cli.command.duration",
@@ -80,7 +80,7 @@ func (t *Telemetry) createMetrics() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Error counter
 	t.errorCounter, err = t.Meter.Int64Counter(
 		"cli.errors",
@@ -90,7 +90,7 @@ func (t *Telemetry) createMetrics() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Database connections
 	t.dbConnections, err = t.Meter.Int64UpDownCounter(
 		"cli.db.connections",
@@ -100,7 +100,7 @@ func (t *Telemetry) createMetrics() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Cache hits
 	t.cacheHits, err = t.Meter.Int64Counter(
 		"cli.cache.hits",
@@ -110,7 +110,7 @@ func (t *Telemetry) createMetrics() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Cache misses
 	t.cacheMisses, err = t.Meter.Int64Counter(
 		"cli.cache.misses",
@@ -120,7 +120,7 @@ func (t *Telemetry) createMetrics() error {
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -132,24 +132,24 @@ func (t *Telemetry) StartCommand(ctx context.Context, command string, args []str
 			attribute.StringSlice("args", args),
 		),
 	)
-	
+
 	// Record command execution
 	t.commandCounter.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("command", command),
 	))
-	
+
 	return ctx, span
 }
 
 // EndCommand ends a command trace
 func (t *Telemetry) EndCommand(ctx context.Context, span trace.Span, start time.Time, command string, err error) {
 	duration := time.Since(start).Milliseconds()
-	
+
 	// Record duration
 	t.commandDuration.Record(ctx, float64(duration), metric.WithAttributes(
 		attribute.String("command", command),
 	))
-	
+
 	// Record error if any
 	if err != nil {
 		span.RecordError(err)
@@ -158,7 +158,7 @@ func (t *Telemetry) EndCommand(ctx context.Context, span trace.Span, start time.
 			attribute.String("error", err.Error()),
 		))
 	}
-	
+
 	span.End()
 }
 

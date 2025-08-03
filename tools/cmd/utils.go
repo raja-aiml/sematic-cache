@@ -14,7 +14,7 @@ func checkTCPConnection(endpoint string) bool {
 	} else if strings.HasPrefix(endpoint, "https://") {
 		endpoint = strings.TrimPrefix(endpoint, "https://")
 	}
-	
+
 	// Try to establish TCP connection
 	conn, err := net.DialTimeout("tcp", endpoint, 2*time.Second)
 	if err != nil {

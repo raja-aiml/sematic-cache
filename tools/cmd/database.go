@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// NewDatabaseCmd creates the database command group  
+// NewDatabaseCmd creates the database command group
 func NewDatabaseCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "database",
@@ -36,14 +36,14 @@ func NewDatabasePingCmd() *cobra.Command {
 		Short: "Test database connection",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			
+
 			// Validate database configuration
 			if err := globalCfg.ValidateDatabase(); err != nil {
 				return err
 			}
-			
+
 			globalLogger.Info("Testing database connection", zap.String("dsn", maskDSN(globalCfg.DatabaseURL)))
-			
+
 			// Connect to database
 			db, err := connectDatabase(ctx, globalCfg, globalLogger)
 			if err != nil {
@@ -55,27 +55,27 @@ func NewDatabasePingCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to get database connection: %w", err)
 			}
-			
+
 			if err := sqlDB.PingContext(ctx); err != nil {
 				return fmt.Errorf("database ping failed: %w", err)
 			}
-			
+
 			globalLogger.Info("Database connection successful")
 			fmt.Println("✓ Database connection successful")
-			
+
 			// Check pgvector extension
 			var extensionExists bool
 			err = db.Raw("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')").Scan(&extensionExists).Error
 			if err != nil {
 				return fmt.Errorf("failed to check pgvector extension: %w", err)
 			}
-			
+
 			if extensionExists {
 				fmt.Println("✓ pgvector extension is installed")
 			} else {
 				fmt.Println("✗ pgvector extension is not installed")
 			}
-			
+
 			return nil
 		},
 	}
@@ -88,14 +88,14 @@ func NewDatabaseMigrateCmd() *cobra.Command {
 		Short: "Run database migrations",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			
+
 			// Validate database configuration
 			if err := globalCfg.ValidateDatabase(); err != nil {
 				return err
 			}
-			
+
 			globalLogger.Info("Running database migrations")
-			
+
 			// Connect to database
 			db, err := connectDatabase(ctx, globalCfg, globalLogger)
 			if err != nil {
@@ -106,7 +106,7 @@ func NewDatabaseMigrateCmd() *cobra.Command {
 			if err := db.Exec("CREATE EXTENSION IF NOT EXISTS vector").Error; err != nil {
 				return fmt.Errorf("failed to create pgvector extension: %w", err)
 			}
-			
+
 			// Use internal storage to ensure proper table creation
 			store, err := pgvector.NewStore(globalCfg.DatabaseURL)
 			if err != nil {
@@ -114,10 +114,10 @@ func NewDatabaseMigrateCmd() *cobra.Command {
 			}
 			// Store creation handles table creation via AutoMigrate
 			_ = store
-			
+
 			globalLogger.Info("Database migrations completed successfully")
 			fmt.Println("✓ Database migrations completed successfully")
-			
+
 			return nil
 		},
 	}
@@ -130,14 +130,14 @@ func NewDatabaseStatusCmd() *cobra.Command {
 		Short: "Show database status",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			
+
 			// Validate database configuration
 			if err := globalCfg.ValidateDatabase(); err != nil {
 				return err
 			}
-			
+
 			globalLogger.Info("Checking database status")
-			
+
 			// Connect to database
 			db, err := connectDatabase(ctx, globalCfg, globalLogger)
 			if err != nil {
@@ -149,15 +149,15 @@ func NewDatabaseStatusCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to get database connection: %w", err)
 			}
-			
+
 			stats := sqlDB.Stats()
-			
+
 			fmt.Println("Database Status:")
 			fmt.Printf("  Open Connections: %d\n", stats.OpenConnections)
 			fmt.Printf("  In Use: %d\n", stats.InUse)
 			fmt.Printf("  Idle: %d\n", stats.Idle)
 			fmt.Printf("  Max Open Connections: %d\n", stats.MaxOpenConnections)
-			
+
 			// Check table count
 			var count int64
 			err = db.Raw("SELECT COUNT(*) FROM embeddings").Scan(&count).Error
@@ -166,14 +166,14 @@ func NewDatabaseStatusCmd() *cobra.Command {
 			} else {
 				fmt.Printf("\nEmbeddings: %d\n", count)
 			}
-			
+
 			// Check pgvector version
 			var version string
 			err = db.Raw("SELECT extversion FROM pg_extension WHERE extname = 'vector'").Scan(&version).Error
 			if err == nil {
 				fmt.Printf("pgvector Version: %s\n", version)
 			}
-			
+
 			return nil
 		},
 	}
@@ -185,19 +185,18 @@ func connectDatabase(ctx context.Context, cfg *config.Config, logger *zap.Logger
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	
+
 	// Configure connection pool
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database connection: %w", err)
 	}
-	
+
 	sqlDB.SetMaxOpenConns(cfg.DatabaseMaxConnections)
 	sqlDB.SetMaxIdleConns(cfg.DatabaseMaxIdleConnections)
-	
+
 	return db, nil
 }
-
 
 // maskDSN masks sensitive parts of the DSN for logging
 func maskDSN(dsn string) string {

@@ -11,7 +11,7 @@ import (
 var (
 	configPath string
 	verbose    bool
-	
+
 	// Global config and logger that will be initialized
 	globalCfg    *config.Config
 	globalLogger *zap.Logger
@@ -40,20 +40,20 @@ This tool provides commands for:
 		if cmd.Name() == "help" || cmd.Name() == "completion" {
 			return nil
 		}
-		
+
 		// Initialize configuration with the provided path
 		var err error
 		globalCfg, err = config.LoadConfigFrom(configPath)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
-		
+
 		// Initialize logger
 		globalLogger, err = initLogger(globalCfg.LogLevel, globalCfg.LogFormat)
 		if err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
-		
+
 		return nil
 	},
 }
@@ -62,7 +62,7 @@ func init() {
 	// Add persistent flags
 	rootCmd.PersistentFlags().StringVar(&configPath, "config-path", "", "Path to config directory or file (loads .env.app and .env from directory)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
-	
+
 	// Add subcommands
 	rootCmd.AddCommand(
 		NewCacheCmd(),
@@ -99,7 +99,7 @@ func NewCacheGetCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 			globalLogger.Info("Getting cache entry", zap.String("key", key))
-			
+
 			// Implementation will use the cache client
 			fmt.Printf("Getting key: %s\n", key)
 			return nil
@@ -117,7 +117,7 @@ func NewCacheSetCmd() *cobra.Command {
 			key := args[0]
 			value := args[1]
 			globalLogger.Info("Setting cache entry", zap.String("key", key))
-			
+
 			// Implementation will use the cache client
 			fmt.Printf("Setting key: %s, value: %s\n", key, value)
 			return nil
@@ -128,7 +128,7 @@ func NewCacheSetCmd() *cobra.Command {
 // NewCacheClearCmd creates the cache clear command
 func NewCacheClearCmd() *cobra.Command {
 	var all bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "clear",
 		Short: "Clear cache entries",
@@ -143,15 +143,15 @@ func NewCacheClearCmd() *cobra.Command {
 			return nil
 		},
 	}
-	
+
 	cmd.Flags().BoolVar(&all, "all", false, "Clear all entries (not just expired)")
-	
+
 	return cmd
 }
 
 func initLogger(level, format string) (*zap.Logger, error) {
 	var config zap.Config
-	
+
 	if format == "json" {
 		config = zap.NewProductionConfig()
 	} else {

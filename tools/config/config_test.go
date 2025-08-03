@@ -20,7 +20,7 @@ func TestLoadConfig(t *testing.T) {
 		{
 			name: "valid configuration with required fields",
 			envVars: map[string]string{
-				"DATABASE_URL":  "postgresql://user:pass@localhost/db",
+				"DATABASE_URL":   "postgresql://user:pass@localhost/db",
 				"OPENAI_API_KEY": "sk-test-key",
 			},
 			wantErr: false,
@@ -50,7 +50,7 @@ func TestLoadConfig(t *testing.T) {
 			name: "invalid similarity threshold",
 			envVars: map[string]string{
 				"DATABASE_URL":         "postgresql://user:pass@localhost/db",
-				"OPENAI_API_KEY":      "sk-test-key",
+				"OPENAI_API_KEY":       "sk-test-key",
 				"SIMILARITY_THRESHOLD": "1.5",
 			},
 			wantErr:     true,
@@ -59,12 +59,12 @@ func TestLoadConfig(t *testing.T) {
 		{
 			name: "custom values override defaults",
 			envVars: map[string]string{
-				"DATABASE_URL":                    "postgresql://custom:pass@custom/db",
-				"OPENAI_API_KEY":                 "sk-custom-key",
-				"SERVER_PORT":                    "9090",
-				"LOG_LEVEL":                      "debug",
-				"SIMILARITY_THRESHOLD":           "0.9",
-				"DATABASE_MAX_CONNECTIONS":       "50",
+				"DATABASE_URL":             "postgresql://custom:pass@custom/db",
+				"OPENAI_API_KEY":           "sk-custom-key",
+				"SERVER_PORT":              "9090",
+				"LOG_LEVEL":                "debug",
+				"SIMILARITY_THRESHOLD":     "0.9",
+				"DATABASE_MAX_CONNECTIONS": "50",
 			},
 			wantErr: false,
 			validate: func(t *testing.T, cfg *Config) {
@@ -116,9 +116,9 @@ func TestValidate(t *testing.T) {
 			name: "valid configuration",
 			config: Config{
 				DatabaseURL:         "postgresql://user:pass@localhost/db",
-				OpenAIAPIKey:       "sk-test-key",
+				OpenAIAPIKey:        "sk-test-key",
 				SimilarityThreshold: 0.8,
-				VectorDimensions:   1536,
+				VectorDimensions:    1536,
 			},
 			wantErr: false,
 		},
@@ -127,7 +127,7 @@ func TestValidate(t *testing.T) {
 			config: Config{
 				OpenAIAPIKey:        "sk-test-key",
 				SimilarityThreshold: 0.8,
-				VectorDimensions:   1536,
+				VectorDimensions:    1536,
 			},
 			wantErr:     true,
 			errContains: "DATABASE_URL is required",
@@ -137,7 +137,7 @@ func TestValidate(t *testing.T) {
 			config: Config{
 				DatabaseURL:         "postgresql://user:pass@localhost/db",
 				SimilarityThreshold: 0.8,
-				VectorDimensions:   1536,
+				VectorDimensions:    1536,
 			},
 			wantErr:     true,
 			errContains: "OPENAI_API_KEY is required",
@@ -146,9 +146,9 @@ func TestValidate(t *testing.T) {
 			name: "invalid similarity threshold (negative)",
 			config: Config{
 				DatabaseURL:         "postgresql://user:pass@localhost/db",
-				OpenAIAPIKey:       "sk-test-key",
+				OpenAIAPIKey:        "sk-test-key",
 				SimilarityThreshold: -0.1,
-				VectorDimensions:   1536,
+				VectorDimensions:    1536,
 			},
 			wantErr:     true,
 			errContains: "SIMILARITY_THRESHOLD must be between 0 and 1",
@@ -157,9 +157,9 @@ func TestValidate(t *testing.T) {
 			name: "invalid similarity threshold (greater than 1)",
 			config: Config{
 				DatabaseURL:         "postgresql://user:pass@localhost/db",
-				OpenAIAPIKey:       "sk-test-key",
+				OpenAIAPIKey:        "sk-test-key",
 				SimilarityThreshold: 1.1,
-				VectorDimensions:   1536,
+				VectorDimensions:    1536,
 			},
 			wantErr:     true,
 			errContains: "SIMILARITY_THRESHOLD must be between 0 and 1",
@@ -168,9 +168,9 @@ func TestValidate(t *testing.T) {
 			name: "invalid vector dimensions",
 			config: Config{
 				DatabaseURL:         "postgresql://user:pass@localhost/db",
-				OpenAIAPIKey:       "sk-test-key",
+				OpenAIAPIKey:        "sk-test-key",
 				SimilarityThreshold: 0.8,
-				VectorDimensions:   0,
+				VectorDimensions:    0,
 			},
 			wantErr:     true,
 			errContains: "VECTOR_DIMENSIONS must be positive",
@@ -198,39 +198,39 @@ func TestFindProjectRoot(t *testing.T) {
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "project")
 	subDir := filepath.Join(projectDir, "sub", "dir")
-	
+
 	// Create directories
 	err := os.MkdirAll(subDir, 0755)
 	require.NoError(t, err)
-	
+
 	// Create go.mod in project directory
 	goModPath := filepath.Join(projectDir, "go.mod")
 	err = os.WriteFile(goModPath, []byte("module test\n"), 0644)
 	require.NoError(t, err)
-	
+
 	// Test from project directory
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	
+
 	err = os.Chdir(projectDir)
 	require.NoError(t, err)
-	
+
 	root, err := findProjectRoot()
 	assert.NoError(t, err)
 	assert.Equal(t, projectDir, root)
-	
+
 	// Test from subdirectory
 	err = os.Chdir(subDir)
 	require.NoError(t, err)
-	
+
 	root, err = findProjectRoot()
 	assert.NoError(t, err)
 	assert.Equal(t, projectDir, root)
-	
+
 	// Test from directory without go.mod
 	err = os.Chdir(tmpDir)
 	require.NoError(t, err)
-	
+
 	_, err = findProjectRoot()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "could not find project root")

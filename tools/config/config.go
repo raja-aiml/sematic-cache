@@ -69,17 +69,17 @@ func LoadConfigFrom(configPath string) (*Config, error) {
 
 	// Set defaults FIRST
 	setDefaults(v)
-	
+
 	var explicitConfigPath bool
 	var configDir string
-	
+
 	// If no path specified, look in parent directory
 	if configPath == "" {
 		dir, err := os.Getwd()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get working directory: %w", err)
 		}
-		
+
 		// Determine the root path based on where we are
 		if strings.Contains(dir, "/tools") {
 			// We're in the tools directory, go to parent
@@ -112,7 +112,7 @@ func LoadConfigFrom(configPath string) (*Config, error) {
 		}
 		explicitConfigPath = true
 	}
-	
+
 	// Load .env.app and .env files from the directory if configDir is set
 	if configDir != "" {
 		// First load .env.app (base configuration)
@@ -123,7 +123,7 @@ func LoadConfigFrom(configPath string) (*Config, error) {
 				return nil, fmt.Errorf("failed to read .env.app from %s: %w", envAppPath, err)
 			}
 		}
-		
+
 		// Then load .env (overrides .env.app)
 		envPath := filepath.Join(configDir, ".env")
 		if _, err := os.Stat(envPath); err == nil {
@@ -134,7 +134,7 @@ func LoadConfigFrom(configPath string) (*Config, error) {
 			}
 		}
 	}
-	
+
 	// Only bind environment variables if config path was not explicitly provided
 	// This allows --config-path to override environment variables
 	if !explicitConfigPath {
@@ -142,7 +142,7 @@ func LoadConfigFrom(configPath string) (*Config, error) {
 		v.SetEnvPrefix("") // No prefix for env vars
 		v.AutomaticEnv()
 		v.AllowEmptyEnv(true)
-		
+
 		// Explicitly bind DATABASE_URL
 		v.BindEnv("DATABASE_URL", "DATABASE_URL")
 	}
@@ -163,7 +163,7 @@ func LoadConfigFrom(configPath string) (*Config, error) {
 func setDefaults(v *viper.Viper) {
 	// Do NOT set DATABASE_URL default - let it come from env/file
 	// IMPORTANT: Don't set DATABASE_URL default here
-	
+
 	// Server defaults
 	v.SetDefault("SERVER_PORT", "8080")
 	v.SetDefault("SERVER_ADDRESS", "0.0.0.0")
@@ -248,15 +248,15 @@ func (c *Config) ValidateOpenAI() error {
 // ValidateForSearch validates configuration for search commands
 func (c *Config) ValidateForSearch() error {
 	var errors []string
-	
+
 	if err := c.ValidateDatabase(); err != nil {
 		errors = append(errors, err.Error())
 	}
-	
+
 	if err := c.ValidateOpenAI(); err != nil {
 		errors = append(errors, err.Error())
 	}
-	
+
 	if c.SimilarityThreshold < 0 || c.SimilarityThreshold > 1 {
 		errors = append(errors, "SIMILARITY_THRESHOLD must be between 0 and 1")
 	}
@@ -264,11 +264,10 @@ func (c *Config) ValidateForSearch() error {
 	if c.VectorDimensions <= 0 {
 		errors = append(errors, "VECTOR_DIMENSIONS must be positive")
 	}
-	
+
 	if len(errors) > 0 {
 		return fmt.Errorf("%s", strings.Join(errors, "\n"))
 	}
-	
+
 	return nil
 }
-
