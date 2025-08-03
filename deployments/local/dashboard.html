@@ -33,15 +33,15 @@
         
         .services-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
             margin-bottom: 30px;
         }
         
         .service-card {
             background: white;
             border-radius: 12px;
-            padding: 20px;
+            padding: 25px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             transition: transform 0.3s, box-shadow 0.3s;
         }
@@ -51,11 +51,25 @@
             box-shadow: 0 15px 40px rgba(0,0,0,0.15);
         }
         
+        .service-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
         .service-name {
-            font-size: 1.3em;
+            font-size: 1.4em;
             font-weight: 600;
             color: #333;
-            margin-bottom: 15px;
+        }
+        
+        .service-description {
+            color: #6b7280;
+            font-size: 0.95em;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            min-height: 60px;
         }
         
         .service-url {
@@ -64,12 +78,15 @@
             font-family: 'Monaco', 'Courier New', monospace;
             margin-bottom: 15px;
             word-break: break-all;
+            background: #f3f4f6;
+            padding: 8px 12px;
+            border-radius: 6px;
         }
         
         .btn {
             display: inline-block;
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: none;
             border-radius: 8px;
             font-weight: 500;
@@ -79,6 +96,7 @@
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             transition: opacity 0.3s;
+            font-size: 0.95em;
         }
         
         .btn:hover {
@@ -87,10 +105,10 @@
         
         .status {
             display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 5px 10px;
+            border-radius: 20px;
             font-size: 0.85em;
-            margin-bottom: 10px;
+            font-weight: 500;
         }
         
         .status-online {
@@ -103,46 +121,9 @@
             color: #92400e;
         }
         
-        .command-section {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 20px;
-        }
-        
-        .command-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .command-card {
-            background: #f9fafb;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-        }
-        
-        .command-title {
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 8px;
-        }
-        
-        .command-text {
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 0.85em;
-            color: #6b7280;
-            background: white;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #e5e7eb;
-            cursor: pointer;
-        }
-        
-        .command-text:hover {
-            background: #f3f4f6;
+        .status-offline {
+            background: #fee2e2;
+            color: #991b1b;
         }
     </style>
 </head>
@@ -152,85 +133,50 @@
         
         <div class="services-grid">
             <div class="service-card">
-                <div class="service-name">📊 Semantic Cache API</div>
-                <div class="status status-online" id="api-status">Checking...</div>
-                <div class="service-url">http://localhost:8080</div>
-                <a href="http://localhost:8080/health" target="_blank" class="btn">Check Health</a>
+                <div class="service-header">
+                    <div class="service-name">📊 Semantic Cache</div>
+                    <div class="status status-checking" id="api-status">Checking...</div>
+                </div>
+                <div class="service-description">
+                    High-performance caching layer with semantic similarity search using PostgreSQL pgvector. 
+                    Provides intelligent cache matching based on embedding similarity for LLM applications.
+                </div>
+                <div class="service-url">http://localhost/semantic-cache</div>
+                <a href="http://localhost/semantic-cache/health" target="_blank" class="btn">Open API Health</a>
             </div>
             
             <div class="service-card">
-                <div class="service-name">🗄️ PostgreSQL</div>
-                <div class="status status-online" id="db-status">Port 5432</div>
-                <div class="service-url">localhost:5432</div>
-                <div style="color: #6b7280; font-size: 0.85em; margin-top: 10px;">
-                    Database: semantic_cache<br>
-                    User: cache_user
+                <div class="service-header">
+                    <div class="service-name">🔍 Jaeger</div>
+                    <div class="status status-checking" id="jaeger-status">Checking...</div>
                 </div>
+                <div class="service-description">
+                    Distributed tracing platform for monitoring and troubleshooting microservices. 
+                    Visualizes request flows, latency analysis, and dependency graphs across services.
+                </div>
+                <div class="service-url">http://localhost/jaeger</div>
+                <a href="http://localhost/jaeger" target="_blank" class="btn">Open Jaeger UI</a>
             </div>
             
             <div class="service-card">
-                <div class="service-name">🔍 Jaeger UI</div>
-                <div class="status status-online" id="jaeger-status">Checking...</div>
-                <div class="service-url">http://localhost:16686</div>
-                <a href="http://localhost:16686" target="_blank" class="btn">Open Jaeger</a>
-            </div>
-            
-            <div class="service-card">
-                <div class="service-name">📈 Prometheus</div>
-                <div class="status status-online" id="prom-status">Checking...</div>
-                <div class="service-url">http://localhost:9090</div>
-                <a href="http://localhost:9090" target="_blank" class="btn">Open Prometheus</a>
-            </div>
-        </div>
-        
-        <div class="command-section">
-            <h2 style="color: #374151; margin-bottom: 15px;">Quick Commands</h2>
-            <div class="command-grid">
-                <div class="command-card">
-                    <div class="command-title">Start Stack</div>
-                    <div class="command-text" onclick="copyCommand(this)">make start</div>
+                <div class="service-header">
+                    <div class="service-name">📈 Prometheus</div>
+                    <div class="status status-checking" id="prom-status">Checking...</div>
                 </div>
-                <div class="command-card">
-                    <div class="command-title">Stop Stack</div>
-                    <div class="command-text" onclick="copyCommand(this)">make stop</div>
+                <div class="service-description">
+                    Time-series database and monitoring system. Collects metrics from configured targets, 
+                    stores them efficiently, and provides powerful query language for analysis.
                 </div>
-                <div class="command-card">
-                    <div class="command-title">Check Status</div>
-                    <div class="command-text" onclick="copyCommand(this)">make status</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-title">View Logs</div>
-                    <div class="command-text" onclick="copyCommand(this)">make logs</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-title">Test with CLI</div>
-                    <div class="command-text" onclick="copyCommand(this)">./tools/bin/semantic-cache-tool --config-path .env.app health check</div>
-                </div>
-                <div class="command-card">
-                    <div class="command-title">Docker Status</div>
-                    <div class="command-text" onclick="copyCommand(this)">docker-compose ps</div>
-                </div>
+                <div class="service-url">http://localhost/prometheus</div>
+                <a href="http://localhost/prometheus" target="_blank" class="btn">Open Prometheus</a>
             </div>
         </div>
     </div>
     
     <script>
-        function copyCommand(element) {
-            const text = element.textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = element.textContent;
-                element.textContent = '✓ Copied!';
-                element.style.background = '#d1fae5';
-                setTimeout(() => {
-                    element.textContent = originalText;
-                    element.style.background = '';
-                }, 1500);
-            });
-        }
-        
         function checkServices() {
-            // Check API
-            fetch('http://localhost:8080/health')
+            // Check Semantic Cache API
+            fetch('/semantic-cache/health')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('api-status').textContent = 'Online';
@@ -238,29 +184,37 @@
                 })
                 .catch(() => {
                     document.getElementById('api-status').textContent = 'Offline';
-                    document.getElementById('api-status').className = 'status status-checking';
+                    document.getElementById('api-status').className = 'status status-offline';
                 });
             
             // Check Jaeger
-            fetch('http://localhost:16686/api/services')
-                .then(() => {
-                    document.getElementById('jaeger-status').textContent = 'Online';
-                    document.getElementById('jaeger-status').className = 'status status-online';
+            fetch('/jaeger/api/services')
+                .then(response => {
+                    if (response.ok) {
+                        document.getElementById('jaeger-status').textContent = 'Online';
+                        document.getElementById('jaeger-status').className = 'status status-online';
+                    } else {
+                        throw new Error('Service unavailable');
+                    }
                 })
                 .catch(() => {
                     document.getElementById('jaeger-status').textContent = 'Offline';
-                    document.getElementById('jaeger-status').className = 'status status-checking';
+                    document.getElementById('jaeger-status').className = 'status status-offline';
                 });
             
             // Check Prometheus
-            fetch('http://localhost:9090/api/v1/targets')
-                .then(() => {
-                    document.getElementById('prom-status').textContent = 'Online';
-                    document.getElementById('prom-status').className = 'status status-online';
+            fetch('/prometheus/api/v1/targets')
+                .then(response => {
+                    if (response.ok) {
+                        document.getElementById('prom-status').textContent = 'Online';
+                        document.getElementById('prom-status').className = 'status status-online';
+                    } else {
+                        throw new Error('Service unavailable');
+                    }
                 })
                 .catch(() => {
                     document.getElementById('prom-status').textContent = 'Offline';
-                    document.getElementById('prom-status').className = 'status status-checking';
+                    document.getElementById('prom-status').className = 'status status-offline';
                 });
         }
         

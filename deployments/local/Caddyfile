@@ -32,6 +32,12 @@
         respond "OK" 200
     }
 
+    # Reverse proxy to Semantic Cache API
+    handle /semantic-cache/* {
+        uri strip_prefix /semantic-cache
+        reverse_proxy semantic-cache:8080
+    }
+
     # Reverse proxy to Jaeger UI
     handle /jaeger* {
         reverse_proxy jaeger:16686
@@ -150,11 +156,10 @@
                 "otel_zpages": "http://localhost/otel/zpages",
                 "otel_metrics": "http://localhost/otel/metrics",
                 "ports": {
+                    "cache_api": 8080,
                     "postgresql": 5432,
-                    "redis": 6379,
                     "otlp_grpc": 4317,
-                    "otlp_http": 4318,
-                    "cache_api": 8080
+                    "otlp_http": 4318
                 }
             }
         }` 200
@@ -167,8 +172,8 @@
             "status": "healthy",
             "timestamp": "{time.now.unix}",
             "services": [
+                {"name": "Semantic Cache API", "port": 8080, "internal": "semantic-cache:8080"},
                 {"name": "PostgreSQL", "port": 5432, "internal": "postgres:5432"},
-                {"name": "Redis", "port": 6379, "internal": "redis:6379"},
                 {"name": "Jaeger", "port": 16686, "internal": "jaeger:16686"},
                 {"name": "Prometheus", "port": 9090, "internal": "prometheus:9090"},
                 {"name": "OTel Collector", "port": 4317, "internal": "otel-collector:4317"}
