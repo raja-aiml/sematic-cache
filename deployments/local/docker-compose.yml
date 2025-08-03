@@ -30,7 +30,7 @@ services:
       - ../../.env
     environment:
       DATABASE_URL: postgresql://cache_user:cache_pass@postgres:5432/semantic_cache?sslmode=disable
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
     ports:
       - "8080:8080"
     depends_on:
@@ -121,7 +121,7 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
-      - ./dashboard.html:/srv/dashboard.html
+      - ./observability-demo.html:/srv/observability-demo.html
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

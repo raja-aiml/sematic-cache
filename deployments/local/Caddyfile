@@ -13,17 +13,17 @@
         Access-Control-Allow-Headers "Origin, Content-Type, Accept"
     }
 
-    # Main dashboard
+    # Main observability demo (default landing page)
     handle / {
         root * /srv
         file_server
-        try_files {path} /dashboard.html
+        try_files {path} /observability-demo.html
     }
-
-    # Serve dashboard at root
-    handle /dashboard {
+    
+    # Serve observability demo at /demo as well
+    handle /demo {
         root * /srv
-        rewrite * /dashboard.html
+        rewrite * /observability-demo.html
         file_server
     }
 

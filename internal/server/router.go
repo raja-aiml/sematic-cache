@@ -7,6 +7,7 @@ import (
 	"github.com/raja-aiml/sematic-cache/internal/cache/handlers"
 	"github.com/raja-aiml/sematic-cache/internal/config"
 	"github.com/raja-aiml/sematic-cache/internal/logger"
+	"github.com/raja-aiml/sematic-cache/internal/observability"
 	"github.com/raja-aiml/sematic-cache/internal/storage"
 )
 
@@ -22,6 +23,7 @@ func SetupRouter(cache storage.CacheBackend, cfg *config.EnvConfig) *gin.Engine 
 	// Middleware
 	router.Use(logger.RecoveryMiddleware())
 	router.Use(logger.GinMiddleware())
+	router.Use(observability.TracingMiddleware("semantic-cache"))
 
 	// Health checks
 	router.GET(cfg.HealthCheckPath, HealthCheck)

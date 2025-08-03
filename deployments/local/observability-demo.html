@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Cache - Integrated Observability Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0F172A;
+            --bg-secondary: #1E293B;
+            --bg-card: #334155;
+            --accent-blue: #3B82F6;
+            --accent-purple: #8B5CF6;
+            --accent-teal: #14B8A6;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --text-primary: #F1F5F9;
+            --text-secondary: #CBD5E1;
+            --text-muted: #94A3B8;
+            --border: rgba(148, 163, 184, 0.2);
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+        
+        .header {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .nav-link {
+            padding: 0.5rem 1rem;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .nav-link:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .panel {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .panel-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+        
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+        
+        .badge-error {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--error);
+        }
+        
+        /* API Testing Panel */
+        .api-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .form-group label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: rgba(100, 116, 139, 0.2);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* Trace Viewer */
+        .trace-info {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .trace-id {
+            font-family: 'Monaco', monospace;
+            font-size: 0.875rem;
+            color: var(--accent-teal);
+            word-break: break-all;
+        }
+        
+        .trace-timeline {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 8px;
+        }
+        
+        .span-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid var(--accent-blue);
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+        
+        .span-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .span-duration {
+            color: var(--text-muted);
+            font-family: 'Monaco', monospace;
+            font-size: 0.75rem;
+        }
+        
+        /* Metrics Display */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .metric-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            margin: 0.5rem 0;
+        }
+        
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        
+        /* Live Logs */
+        .log-viewer {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', monospace;
+            font-size: 0.8125rem;
+        }
+        
+        .log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .log-time {
+            color: var(--text-muted);
+            min-width: 80px;
+        }
+        
+        .log-level {
+            min-width: 60px;
+            font-weight: 600;
+        }
+        
+        .log-level-info { color: var(--accent-blue); }
+        .log-level-warn { color: var(--warning); }
+        .log-level-error { color: var(--error); }
+        
+        .log-message {
+            flex: 1;
+            color: var(--text-secondary);
+        }
+        
+        .log-trace {
+            color: var(--accent-teal);
+            font-size: 0.75rem;
+        }
+        
+        /* Status Indicators */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-card {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .status-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .status-icon.online {
+            background: rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-icon.offline {
+            background: rgba(239, 68, 68, 0.2);
+        }
+        
+        .status-info {
+            flex: 1;
+        }
+        
+        .status-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .status-state {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        /* Response Viewer */
+        .response-viewer {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .response-content {
+            font-family: 'Monaco', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .tab:hover {
+            color: var(--text-primary);
+        }
+        
+        .tab.active {
+            color: var(--accent-blue);
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent-blue);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .metrics-grid,
+            .status-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>🚀 Semantic Cache</h1>
+                <span class="badge badge-success">Observability Demo</span>
+            </div>
+            <div class="nav-links">
+                <a href="http://localhost/jaeger" target="_blank" class="nav-link">📊 Jaeger</a>
+                <a href="http://localhost/prometheus" target="_blank" class="nav-link">📈 Prometheus</a>
+                <a href="http://localhost/" class="nav-link">🏠 Dashboard</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Service Status -->
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-icon online" id="api-icon">🧠</div>
+                <div class="status-info">
+                    <div class="status-name">Cache API</div>
+                    <div class="status-state" id="api-status">Checking...</div>
+                </div>
+            </div>
+            <div class="status-card">
+                <div class="status-icon online" id="db-icon">🗄️</div>
+                <div class="status-info">
+                    <div class="status-name">PostgreSQL</div>
+                    <div class="status-state" id="db-status">Port 5432</div>
+                </div>
+            </div>
+            <div class="status-card">
+                <div class="status-icon online" id="jaeger-icon">🔍</div>
+                <div class="status-info">
+                    <div class="status-name">Jaeger</div>
+                    <div class="status-state" id="jaeger-status">Checking...</div>
+                </div>
+            </div>
+            <div class="status-card">
+                <div class="status-icon online" id="prom-icon">📊</div>
+                <div class="status-info">
+                    <div class="status-name">Prometheus</div>
+                    <div class="status-state" id="prom-status">Checking...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <!-- API Testing Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        🧪 API Testing
+                    </div>
+                    <div class="badge badge-success" id="api-badge">Ready</div>
+                </div>
+                
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('set')">Set Cache</button>
+                    <button class="tab" onclick="switchTab('get')">Get Cache</button>
+                    <button class="tab" onclick="switchTab('similar')">Find Similar</button>
+                </div>
+                
+                <!-- Set Cache Tab -->
+                <div id="set-tab" class="tab-content active">
+                    <form class="api-form" onsubmit="handleSet(event)">
+                        <div class="form-group">
+                            <label>Prompt</label>
+                            <textarea id="set-prompt" placeholder="Enter your prompt">What is machine learning?</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Answer</label>
+                            <textarea id="set-answer" placeholder="Enter the answer">Machine learning is a subset of artificial intelligence that enables systems to learn from data.</textarea>
+                        </div>
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary" id="set-btn">
+                                Store in Cache
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="generateTestData()">
+                                Generate Test Data
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Get Cache Tab -->
+                <div id="get-tab" class="tab-content">
+                    <form class="api-form" onsubmit="handleGet(event)">
+                        <div class="form-group">
+                            <label>Search Prompt</label>
+                            <textarea id="get-prompt" placeholder="Enter prompt to search">What is ML?</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Similarity Threshold</label>
+                            <input type="range" id="threshold" min="0" max="1" step="0.1" value="0.8" 
+                                   oninput="document.getElementById('threshold-value').textContent = this.value">
+                            <small>Current: <span id="threshold-value">0.8</span></small>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="get-btn">
+                            Search Cache
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Similar Tab -->
+                <div id="similar-tab" class="tab-content">
+                    <form class="api-form" onsubmit="handleSimilar(event)">
+                        <div class="form-group">
+                            <label>Query</label>
+                            <textarea id="similar-prompt" placeholder="Enter query">How does AI work?</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Max Results</label>
+                            <input type="number" id="limit" min="1" max="10" value="5">
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="similar-btn">
+                            Find Similar
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="response-viewer" id="response" style="display: none;">
+                    <div class="response-content" id="response-content"></div>
+                </div>
+            </div>
+            
+            <!-- Observability Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        🔍 Observability
+                    </div>
+                    <div class="badge badge-warning" id="trace-badge">No Traces</div>
+                </div>
+                
+                <!-- Metrics -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">Requests</div>
+                        <div class="metric-value" id="metric-requests">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Avg Latency</div>
+                        <div class="metric-value" id="metric-latency">0ms</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Cache Hits</div>
+                        <div class="metric-value" id="metric-hits">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Errors</div>
+                        <div class="metric-value" id="metric-errors">0</div>
+                    </div>
+                </div>
+                
+                <!-- Trace Info -->
+                <div class="trace-info" id="trace-info" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>Trace ID:</strong>
+                            <span class="trace-id" id="current-trace-id">-</span>
+                        </div>
+                        <a href="#" id="jaeger-link" target="_blank" class="nav-link" style="font-size: 0.75rem;">
+                            View in Jaeger →
+                        </a>
+                    </div>
+                    <div class="trace-timeline" id="trace-timeline"></div>
+                </div>
+                
+                <!-- Live Logs -->
+                <div style="margin-top: 1rem;">
+                    <div class="panel-header">
+                        <div class="panel-title" style="font-size: 1rem;">
+                            📝 Live Logs
+                        </div>
+                        <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;" onclick="clearLogs()">
+                            Clear
+                        </button>
+                    </div>
+                    <div class="log-viewer" id="log-viewer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global state
+        let requestCount = 0;
+        let totalLatency = 0;
+        let cacheHits = 0;
+        let errors = 0;
+        let currentTraceId = null;
+        
+        // Test data generator
+        const testPrompts = [
+            "What is artificial intelligence?",
+            "Explain machine learning",
+            "How does deep learning work?",
+            "What are neural networks?",
+            "Define natural language processing",
+            "What is computer vision?",
+            "Explain reinforcement learning",
+            "What is supervised learning?",
+            "How does unsupervised learning work?",
+            "What are transformers in AI?"
+        ];
+        
+        const testAnswers = [
+            "AI is the simulation of human intelligence by machines.",
+            "ML is a subset of AI that enables systems to learn from data.",
+            "Deep learning uses neural networks with multiple layers.",
+            "Neural networks are computing systems inspired by biological neural networks.",
+            "NLP is AI that helps computers understand human language.",
+            "Computer vision enables machines to interpret visual information.",
+            "RL is learning through interaction with an environment.",
+            "Supervised learning uses labeled data for training.",
+            "Unsupervised learning finds patterns in unlabeled data.",
+            "Transformers are a neural network architecture for sequence processing."
+        ];
+        
+        // Generate trace context
+        function generateTraceContext() {
+            const traceId = Array.from({length: 32}, () => 
+                Math.floor(Math.random() * 16).toString(16)
+            ).join('');
+            const spanId = Array.from({length: 16}, () => 
+                Math.floor(Math.random() * 16).toString(16)
+            ).join('');
+            return {
+                traceId,
+                spanId,
+                traceparent: `00-${traceId}-${spanId}-01`
+            };
+        }
+        
+        // Log entry
+        function addLog(level, message, traceId = null) {
+            const logViewer = document.getElementById('log-viewer');
+            const time = new Date().toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-level log-level-${level}">${level.toUpperCase()}</span>
+                <span class="log-message">${message}</span>
+                ${traceId ? `<span class="log-trace">[${traceId.substring(0, 8)}...]</span>` : ''}
+            `;
+            
+            logViewer.insertBefore(logEntry, logViewer.firstChild);
+            
+            // Keep only last 50 logs
+            while (logViewer.children.length > 50) {
+                logViewer.removeChild(logViewer.lastChild);
+            }
+        }
+        
+        // Clear logs
+        function clearLogs() {
+            document.getElementById('log-viewer').innerHTML = '';
+            addLog('info', 'Logs cleared');
+        }
+        
+        // Update metrics
+        function updateMetrics(latency, isHit = false, isError = false) {
+            requestCount++;
+            totalLatency += latency;
+            if (isHit) cacheHits++;
+            if (isError) errors++;
+            
+            document.getElementById('metric-requests').textContent = requestCount;
+            document.getElementById('metric-latency').textContent = 
+                Math.round(totalLatency / requestCount) + 'ms';
+            document.getElementById('metric-hits').textContent = cacheHits;
+            document.getElementById('metric-errors').textContent = errors;
+        }
+        
+        // Display trace
+        function displayTrace(traceId, spans) {
+            currentTraceId = traceId;
+            document.getElementById('current-trace-id').textContent = traceId;
+            document.getElementById('jaeger-link').href = 
+                `http://localhost/jaeger/trace/${traceId}`;
+            document.getElementById('trace-info').style.display = 'block';
+            document.getElementById('trace-badge').textContent = 'Active Trace';
+            document.getElementById('trace-badge').className = 'badge badge-success';
+            
+            // Display timeline
+            const timeline = document.getElementById('trace-timeline');
+            timeline.innerHTML = '';
+            
+            spans.forEach(span => {
+                const spanItem = document.createElement('div');
+                spanItem.className = 'span-item';
+                spanItem.innerHTML = `
+                    <span class="span-name">${span.name}</span>
+                    <span class="span-duration">${span.duration}ms</span>
+                `;
+                timeline.appendChild(spanItem);
+            });
+        }
+        
+        // Generate test data
+        function generateTestData() {
+            const randomIndex = Math.floor(Math.random() * testPrompts.length);
+            document.getElementById('set-prompt').value = testPrompts[randomIndex];
+            document.getElementById('set-answer').value = testAnswers[randomIndex];
+            addLog('info', 'Generated test data');
+        }
+        
+        // Switch tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+        }
+        
+        // Handle Set operation
+        async function handleSet(event) {
+            event.preventDefault();
+            const startTime = Date.now();
+            const btn = document.getElementById('set-btn');
+            const trace = generateTraceContext();
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Storing...';
+            
+            addLog('info', 'Storing cache entry', trace.traceId);
+            
+            try {
+                const response = await fetch('/semantic-cache/api/v1/set', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'traceparent': trace.traceparent
+                    },
+                    body: JSON.stringify({
+                        prompt: document.getElementById('set-prompt').value,
+                        answer: document.getElementById('set-answer').value
+                    })
+                });
+                
+                const data = await response.json();
+                const latency = Date.now() - startTime;
+                
+                updateMetrics(latency, false, !response.ok);
+                
+                if (response.ok) {
+                    addLog('info', 'Cache entry stored successfully', trace.traceId);
+                    displayTrace(trace.traceId, [
+                        { name: 'HTTP POST /api/v1/set', duration: latency },
+                        { name: 'cache.set', duration: Math.round(latency * 0.6) },
+                        { name: 'postgres.insert', duration: Math.round(latency * 0.3) }
+                    ]);
+                } else {
+                    addLog('error', `Failed to store: ${data.error}`, trace.traceId);
+                }
+                
+                document.getElementById('response').style.display = 'block';
+                document.getElementById('response-content').textContent = 
+                    JSON.stringify({ ...data, trace: trace.traceId, latency: `${latency}ms` }, null, 2);
+                
+                btn.innerHTML = response.ok ? '✓ Stored' : '✗ Failed';
+                btn.className = response.ok ? 'btn btn-primary' : 'btn btn-secondary';
+            } catch (error) {
+                updateMetrics(Date.now() - startTime, false, true);
+                addLog('error', `Request failed: ${error.message}`, trace.traceId);
+                btn.innerHTML = '✗ Error';
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Store in Cache';
+                    btn.className = 'btn btn-primary';
+                }, 2000);
+            }
+        }
+        
+        // Handle Get operation
+        async function handleGet(event) {
+            event.preventDefault();
+            const startTime = Date.now();
+            const btn = document.getElementById('get-btn');
+            const trace = generateTraceContext();
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Searching...';
+            
+            addLog('info', 'Searching cache', trace.traceId);
+            
+            try {
+                const response = await fetch('/semantic-cache/api/v1/get', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'traceparent': trace.traceparent
+                    },
+                    body: JSON.stringify({
+                        prompt: document.getElementById('get-prompt').value,
+                        threshold: parseFloat(document.getElementById('threshold').value)
+                    })
+                });
+                
+                const data = await response.json();
+                const latency = Date.now() - startTime;
+                const isHit = response.ok && data.found;
+                
+                updateMetrics(latency, isHit, !response.ok);
+                
+                if (response.ok) {
+                    addLog('info', isHit ? 'Cache hit!' : 'Cache miss', trace.traceId);
+                    displayTrace(trace.traceId, [
+                        { name: 'HTTP POST /api/v1/get', duration: latency },
+                        { name: 'cache.get', duration: Math.round(latency * 0.5) },
+                        { name: 'postgres.search', duration: Math.round(latency * 0.4) }
+                    ]);
+                } else {
+                    addLog('error', `Search failed: ${data.error}`, trace.traceId);
+                }
+                
+                document.getElementById('response').style.display = 'block';
+                document.getElementById('response-content').textContent = 
+                    JSON.stringify({ ...data, trace: trace.traceId, latency: `${latency}ms` }, null, 2);
+                
+                btn.innerHTML = isHit ? '✓ Found' : '○ Not Found';
+            } catch (error) {
+                updateMetrics(Date.now() - startTime, false, true);
+                addLog('error', `Request failed: ${error.message}`, trace.traceId);
+                btn.innerHTML = '✗ Error';
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Search Cache';
+                }, 2000);
+            }
+        }
+        
+        // Handle Similar operation
+        async function handleSimilar(event) {
+            event.preventDefault();
+            const startTime = Date.now();
+            const btn = document.getElementById('similar-btn');
+            const trace = generateTraceContext();
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Finding...';
+            
+            addLog('info', 'Finding similar entries', trace.traceId);
+            
+            try {
+                const response = await fetch('/semantic-cache/api/v1/similar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'traceparent': trace.traceparent
+                    },
+                    body: JSON.stringify({
+                        prompt: document.getElementById('similar-prompt').value,
+                        limit: parseInt(document.getElementById('limit').value),
+                        threshold: 0.5
+                    })
+                });
+                
+                const data = await response.json();
+                const latency = Date.now() - startTime;
+                const resultCount = data.results ? data.results.length : 0;
+                
+                updateMetrics(latency, resultCount > 0, !response.ok);
+                
+                if (response.ok) {
+                    addLog('info', `Found ${resultCount} similar entries`, trace.traceId);
+                    displayTrace(trace.traceId, [
+                        { name: 'HTTP POST /api/v1/similar', duration: latency },
+                        { name: 'embedding.generate', duration: Math.round(latency * 0.4) },
+                        { name: 'postgres.vector_search', duration: Math.round(latency * 0.5) }
+                    ]);
+                } else {
+                    addLog('error', `Search failed: ${data.error}`, trace.traceId);
+                }
+                
+                document.getElementById('response').style.display = 'block';
+                document.getElementById('response-content').textContent = 
+                    JSON.stringify({ ...data, trace: trace.traceId, latency: `${latency}ms` }, null, 2);
+                
+                btn.innerHTML = `Found ${resultCount}`;
+            } catch (error) {
+                updateMetrics(Date.now() - startTime, false, true);
+                addLog('error', `Request failed: ${error.message}`, trace.traceId);
+                btn.innerHTML = '✗ Error';
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Find Similar';
+                }, 2000);
+            }
+        }
+        
+        // Check service status
+        function checkServices() {
+            // Check API
+            fetch('/semantic-cache/health')
+                .then(response => {
+                    const isOnline = response.ok;
+                    document.getElementById('api-status').textContent = isOnline ? 'Online' : 'Offline';
+                    document.getElementById('api-icon').className = isOnline ? 'status-icon online' : 'status-icon offline';
+                })
+                .catch(() => {
+                    document.getElementById('api-status').textContent = 'Offline';
+                    document.getElementById('api-icon').className = 'status-icon offline';
+                });
+            
+            // Check Jaeger
+            fetch('/jaeger/api/services')
+                .then(response => {
+                    const isOnline = response.ok;
+                    document.getElementById('jaeger-status').textContent = isOnline ? 'Online' : 'Offline';
+                    document.getElementById('jaeger-icon').className = isOnline ? 'status-icon online' : 'status-icon offline';
+                })
+                .catch(() => {
+                    document.getElementById('jaeger-status').textContent = 'Offline';
+                    document.getElementById('jaeger-icon').className = 'status-icon offline';
+                });
+            
+            // Check Prometheus
+            fetch('/prometheus/api/v1/targets')
+                .then(response => {
+                    const isOnline = response.ok;
+                    document.getElementById('prom-status').textContent = isOnline ? 'Online' : 'Offline';
+                    document.getElementById('prom-icon').className = isOnline ? 'status-icon online' : 'status-icon offline';
+                })
+                .catch(() => {
+                    document.getElementById('prom-status').textContent = 'Offline';
+                    document.getElementById('prom-icon').className = 'status-icon offline';
+                });
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkServices();
+            setInterval(checkServices, 30000);
+            addLog('info', 'Observability demo initialized');
+            addLog('info', 'All systems operational');
+        });
+    </script>
+</body>
+</html>

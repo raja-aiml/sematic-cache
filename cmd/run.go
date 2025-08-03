@@ -26,6 +26,24 @@ func Run() error {
 		return fmt.Errorf("configuration validation failed: %w", err)
 	}
 
+	// Initialize OpenTelemetry if configured
+	if cfg.OTELEndpoint != "" {
+		ctx := context.Background()
+		shutdown, err := observability.Init(ctx, "semantic-cache", cfg.OTELEndpoint)
+		if err != nil {
+			logger.Warn("Failed to initialize OpenTelemetry", logger.Fields{"error": err.Error()})
+		} else {
+			defer func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := shutdown(ctx); err != nil {
+					logger.Error("Failed to shutdown OpenTelemetry", logger.Fields{"error": err.Error()})
+				}
+			}()
+			logger.Info("OpenTelemetry initialized", logger.Fields{"endpoint": cfg.OTELEndpoint})
+		}
+	}
+
 	server.LogServerConfig(cfg)
 
 	if err := database.WaitForDatabase(cfg.DatabaseURL); err != nil {
